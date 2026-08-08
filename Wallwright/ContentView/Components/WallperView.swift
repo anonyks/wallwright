@@ -1,0 +1,282 @@
+//
+//  WallperView.swift
+//  Wallwright
+//
+//  Browse and import live wallpapers from wallper.app.
+//
+
+import SwiftUI
+
+struct WallperView: SubviewOfContentView {
+    @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject private var wallperVM: WallperViewModel
+
+    init(contentViewModel viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        self.wallperVM = viewModel.wallperViewModel
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            searchBar
+            Divider()
+            categoryPicker
+            Divider()
+            content
+        }
+        .onAppear {
+            wallperVM.loadInitialIfNeeded()
+        }
+    }
+
+    private var searchBar: some View {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search Wallper...", text: $wallperVM.searchQuery)
+                        .textFieldStyle(.plain)
+                        .onSubmit { wallperVM.search() }
+                        .onChange(of: wallperVM.searchQuery) { _, _ in wallperVM.search() }
+                    if !wallperVM.searchQuery.isEmpty {
+                        Button {
+                            wallperVM.clearSearch()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Clear Search")
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 9))
+
+                if !wallperVM.hiddenItemIDs.isEmpty {
+                    Button {
+                        wallperVM.unhideAll()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "eye.slash")
+                            Text("\(wallperVM.hiddenItemIDs.count)")
+                        }
+                    }
+                    .buttonStyle(.glass)
+                    .help("Unhide all previously hidden items")
+                }
+            }
+            .controlSize(.regular)
+        }
+        .padding(10)
+    }
+
+    private var categoryPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(WallperCategory.allCases) { category in
+                        let isSelected = wallperVM.category == category
+                        Button(category.displayName) {
+                            wallperVM.setCategory(category)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.callout.weight(isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Color.primary : .secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: Capsule())
+                    }
+                }
+            }
+            .padding(10)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if wallperVM.isLoadingIndex && wallperVM.allItems.isEmpty {
+            Spacer()
+            ProgressView("Loading Wallper's catalog...")
+            Spacer()
+        } else if let error = wallperVM.errorMessage, wallperVM.allItems.isEmpty {
+            Spacer()
+            VStack(spacing: 10) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Retry") {
+                    Task { await wallperVM.loadIndex() }
+                }
+                .buttonStyle(.glass)
+            }
+            .frame(maxWidth: 320)
+            Spacer()
+        } else if wallperVM.visibleItems.isEmpty {
+            Spacer()
+            VStack(spacing: 10) {
+                Image(systemName: wallperVM.searchQuery.isEmpty ? "eye.slash" : "magnifyingglass")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+                Text(wallperVM.searchQuery.isEmpty ? "Everything here is hidden" : "No results for \"\(wallperVM.searchQuery)\"")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: 320)
+            Spacer()
+        } else {
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
+                    ForEach(wallperVM.visibleItems) { item in
+                        WallperItemCard(item: item, viewModel: wallperVM)
+                    }
+                }
+                .padding()
+
+                if wallperVM.hasMore {
+                    Button("Load More") {
+                        wallperVM.loadMore()
+                    }
+                    .buttonStyle(.glass)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+    }
+}
+
+private struct WallperItemCard: View {
+    let item: WallperItem
+    @ObservedObject var viewModel: WallperViewModel
+
+    @State private var isHovered = false
+    @State private var isPreviewReady = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RetryingAsyncImage(url: item.thumbnailURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(16.0 / 9.0, contentMode: .fill)
+                    case .failure:
+                        Rectangle().fill(.quaternary).overlay {
+                            Image(systemName: "photo").foregroundStyle(.tertiary)
+                        }
+                    default:
+                        Rectangle().fill(.quaternary)
+                    }
+                }
+
+                // Swapped in on hover — Wallper's own site lists these clips as ~2 seconds long,
+                // so `item.videoURL` (the same file the real download uses) is already tiny; there's
+                // no separate lightweight preview asset to fetch instead. Stays transparent
+                // (thumbnail still showing through) until the first frame is actually ready, so
+                // the brief fetch/decode latency shows as the thumbnail persisting, not a black flash.
+                if isHovered {
+                    HoverPreviewPlayer(url: item.videoURL) { isPreviewReady = true }
+                        .opacity(isPreviewReady ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.2), value: isPreviewReady)
+                }
+            }
+            .frame(height: 116)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    viewModel.hide(item)
+                } label: {
+                    Image(systemName: "eye.slash.fill")
+                        .font(.caption)
+                        .padding(6)
+                        .background(.black.opacity(0.5), in: Circle())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .padding(6)
+                .opacity(isHovered ? 1 : 0)
+                .help("Hide this wallpaper")
+            }
+            .onHover { hovering in
+                isHovered = hovering
+                if !hovering { isPreviewReady = false }
+            }
+
+            Text(item.title)
+                .font(.callout.weight(.medium))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 32, alignment: .top)
+
+            downloadControl
+        }
+        .contextMenu {
+            Button {
+                NSWorkspace.shared.open(item.pageURL)
+            } label: {
+                Label("Open in Browser", systemImage: "safari")
+            }
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.pageURL.absoluteString, forType: .string)
+            } label: {
+                Label("Copy Link", systemImage: "link")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var downloadControl: some View {
+        switch viewModel.downloadState[item.id] {
+        case .downloading(let progress):
+            VStack(alignment: .leading, spacing: 3) {
+                if let progress {
+                    ProgressView(value: progress)
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+        case .importing:
+            Label("Importing…", systemImage: "square.and.arrow.down")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .completed:
+            Label("Added", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+        case .failed(let message):
+            HStack(spacing: 6) {
+                Label(message, systemImage: "xmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Button {
+                    viewModel.download(item: item)
+                } label: {
+                    Image(systemName: "arrow.clockwise.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Retry download")
+            }
+        case nil:
+            Button {
+                viewModel.download(item: item)
+            } label: {
+                Label("Download", systemImage: "arrow.down.circle")
+                    .font(.caption)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.small)
+        }
+    }
+}
