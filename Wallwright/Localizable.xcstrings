@@ -1,0 +1,326 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "": {},
+    "!!! Notice that this may affects performance !!!": {},
+    "%@": {},
+    "%lld": {},
+    "1 per page (developer)": {},
+    "10 per page": {},
+    "2048x2048 MacBook Pro 14''": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2048 x 2048 MacBook Pro 14\""
+          }
+        }
+      }
+    },
+    "25 per page": {},
+    "50 per page": {},
+    "@haren724": {},
+    "@winddog": {
+      "extractionState": "manual"
+    },
+    "About": {
+      "extractionState": "manual"
+    },
+    "About Wallwright": {},
+    "Add Wallpaper": {},
+    "Add to Favorites": {},
+    "Add to Playlist": {},
+    "Adjust Menu Bar Color": {},
+    "Advanced": {},
+    "Age Rating": {},
+    "All": {},
+    "Animates": {},
+    "Anti-aliasing": {},
+    "Appearance": {},
+    "Apple AVKit": {},
+    "Application Rules": {},
+    "Apply to all Wallpapers": {},
+    "Assign Hotkey": {},
+    "Audio": {},
+    "Audio Output": {},
+    "Auto": {},
+    "Automatic": {},
+    "Automatic Startup": {},
+    "Basic Setup": {},
+    "Below Normal": {},
+    "Browse All By": {},
+    "Browse Presets": {},
+    "Cancel": {},
+    "Change Wallpaper": {},
+    "Chinese Simplified": {},
+    "Choose Display": {},
+    "Close Window": {},
+    "Come out soon...": {},
+    "Comment": {},
+    "Configure": {},
+    "Copy": {},
+    "Currently, these settings below are designed for scene wallpapers \nand may not work as expect ": {},
+    "Cut": {},
+    "Dark": {},
+    "Debug": {},
+    "Delete All": {},
+    "Delete Immediately": {},
+    "Description...": {},
+    "Developer": {},
+    "Disabled": {},
+    "Discover": {},
+    "Display asleep": {},
+    "Displays": {},
+    "Don't ask again for this wallpaper": {},
+    "Dual Monitor": {},
+    "Edit": {},
+    "Edited": {},
+    "Enabled": {},
+    "English": {},
+    "Enter Full Screen": {},
+    "Errors Only": {},
+    "FPS": {},
+    "Favorite": {
+      "extractionState": "stale"
+    },
+    "File": {},
+    "File Size": {
+      "extractionState": "stale"
+    },
+    "Filter Results": {},
+    "Follow System": {},
+    "Fully take over": {
+      "extractionState": "stale"
+    },
+    "General": {
+      "extractionState": "manual"
+    },
+    "Group": {},
+    "Hello, World!": {},
+    "Help": {},
+    "Hide": {},
+    "Hide Others": {},
+    "High": {},
+    "High FPS may slow down your PC!": {},
+    "High FPS may slow down your PC! We're serious, this is too much 🔥.": {},
+    "High Performance": {},
+    "High Quality": {},
+    "Icon Size": {},
+    "Import": {},
+    "Installed": {},
+    "Internal": {},
+    "Keep Running": {},
+    "Language": {},
+    "Laptop on battery": {},
+    "Large Icons": {},
+    "Last Updated": {
+      "extractionState": "stale"
+    },
+    "Light": {},
+    "Live Wallpapers for Mac": {},
+    "Load": {},
+    "Load Profile": {},
+    "Log Level": {},
+    "Low": {},
+    "MSAA x2": {},
+    "MSAA x4": {},
+    "MSAA x8": {},
+    "Made with ❤️ by": {},
+    "Manage Blocklist": {},
+    "Medium": {},
+    "Medium Icons": {},
+    "Mobile": {},
+    "Move to Trash": {},
+    "Mute": {},
+    "Name": {
+      "extractionState": "stale"
+    },
+    "Never show this again until next update": {},
+    "New Tag": {},
+    "No Tags": {},
+    "No wallpapers found for your search.\nExpand or reset the categories in the filter sidebar or try another search term.": {},
+    "None": {},
+    "Normal": {},
+    "OK": {},
+    "Only enabled when app is running": {
+      "extractionState": "stale"
+    },
+    "Open All in Finder": {},
+    "Open Wallpaper": {},
+    "Open in Finder": {},
+    "Opening Unkown %@": {},
+    "Other Application Focused:": {},
+    "Other Application Fullscreen:": {},
+    "Other Application Playing Audio:": {},
+    "Paste": {},
+    "Pause": {},
+    "Pause when VRAM is exhausted": {},
+    "Performance": {
+      "extractionState": "manual"
+    },
+    "Playback": {},
+    "Playback Rate": {},
+    "Playlist": {},
+    "Please be aware of malware.": {},
+    "Please select a valid wallpaper": {},
+    "Please wait %lld seconds.": {},
+    "Plugins": {
+      "extractionState": "manual"
+    },
+    "Post-Processing": {},
+    "Potrait Monitor / Phone": {},
+    "Power Saving Mode, Sleeping...": {},
+    "Proceed": {},
+    "Process Piority": {},
+    "Properties": {},
+    "Protect against crashes": {
+      "extractionState": "stale"
+    },
+    "Quality": {},
+    "Quit": {},
+    "Rating": {
+      "extractionState": "stale"
+    },
+    "Recent Wallpapers": {},
+    "Redo": {},
+    "Reflection": {},
+    "Reflections": {},
+    "Related Wallpapers": {},
+    "Reload when changing output device": {},
+    "Remove Wallpaper": {},
+    "Report": {},
+    "Report & Block": {},
+    "Reset": {},
+    "Reset Config": {},
+    "Reset Filters": {},
+    "Reset First Launch": {},
+    "Resolution": {},
+    "Restart after crashing": {},
+    "Safe start after hibernation": {
+      "extractionState": "stale"
+    },
+    "Save": {},
+    "Save Profile": {},
+    "Scheme Color": {},
+    "Search": {},
+    "Select All": {},
+    "Settings": {},
+    "Settings...": {},
+    "Share JSON": {},
+    "Show Filter Results": {},
+    "Show Only:": {},
+    "Show Wallwright": {},
+    "Similar UI Layout to Wallpaper Engine on Steam": {},
+    "Small Icons": {},
+    "Sort By": {},
+    "Source": {},
+    "Split": {},
+    "Start with macOS": {},
+    "Stop (free memory)": {},
+    "Subscription Date": {
+      "extractionState": "stale"
+    },
+    "Super High Performance": {},
+    "Support & FAQ": {},
+    "Tags": {},
+    "Texture Resolution": {},
+    "Theme": {},
+    "Third-party": {},
+    "This plugin enables animation of GIF thumbnail images in wallpaper explorer": {},
+    "Those all settings above don't have to be saved for taking effect.": {},
+    "Titles per page": {},
+    "Toggle Desktop Wallpaper Window (Debug)": {},
+    "Triple Monitor": {},
+    "Type": {},
+    "Ultra": {},
+    "Ultra Widescreen": {},
+    "Ultra mode adds HDR bloom to supported wallpapers and is only recommended for powerful high-end desktop graphics cards.": {},
+    "Undo": {},
+    "Unkown Author": {},
+    "Unmute": {},
+    "Verbose": {},
+    "Video": {},
+    "Video Framework": {},
+    "View": {},
+    "Volume": {},
+    "Wallpaper Editor": {},
+    "Wallpaper Explorer": {},
+    "Wallpaper Per Display": {},
+    "Wallpaper Title": {},
+    "Wallpaper from Folder": {},
+    "Wallpapers in Folders": {},
+    "Wallwright": {},
+    "Wallwright has no control over this file, you must ensure that it comes from a rellable source before proceeding.": {},
+    "We Take Care of Your Laptop's Battery Life": {},
+    "We brings you a smoother app animation experience. Powered by the lightweight, modern SwiftUI Framework.": {},
+    "What's New in Wallwright": {},
+    "When it comes to without pluging to the power adapter, we reduced the power consumption as much as possible, without just stoping the playback.": {},
+    "Widescreen": {},
+    "Window": {},
+    "Working on it": {},
+    "Workshop": {},
+    "You are about to open an external %@ as a wallpaper:": {},
+    "You may feel familar when using this dynamic desktop wallpaper tool since it almost has the same layout to its ancesstor.": {},
+    "Your Presets": {},
+    "_approved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approved"
+          }
+        }
+      }
+    },
+    "_audioResponsive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Responsive"
+          }
+        }
+      }
+    },
+    "_customizable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Customizable"
+          }
+        }
+      }
+    },
+    "_mobileCompatible": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mobile Compatible"
+          }
+        }
+      }
+    },
+    "_myFavourites": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My Favourites"
+          }
+        }
+      }
+    },
+    "macOS": {},
+    "version: %@": {},
+    "×8 MSAA is only recommended for powerful high-end desktop graphics cards.": {},
+    "􀄪 You can toggle this to have a preview": {}
+  },
+  "version": "1.0"
+}

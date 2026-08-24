@@ -1,0 +1,54 @@
+# Xcode
+
+## User settings
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+## Build products
+build/
+DerivedData/
+dist/
+*.ipa
+*.pkg
+*.dmg
+*.xcarchive
+*.dSYM.zip
+*.dSYM
+
+## Code coverage / profiling artifacts (instrumented test/build runs)
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+
+## Swift Package Manager
+.swiftpm/
+.build/
+
+## Signing material — never belongs in source control
+*.p12
+*.cer
+*.mobileprovision
+
+## Secrets / local env overrides
+*.env
+*.env.*
+.env
+
+## OS junk
+.DS_Store
+Thumbs.db
+
+## Playwright MCP
+.playwright-mcp/
+
+## Local Claude Code tooling state — session data and worktree scratch copies, not project source
+.claude/
+
+## Research reference clones — large, disposable, easily re-cloned. The NOTES.md/README.md docs
+## alongside them are the actual durable output and should still be tracked normally.
+references/*/repo/
+## Third-party competitor app binaries/DMGs gathered for local resource-usage comparison — not
+## ours to redistribute, and not project source.
+references/dmgs/
