@@ -25,7 +25,6 @@
 		EE0000000000000000000053 /* VideoFrameScrubberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000054 /* VideoFrameScrubberView.swift */; };
 		5E7665262A2DC30E00E0E4B4 /* WEProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7665252A2DC30D00E0E4B4 /* WEProject.swift */; };
 		5E76652A2A2E231400E0E4B4 /* AboutUsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7665292A2E231400E0E4B4 /* AboutUsView.swift */; };
-		5E7A89C02AAB9D4E00192EB0 /* maxwell-cat.gif in Resources */ = {isa = PBXBuildFile; fileRef = 5E7A89BF2AAB9D4E00192EB0 /* maxwell-cat.gif */; };
 		5E8C82032A9E15D0009E291B /* ExplorerItemMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8C82022A9E15D0009E291B /* ExplorerItemMenu.swift */; };
 		5E98F6C72A81D8B200C12E34 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E98F6C62A81D8B200C12E34 /* MainWindow.swift */; };
 		5E9D40442A2EC68600AB8A0C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9D40432A2EC68600AB8A0C /* AppDelegate.swift */; };
@@ -88,6 +87,7 @@
 		EE0000000000000000000085 /* NtfyInboxTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000086 /* NtfyInboxTransport.swift */; };
 		EE0000000000000000000087 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000088 /* InboxView.swift */; };
 		EE0000000000000000000089 /* VideoCropDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008A /* VideoCropDetector.swift */; };
+		EE000000000000000000008B /* BrowseSourceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008C /* BrowseSourceSession.swift */; };
 		EE0000000000000000000013 /* Hotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000014 /* Hotkey.swift */; };
 		EE0000000000000000000015 /* ReservedShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000016 /* ReservedShortcuts.swift */; };
 		EE0000000000000000000017 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000018 /* GlobalHotkeyManager.swift */; };
@@ -146,7 +146,6 @@
 		EE0000000000000000000054 /* VideoFrameScrubberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameScrubberView.swift; sourceTree = "<group>"; };
 		5E7665252A2DC30D00E0E4B4 /* WEProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WEProject.swift; sourceTree = "<group>"; };
 		5E7665292A2E231400E0E4B4 /* AboutUsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutUsView.swift; sourceTree = "<group>"; };
-		5E7A89BF2AAB9D4E00192EB0 /* maxwell-cat.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "maxwell-cat.gif"; sourceTree = "<group>"; };
 		5E8C82022A9E15D0009E291B /* ExplorerItemMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplorerItemMenu.swift; sourceTree = "<group>"; };
 		5E98F6C62A81D8B200C12E34 /* MainWindow.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		5E9D40432A2EC68600AB8A0C /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -216,6 +215,7 @@
 		EE0000000000000000000086 /* NtfyInboxTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NtfyInboxTransport.swift; sourceTree = "<group>"; };
 		EE0000000000000000000088 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		EE000000000000000000008A /* VideoCropDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCropDetector.swift; sourceTree = "<group>"; };
+		EE000000000000000000008C /* BrowseSourceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseSourceSession.swift; sourceTree = "<group>"; };
 		EE0000000000000000000014 /* Hotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hotkey.swift; sourceTree = "<group>"; };
 		EE0000000000000000000016 /* ReservedShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservedShortcuts.swift; sourceTree = "<group>"; };
 		EE0000000000000000000018 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
@@ -378,6 +378,7 @@
 				EE000000000000000000004E /* WallperService.swift */,
 				EE0000000000000000000024 /* VideoTranscoder.swift */,
 				EE000000000000000000008A /* VideoCropDetector.swift */,
+				EE000000000000000000008C /* BrowseSourceSession.swift */,
 				EE0000000000000000000026 /* FullscreenAppMonitor.swift */,
 				EE0000000000000000000028 /* SteamWorkshopService.swift */,
 				EE000000000000000000002A /* PackageImporter.swift */,
@@ -416,7 +417,6 @@
 		5E98F6CC2A826ED500C12E34 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				5E7A89BF2AAB9D4E00192EB0 /* maxwell-cat.gif */,
 				5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */,
 				5EC47E7D2A2DB2E700120CCC /* Assets.xcassets */,
 				EE000000000000000000000D /* Fonts */,
@@ -571,7 +571,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5E7A89C02AAB9D4E00192EB0 /* maxwell-cat.gif in Resources */,
 				5EC47E812A2DB2E700120CCC /* Preview Assets.xcassets in Resources */,
 				5E2F1E892A57DF2D0081D69D /* Localizable.xcstrings in Resources */,
 				5E0700E62A859FAD00ADFE2E /* WallpaperNotFound.mp4 in Resources */,
@@ -674,6 +673,7 @@
 				EE0000000000000000000051 /* WallperView.swift in Sources */,
 				EE0000000000000000000023 /* VideoTranscoder.swift in Sources */,
 				EE0000000000000000000089 /* VideoCropDetector.swift in Sources */,
+				EE000000000000000000008B /* BrowseSourceSession.swift in Sources */,
 				EE0000000000000000000025 /* FullscreenAppMonitor.swift in Sources */,
 				EE0000000000000000000027 /* SteamWorkshopService.swift in Sources */,
 				EE0000000000000000000029 /* PackageImporter.swift in Sources */,

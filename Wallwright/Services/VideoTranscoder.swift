@@ -179,11 +179,27 @@ enum VideoTranscoder {
         }
 
         try process.run()
+        // A generous 5-minute ceiling, not a tight one, same as VideoCropDetector.crop's own
+        // re-encode — a legitimately long import on a slow machine deserves real time. Still
+        // bounded, though: without this, a truly stuck ffmpeg process (rare, but real on certain
+        // malformed inputs) left the import UI hanging forever with no way to know something's
+        // wrong, the same gap YtDlpService.fetchInfo had before it got the same fix.
+        var timedOut = false
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000_000)
+            guard !Task.isCancelled, process.isRunning else { return }
+            timedOut = true
+            process.terminate()
+        }
         await withCheckedContinuation { continuation in
             process.terminationHandler = { _ in continuation.resume() }
         }
+        timeoutTask.cancel()
         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
+        if timedOut {
+            throw VideoTranscoderError.transcodeFailed("Timed out after 5 minutes")
+        }
         guard process.terminationStatus == 0 else {
             // ffmpeg always prints its full version/build banner to stderr before any real error,
             // so surfacing the whole blob is nearly useless — pull out the actual failure lines

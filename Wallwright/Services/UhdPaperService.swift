@@ -132,7 +132,7 @@ final class UhdPaperService {
     }
 
     private func fetchData(_ url: URL) async throws -> Data {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else { throw UhdPaperError.requestFailed }
         guard httpResponse.statusCode == 200 else { throw UhdPaperError.httpError(httpResponse.statusCode) }
         return data

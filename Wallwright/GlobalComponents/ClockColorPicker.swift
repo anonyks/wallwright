@@ -38,7 +38,7 @@ struct ClockColorPicker: View {
         // a tap gesture on a plain shape has no focus or VoiceOver semantics, so this swatch was
         // unreachable via Tab/Full Keyboard Access despite already carrying an `.accessibilityLabel`
         // that could never actually be read in context.
-        Button {
+        let button = Button {
             settings.clockColor = option
             if option == .custom {
                 isCustomGradientPopoverPresented = true
@@ -66,13 +66,19 @@ struct ClockColorPicker: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(option.rawValue)
-        .popover(isPresented: Binding(
-            get: { option == .custom && isCustomGradientPopoverPresented },
-            set: { if !$0 { isCustomGradientPopoverPresented = false } }
-        )) {
-            if option == .custom {
+
+        // Only the custom swatch actually needs a popover, but this used to attach one to every
+        // swatch in the ForEach (gated on `option == .custom` inside the binding itself), so N
+        // separate popover declarations existed at once sharing overlapping state. That's very
+        // likely why clicking outside the popover didn't reliably close it, confirmed live
+        // (2026-08-24) as a real bug report. A single popover declared only where it's actually
+        // used behaves correctly.
+        if option == .custom {
+            button.popover(isPresented: $isCustomGradientPopoverPresented) {
                 customGradientEditor
             }
+        } else {
+            button
         }
     }
 

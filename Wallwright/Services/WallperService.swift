@@ -76,7 +76,7 @@ final class WallperService {
     /// category/search, since filtering afterward is free.
     func fetchIndex() async throws -> [WallperItem] {
         guard let url = URL(string: "\(Self.baseURL)/sitemap.xml") else { throw WallperError.requestFailed }
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else { throw WallperError.requestFailed }
         guard httpResponse.statusCode == 200 else { throw WallperError.httpError(httpResponse.statusCode) }
         guard let xml = String(data: data, encoding: .utf8) else { throw WallperError.parsingFailed }

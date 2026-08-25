@@ -4,18 +4,5 @@
 <dict>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Wallwright checks whether Spotify or Music is actively playing audio, so it can automatically pause or mute your wallpaper instead of having two things play sound at once.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>haren724.top</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-			</dict>
-		</dict>
-	</dict>
 </dict>
 </plist>

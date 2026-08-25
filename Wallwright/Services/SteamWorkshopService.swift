@@ -105,7 +105,7 @@ enum SteamWorkshopService {
         guard let pageURL = URL(string: "https://steamcommunity.com/sharedfiles/filedetails/?id=\(itemId)") else {
             throw SteamWorkshopError.invalidURL
         }
-        let (data, response) = try await URLSession.shared.data(from: pageURL)
+        let (data, response) = try await URLSession.browseSource.data(from: pageURL)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, let html = String(data: data, encoding: .utf8) else {
             throw SteamWorkshopError.downloadFailed("Couldn't load that Workshop page")
         }

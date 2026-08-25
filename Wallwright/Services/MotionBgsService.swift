@@ -97,7 +97,7 @@ final class MotionBgsService {
             throw MotionBgsError.invalidURL
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MotionBgsError.requestFailed
         }
@@ -122,7 +122,7 @@ final class MotionBgsService {
         ]
         guard let url = components?.url else { throw MotionBgsError.invalidURL }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MotionBgsError.requestFailed
         }
@@ -185,7 +185,7 @@ final class MotionBgsService {
     func fetchTags(slug: String) async throws -> [String] {
         guard let url = URL(string: "\(Self.baseURL)/\(slug)") else { throw MotionBgsError.invalidURL }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MotionBgsError.requestFailed
         }

@@ -4,8 +4,17 @@
 //
 //  AerialsInjector registers the video with the system correctly, but that alone isn't enough —
 //  by default the display sleeps ~30s after the screen locks, and the aerial ramps down to a
-//  static frame on wake. This keeps the display awake for as long as the screen stays locked (on
-//  AC power only, to avoid draining battery), so the injected aerial actually keeps playing.
+//  static frame on wake. This keeps the display awake for a while after the screen locks (on AC
+//  power only, to avoid draining battery), so the injected aerial actually keeps playing, rather
+//  than ramping down almost immediately.
+//
+//  Bounded to `assertionTimeout` below, not held for as long as the screen stays locked — confirmed
+//  live (2026-08-25) via `pmset -g log` that an earlier, unbounded version held the assertion for
+//  2h32m straight because nothing releases it until an actual unlock, which never happens if the
+//  user just locks and walks away. The Mac never reached real sleep the whole time: "sleep prevented
+//  by powerd" traced directly back to this assertion. The aerial ramping down to a static frame
+//  after a while (the same fallback behavior this file exists to delay) is a fully acceptable
+//  tradeoff against a locked Mac that can never sleep on its own.
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
 //  https://github.com/Raunik2/LivePaper
@@ -32,6 +41,12 @@ final class LockScreenSync {
 
     private var assertionID: IOPMAssertionID = 0
     private var started = false
+
+    /// Kept minimal on purpose — just enough to smooth over a quick step-away without the aerial
+    /// ramping down to a static frame at the default ~30s, but not so long that it meaningfully
+    /// delays real sleep for anyone who locks and actually leaves.
+    private static let assertionTimeout: TimeInterval = 2 * 60
+    private var assertionExpiryTimer: Timer?
 
     private init() {}
 
@@ -86,15 +101,25 @@ final class LockScreenSync {
             "Wallwright lock screen video" as CFString,
             &assertionID
         )
+        assertionExpiryTimer?.invalidate()
+        assertionExpiryTimer = Timer.scheduledTimer(withTimeInterval: Self.assertionTimeout, repeats: false) { [weak self] _ in
+            self?.releaseAssertion()
+        }
+    }
+
+    private func releaseAssertion() {
+        assertionExpiryTimer?.invalidate()
+        assertionExpiryTimer = nil
+        if assertionID != 0 {
+            IOPMAssertionRelease(assertionID)
+            assertionID = 0
+        }
     }
 
     private func screenUnlocked() {
         wallpaperDebugLog.notice("GROUND TRUTH: screenIsUnlocked received")
         NotificationCenter.default.post(name: Self.screenDidUnlockNotification, object: nil)
-        if assertionID != 0 {
-            IOPMAssertionRelease(assertionID)
-            assertionID = 0
-        }
+        releaseAssertion()
 
         // Pre-warm for the *next* activation right here, while back on the normal desktop, rather
         // than at the moment of the next lock/screensaver — a WallpaperAgent restart takes real

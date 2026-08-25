@@ -104,7 +104,7 @@ final class DesktopHutService {
     static let baseURL = "https://www.desktophut.com"
 
     private func fetchHTML(_ url: URL) async throws -> String {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.browseSource.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse else { throw DesktopHutError.requestFailed }
         guard httpResponse.statusCode == 200 else { throw DesktopHutError.httpError(httpResponse.statusCode) }
         guard let html = String(data: data, encoding: .utf8) else { throw DesktopHutError.parsingFailed }

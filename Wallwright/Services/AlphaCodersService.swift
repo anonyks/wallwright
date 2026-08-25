@@ -87,7 +87,7 @@ final class AlphaCodersService {
         for (field, value) in headers {
             request.setValue(value, forHTTPHeaderField: field)
         }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.browseSource.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else { throw AlphaCodersError.requestFailed }
         guard httpResponse.statusCode == 200 else { throw AlphaCodersError.httpError(httpResponse.statusCode) }
         guard let html = String(data: data, encoding: .utf8) else { throw AlphaCodersError.parsingFailed }
