@@ -149,16 +149,13 @@ struct ContentView: View {
                 || viewModel.isDirectURLImportReveal || viewModel.isCommandPaletteReveal {
                 Color.black.opacity(0.35)
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        viewModel.isDisplaySettingsReveal = false
-                        viewModel.isClockSettingsReveal = false
-                        viewModel.isPlaylistSettingsReveal = false
-                        viewModel.isEditWallpaperReveal = false
-                        viewModel.isYouTubeImportReveal = false
-                        viewModel.isSteamWorkshopImportReveal = false
-                        viewModel.isDirectURLImportReveal = false
-                        viewModel.isCommandPaletteReveal = false
-                    }
+                    .onTapGesture(perform: dismissAllPopups)
+                    // Escape closing a dialog is a basic, expected macOS convention — every one of
+                    // these popups (bar the Command Palette, which already had its own) was missing
+                    // it entirely, the X button or an outside click were the only ways out. One
+                    // handler here covers all of them at once, same as the outside-click dismiss
+                    // above already does, rather than adding it individually to each sheet.
+                    .onExitCommand(perform: dismissAllPopups)
                     .transition(.opacity)
 
                 Group {
@@ -373,6 +370,20 @@ struct ContentView: View {
             PackageImportReviewSheet(viewModel: viewModel)
         }
         .frame(minWidth: 1000, minHeight: 640, idealHeight: 800)
+    }
+
+    /// Shared by the scrim's outside-click dismiss and Escape — whichever of these popups is
+    /// actually open, this is a no-op for the rest, so calling all eight unconditionally is simpler
+    /// than tracking which one is currently active.
+    private func dismissAllPopups() {
+        viewModel.isDisplaySettingsReveal = false
+        viewModel.isClockSettingsReveal = false
+        viewModel.isPlaylistSettingsReveal = false
+        viewModel.isEditWallpaperReveal = false
+        viewModel.isYouTubeImportReveal = false
+        viewModel.isSteamWorkshopImportReveal = false
+        viewModel.isDirectURLImportReveal = false
+        viewModel.isCommandPaletteReveal = false
     }
 }
 
