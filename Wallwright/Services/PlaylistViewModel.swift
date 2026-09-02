@@ -156,10 +156,18 @@ final class PlaylistViewModel: ObservableObject {
 
     /// Skips directories already present (matched via `isSameWallpaperDirectory`) rather than
     /// allowing duplicates.
+    /// Builds the new list first and assigns `playlist.itemDirectories` once at the end, rather
+    /// than appending inside the loop — `playlist`'s `didSet` triggers a full synchronous JSON
+    /// encode + atomic disk write on every assignment (see `save()`), so appending one at a time
+    /// meant adding N wallpapers at once did N separate synchronous writes instead of one.
+    /// Confirmed live (2026-08-31), same anti-pattern as the already-fixed `refresh()` bug.
     func addWallpapers(_ directories: [URL]) {
-        for directory in directories where !playlist.itemDirectories.contains(where: { $0.isSameWallpaperDirectory(as: directory) }) {
-            playlist.itemDirectories.append(directory)
+        var updated = playlist.itemDirectories
+        for directory in directories where !updated.contains(where: { $0.isSameWallpaperDirectory(as: directory) }) {
+            updated.append(directory)
         }
+        guard updated.count != playlist.itemDirectories.count else { return }
+        playlist.itemDirectories = updated
     }
 
     func removeItems(at offsets: IndexSet) {

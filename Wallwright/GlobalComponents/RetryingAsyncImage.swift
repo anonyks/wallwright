@@ -54,14 +54,26 @@ struct RetryingAsyncImage<Content: View>: View {
         for (field, value) in httpHeaders { request.setValue(value, forHTTPHeaderField: field) }
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                phase = .failure(URLError(.badServerResponse))
+                scheduleRetryIfNeeded()
+                return
+            }
             // Downsampled at decode time, not `NSImage(data:)` — confirmed live (2026-08-09) a
             // source's hero image (7652x4073) was decoding to a ~119MB IOSurface for what's only
             // ever shown as a browse-grid tile. See `ThumbnailDownsampler`'s header for the
             // measured impact of the equivalent bug on local library thumbnails.
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
-                  let nsImage = ThumbnailDownsampler.downsampledImage(from: data)
-            else {
-                phase = .failure(URLError(.badServerResponse))
+            //
+            // Decoded off the main actor — `.task` on a SwiftUI View runs on the main actor by
+            // default, and this synchronous ImageIO call was blocking it directly. Confirmed live
+            // (2026-08-31): a whole browse grid's thumbnails "all start loading at once on a
+            // category switch" (this file's own header comment), so switching tabs bunched many
+            // main-thread decodes together — real, visible stutter, not a theoretical one.
+            let decodeTask = Task.detached(priority: .userInitiated) {
+                ThumbnailDownsampler.downsampledImage(from: data)
+            }
+            guard let nsImage = await decodeTask.value else {
+                phase = .failure(URLError(.cannotDecodeContentData))
                 scheduleRetryIfNeeded()
                 return
             }

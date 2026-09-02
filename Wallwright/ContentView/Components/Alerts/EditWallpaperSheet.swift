@@ -227,12 +227,21 @@ struct EditWallpaperSheet: SubviewOfContentView {
     /// every other in-app edit — see `WallpaperPreview`'s title/tag editors) and pushes the result
     /// back through `hoveredWallpaper` so this popup, the grid, and (if it's the active wallpaper)
     /// the live desktop all reflect the change immediately.
+    ///
+    /// UI propagation happens first, synchronously — nothing it does touches disk — and the actual
+    /// write moves to a background queue after. Confirmed live (2026-08-31): every title rename or
+    /// tag add/remove was blocking the main thread on a synchronous encode+write, same anti-pattern
+    /// as the already-fixed `ContentViewModel.refresh()` bug, just for a single small file instead
+    /// of the whole library — still real, visible stutter on every keystroke-commit.
     private func updateProject(_ mutate: (inout WEProject) -> Void) {
         var updated = project
         mutate(&updated)
-        guard let data = try? JSONEncoder().encode(updated) else { return }
-        try? data.write(to: wallpaper.wallpaperDirectory.appending(path: "project.json"), options: .atomic)
         propagateUpdatedProject(updated)
+        let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
+        DispatchQueue.global(qos: .utility).async {
+            guard let data = try? JSONEncoder().encode(updated) else { return }
+            try? data.write(to: destination, options: .atomic)
+        }
     }
 
     /// The propagation half of `updateProject`, split out so `confirmChosenFrame` (whose own write

@@ -28,6 +28,17 @@ class ContentViewModel: ObservableObject, DropDelegate {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.refresh() }
             .store(in: &cancellables)
+
+        // `searchText` itself stays undebounced — the TextField binds directly to it, so typing
+        // feels instant. `debouncedSearchText` (what `searchedWallpapers` actually filters on) only
+        // updates 300ms after typing settles — confirmed live (2026-08-31) that without this, every
+        // single keystroke re-filtered the whole library (`wallpapers.filter` over every field of
+        // every wallpaper) and re-rendered the entire grid, visibly stuttering while typing.
+        $searchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] text in self?.debouncedSearchText = text }
+            .store(in: &cancellables)
+
         refresh()
     }
 
@@ -125,6 +136,8 @@ class ContentViewModel: ObservableObject, DropDelegate {
     @Published var isBatchRemoveConfirming = false
 
     @Published var searchText = ""
+    /// What `searchedWallpapers` actually filters on — see `init`'s debounce pipeline.
+    @Published private var debouncedSearchText = ""
 
     /// The last text typed into any *browse source's* search bar (AlphaCoders, MoeWalls, etc — not
     /// the library search above) — carried over so switching from one source to another pre-fills
@@ -378,8 +391,8 @@ class ContentViewModel: ObservableObject, DropDelegate {
     private var searchedWallpapers: [WEWallpaper] {
         wallpapers.filter { wallpaper in
             let project = wallpaper.project
-            let searchText = searchText.lowercased()
-            
+            let searchText = debouncedSearchText.lowercased()
+
             guard !searchText.isEmpty else { return true }
             
             guard !project.title.lowercased().contains(searchText) else { return true }
@@ -526,10 +539,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
         autoRefreshWallpapers.filter { selectedWallpapers.contains($0.wallpaperDirectory) }
     }
 
-    func toggleFilter() {
-        isFilterReveal.toggle()
-    }
-    
     func alertImportModal(which error: WPImportError) {
         self.importAlertError = error
         self.importAlertPresented = true
@@ -598,34 +607,48 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// actually touches disk. Call this (or let `VideoImporter.wallpaperLibraryDidChangeNotification`
     /// trigger it) after anything that adds/removes/edits a wallpaper; everything else
     /// (search/filter/sort) reads the cached `wallpapers` array and stays cheap.
+    ///
+    /// The actual scan/decode runs off-main — confirmed live (2026-08-31) this was blocking the
+    /// main thread on every delete/trash/edit (everyday library actions, not just app launch),
+    /// since it re-reads and re-decodes `project.json` for the WHOLE library synchronously, plus a
+    /// recursive directory-size walk and a disk write for any wallpaper still missing
+    /// `packageSizeBytes`. Every call site already treats this as fire-and-forget (nothing reads
+    /// `wallpapers` in the same call stack right after calling this), so hopping to a background
+    /// queue and back is safe.
     public func refresh() {
-        self.wallpapers = self.urls.compactMap { url in
-            guard let data = try? Data(contentsOf: url.appending(path: "project.json")),
-                  var project = try? JSONDecoder().decode(WEProject.self, from: data)
-            else {
-                return WEWallpaper(using: .invalid, where: url)
-            }
-            // Only video/image are supported for rendering — a folder of some other type that
-            // ended up here some other way than the app's own import paths (all of which already
-            // reject unsupported types) would otherwise show up in the grid with a normal-looking
-            // thumbnail and then render blank the moment it's selected. Excluding it here instead
-            // of importing it broken.
-            guard project.isSupportedType else { return nil }
-            // Wallpapers imported before `packageSizeBytes` existed fall back, every time
-            // `wallpaperSize` is read, to a live recursive directory walk — cheap once, but
-            // confirmed live (2026-08-04) that repeating it inside a sort comparator (fixed
-            // separately in `sortedWallpapers`) made switching tabs take several seconds.
-            // Backfilling it here, the one place this class already touches disk on every
-            // library load, means it only ever needs to happen once per wallpaper, same pattern
-            // as `VideoImporter.backfillMetadataIfNeeded`.
-            if project.packageSizeBytes == nil,
-               let sizeBytes = try? url.directoryTotalAllocatedSize(includingSubfolders: true) {
-                project.packageSizeBytes = Int64(sizeBytes)
-                if let updatedData = try? JSONEncoder().encode(project) {
-                    try? updatedData.write(to: url.appending(path: "project.json"), options: .atomic)
+        let urls = self.urls
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let scanned = urls.compactMap { url -> WEWallpaper? in
+                guard let data = try? Data(contentsOf: url.appending(path: "project.json")),
+                      var project = try? JSONDecoder().decode(WEProject.self, from: data)
+                else {
+                    return WEWallpaper(using: .invalid, where: url)
                 }
+                // Only video/image are supported for rendering — a folder of some other type that
+                // ended up here some other way than the app's own import paths (all of which
+                // already reject unsupported types) would otherwise show up in the grid with a
+                // normal-looking thumbnail and then render blank the moment it's selected.
+                // Excluding it here instead of importing it broken.
+                guard project.isSupportedType else { return nil }
+                // Wallpapers imported before `packageSizeBytes` existed fall back, every time
+                // `wallpaperSize` is read, to a live recursive directory walk — cheap once, but
+                // confirmed live (2026-08-04) that repeating it inside a sort comparator (fixed
+                // separately in `sortedWallpapers`) made switching tabs take several seconds.
+                // Backfilling it here, the one place this class already touches disk on every
+                // library load, means it only ever needs to happen once per wallpaper, same
+                // pattern as `VideoImporter.backfillMetadataIfNeeded`.
+                if project.packageSizeBytes == nil,
+                   let sizeBytes = try? url.directoryTotalAllocatedSize(includingSubfolders: true) {
+                    project.packageSizeBytes = Int64(sizeBytes)
+                    if let updatedData = try? JSONEncoder().encode(project) {
+                        try? updatedData.write(to: url.appending(path: "project.json"), options: .atomic)
+                    }
+                }
+                return WEWallpaper(using: project, where: url)
             }
-            return WEWallpaper(using: project, where: url)
+            DispatchQueue.main.async {
+                self?.wallpapers = scanned
+            }
         }
     }
     

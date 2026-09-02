@@ -132,12 +132,18 @@ struct WallpaperPreview: SubviewOfContentView {
 
                                         wallpaper.project.title = title
 
-                                        guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
-
-                                        try? data.write(to: wallpaper.wallpaperDirectory.appending(path: "project.json"), options: .atomic)
-
                                         wallpaperViewModel.currentWallpaper = wallpaper
                                         viewModel.refresh()
+
+                                        // Off-main — confirmed live (2026-08-31) this synchronous
+                                        // encode+write was blocking the main thread on every title
+                                        // commit, same anti-pattern as the already-fixed
+                                        // ContentViewModel.refresh() bug.
+                                        let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
+                                        DispatchQueue.global(qos: .utility).async {
+                                            guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
+                                            try? data.write(to: destination, options: .atomic)
+                                        }
 
                                         isEditingId = ""
                                     }
@@ -285,12 +291,15 @@ struct WallpaperPreview: SubviewOfContentView {
 
                                     wallpaper.project.tags = tags.sorted()
 
-                                    guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
-
-                                    try? data.write(to: wallpaper.wallpaperDirectory.appending(path: "project.json"), options: .atomic)
-
                                     wallpaperViewModel.currentWallpaper = wallpaper
                                     viewModel.refresh()
+
+                                    // Off-main — see the title editor's identical fix above.
+                                    let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
+                                    DispatchQueue.global(qos: .utility).async {
+                                        guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
+                                        try? data.write(to: destination, options: .atomic)
+                                    }
                                 }
                         }
                     }
@@ -399,12 +408,15 @@ struct WallpaperPreview: SubviewOfContentView {
 
                                     wallpaper.project.tags = tags
 
-                                    guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
-
-                                    try? data.write(to: wallpaper.wallpaperDirectory.appending(path: "project.json"), options: .atomic)
-
                                     wallpaperViewModel.currentWallpaper = wallpaper
                                     viewModel.refresh()
+
+                                    // Off-main — see the title editor's identical fix above.
+                                    let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
+                                    DispatchQueue.global(qos: .utility).async {
+                                        guard let data = try? JSONEncoder().encode(wallpaper.project) else { return }
+                                        try? data.write(to: destination, options: .atomic)
+                                    }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                 }
