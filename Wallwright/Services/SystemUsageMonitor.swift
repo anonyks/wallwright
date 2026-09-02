@@ -68,14 +68,19 @@ enum SystemUsageMonitor {
     /// that it was prone to catching a genuine but brief burst (e.g. the very act of building and
     /// rendering the menu this is called from) and reporting it as if it were the sustained rate,
     /// showing 22% while `top`, sampled repeatedly around the same moment, read 0% the whole time.
-    /// `top`/Activity Monitor use roughly a 1-second window specifically to average that kind of
-    /// blip out — matching that here. Only ever happens on a background thread (every call site
-    /// already dispatches this off-main), so the longer wait never blocks the UI it's reporting on;
-    /// the caller already shows a placeholder while this runs.
+    ///
+    /// Widened from an initial 1s to 3s — confirmed live (2026-08-31) that this app's real workload
+    /// (video decode) is itself bursty, not steady, so even a 1s window could land squarely in a
+    /// burst or a lull and report very different numbers for two checks taken a few seconds apart
+    /// (0% vs 13.2%, same app, same moment in practice) — not a bug in the sampling code, just too
+    /// short a window for a bursty workload. 3s averages across enough of that burst/lull cycle to
+    /// give a stable, repeatable number instead. Only ever happens on a background thread (every
+    /// call site already dispatches this off-main), so the longer wait never blocks the UI it's
+    /// reporting on; the caller already shows a placeholder while this runs.
     private static func currentCPUPercent() -> Double? {
         guard let start = cpuTimeSeconds() else { return nil }
         let wallStart = Date()
-        Thread.sleep(forTimeInterval: 1.0)
+        Thread.sleep(forTimeInterval: 3.0)
         guard let end = cpuTimeSeconds() else { return nil }
         let wallElapsed = Date().timeIntervalSince(wallStart)
         guard wallElapsed > 0 else { return nil }

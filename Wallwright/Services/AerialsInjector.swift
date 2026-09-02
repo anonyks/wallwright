@@ -51,6 +51,25 @@ final class AerialsInjector {
     private var lastVideoName: String?
     private var healthCheckTimer: Timer?
 
+    /// Debounces `inject()` against re-injecting the SAME video it just injected a moment ago.
+    /// Confirmed live (2026-08-31) two separate real cases of this: (1) `LockScreenSync`'s
+    /// `screensaverDidDeactivate()` (`com.apple.screensaver.didStop`) and `screenUnlocked()`
+    /// (`com.apple.sessionagent.screenIsUnlocked`) both fire for one real "user is back" event, and
+    /// (2) at launch, `AppDelegate.applicationDidFinishLaunching`'s explicit deterministic
+    /// re-injection and `GlobalSettingsService`'s reactive `$wallpapers` sink both fire for one real
+    /// "app just started" event. Same double-notification pattern `VideoWallpaperViewModel` already
+    /// found and debounced (`lastReattachAt`) for wake/unlock, just two more instances of it.
+    /// `inject()` always restarts WallpaperAgent regardless of whether the video changed (see its
+    /// own doc comment) — so without this, each of those was two full `killall WallpaperAgent`
+    /// restarts back-to-back for one event, not a free no-op the second time.
+    ///
+    /// Keyed on the URL actually matching, not just elapsed time — a genuine wallpaper switch to
+    /// DIFFERENT content within the window (e.g. rapidly clicking through videos) must never be
+    /// silently dropped, only a redundant re-injection of the exact same content should be.
+    private var lastInjectedURL: URL?
+    private var lastInjectAt = Date.distantPast
+    private static let injectDebounceInterval: TimeInterval = 2
+
     /// Periodically verifies the injected aerial is still intact — a macOS update, a WallpaperAgent
     /// cache reset, or the user clearing app caches can silently wipe it. Re-injects without an
     /// agent restart when possible, so recovery doesn't cause a visible flicker.
@@ -121,10 +140,21 @@ final class AerialsInjector {
     }
 
     /// Registers `videoURL` as the system's aerial wallpaper, syncing desktop, lock screen, and
-    /// screensaver to it. Skips the (relatively slow) agent restart if the video hasn't changed.
+    /// screensaver to it. Skips the file copy/thumbnail work if the video hasn't changed, but
+    /// always restarts WallpaperAgent regardless — see the comment on `restartWallpaperAgent()`'s
+    /// call site below for why an unchanged video still needs the restart. Callers that don't want
+    /// that cost paid twice for one real event should debounce (see `prewarmForNextActivation`).
     func inject(videoURL: URL, name: String) {
+        if videoURL == lastInjectedURL, Date().timeIntervalSince(lastInjectAt) < Self.injectDebounceInterval {
+            // Redundant re-injection of the exact same content two callers both fired for one real
+            // event — see this property's own doc comment. `lastVideoURL`/`lastVideoName` are
+            // already correct from the first call, nothing here needs updating.
+            return
+        }
         lastVideoURL = videoURL
         lastVideoName = name
+        lastInjectedURL = videoURL
+        lastInjectAt = Date()
         let fm = FileManager.default
 
         // Compare against the *previous* injection's source size (see `lastInjectedSourceSize`'s

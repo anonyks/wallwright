@@ -54,7 +54,7 @@ class VideoWallpaperViewModel: ObservableObject {
                 NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
             }
             let url = currentWallpaper.wallpaperDirectory.appending(path: currentWallpaper.project.file)
-            let newItem = AVPlayerItem(url: url)
+            let newItem = Self.videoOnlyItem(url: url)
             let newAudioItem = Self.audioOnlyItem(url: url)
             Self.applyTrimEnd(project: currentWallpaper.project, to: newItem, newAudioItem)
             self.player.replaceCurrentItem(with: newItem)
@@ -117,6 +117,42 @@ class VideoWallpaperViewModel: ObservableObject {
             return AVPlayerItem(url: url)
         }
         wallpaperDebugLog.notice("audioOnlyItem: composition built successfully, using audio-only item")
+        return AVPlayerItem(asset: composition)
+    }
+
+    /// Builds `player`'s (the visual layer's) item with ONLY the video track — the mirror image
+    /// of `audioOnlyItem` above. `player.isMuted = true` silences OUTPUT, not decode: an item built
+    /// straight from the file URL still carries the audio track, so this player was decoding audio
+    /// a second time for nothing on top of `audioPlayer`'s own real decode of the same content —
+    /// confirmed live (2026-08-31) via `SystemUsageMonitor` showing real, sustained CPU well above
+    /// what a single video decode + single audio decode should cost for a wallpaper with audio. A
+    /// composition with just the video track means there's no audio track for this item to ever
+    /// decode at all. `preferredTransform` is copied over explicitly — `AVMutableCompositionTrack`
+    /// doesn't inherit the source track's rotation/orientation metadata on its own, and losing it
+    /// would show some videos sideways or upside down. Falls back to the plain file URL if the
+    /// asset has no audio track (nothing to strip) or composition setup fails.
+    private static func videoOnlyItem(url: URL) -> AVPlayerItem {
+        let asset = AVURLAsset(url: url)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            return AVPlayerItem(url: url)
+        }
+        guard !asset.tracks(withMediaType: .audio).isEmpty else {
+            // Already video-only — nothing to strip, no benefit to building a composition.
+            return AVPlayerItem(url: url)
+        }
+        let composition = AVMutableComposition()
+        guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            wallpaperDebugLog.notice("videoOnlyItem: addMutableTrack failed, falling back to full URL")
+            return AVPlayerItem(url: url)
+        }
+        do {
+            try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: asset.duration), of: videoTrack, at: .zero)
+        } catch {
+            wallpaperDebugLog.notice("videoOnlyItem: insertTimeRange failed (\(error.localizedDescription, privacy: .public)), falling back to full URL")
+            return AVPlayerItem(url: url)
+        }
+        compositionTrack.preferredTransform = videoTrack.preferredTransform
+        wallpaperDebugLog.notice("videoOnlyItem: composition built successfully, using video-only item")
         return AVPlayerItem(asset: composition)
     }
 
@@ -303,7 +339,12 @@ class VideoWallpaperViewModel: ObservableObject {
         self.screenId = screenId
         self.currentWallpaper = currentWallpaper
         let url = currentWallpaper.wallpaperDirectory.appending(path: currentWallpaper.project.file)
-        self.player = AVPlayer(url: url)
+        // `videoOnlyItem`, not a plain `AVPlayer(url:)` — see its own doc comment. Building
+        // straight from the file URL here (init only runs once, for the very first wallpaper
+        // shown on this screen at launch) reintroduced the exact double-audio-decode bug already
+        // fixed in `applyCurrentWallpaperChange` for every subsequent wallpaper switch — confirmed
+        // live (2026-08-31) this was a second, separate construction path for the same player.
+        self.player = AVPlayer(playerItem: Self.videoOnlyItem(url: url))
         self.player.isMuted = true
         self.audioPlayer = AVPlayer(playerItem: Self.audioOnlyItem(url: url))
         if let item = self.player.currentItem {

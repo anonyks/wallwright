@@ -189,9 +189,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // after `wallpapers` is actually populated) isn't reliable enough on its own: after
             // quitting or an OS restart, a stale aerial registration from the *previous* session
             // was found left dangling in the Store, producing inconsistent stale/frozen/blank
-            // wallpaper state per screen until something unrelated forced a resync. This call is
-            // safe to run alongside that reactive path even if it also fires — re-injecting the
-            // same still-unchanged video is a cheap, idempotent WallpaperAgent restart either way.
+            // wallpaper state per screen until something unrelated forced a resync. This call can
+            // race the reactive path also firing at launch for the same wallpaper — that used to
+            // mean two full `killall WallpaperAgent` restarts for one real "app started" event
+            // (confirmed live 2026-08-31, `AerialsInjector.inject()` always restarts, it's not
+            // actually cheap to call twice); `AerialsInjector.inject()` now debounces a same-URL
+            // re-injection on its own, so this call staying here is safe regardless of whether the
+            // reactive path also fires.
             let wallpaper = wallpaperViewModel.currentWallpaper
             DispatchQueue.global(qos: .utility).async {
                 let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
