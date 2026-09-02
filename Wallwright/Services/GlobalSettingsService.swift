@@ -188,10 +188,13 @@ struct GlobalSettings: Codable, Equatable {
     // waste with no offsetting benefit.
     var displayAsleep = GSPlayback.pause
     var laptopOnBattery = GSPlayback.keepRunning
+    // Defaults to `.pause`, same reasoning as `otherApplicationFullscreen`/`displayAsleep` above —
+    // thermal throttling or a near-empty battery are both states where nothing on any display
+    // benefits from continued decode. See `PowerConditionMonitor`.
+    var lowPowerConditions = GSPlayback.pause
 
     // MARK: Automatic Setup
     var autoStart = false
-    var safeMode = false
 
     // MARK: Inbox
     /// The ntfy.sh topic name `NtfyInboxTransport` subscribes to — deliberately empty by default,
@@ -308,8 +311,8 @@ struct GlobalSettings: Codable, Equatable {
         otherApplicationPlayingAudio = (try? c.decodeIfPresent(GSPlayback.self, forKey: .otherApplicationPlayingAudio)) ?? nil ?? .keepRunning
         displayAsleep = (try? c.decodeIfPresent(GSPlayback.self, forKey: .displayAsleep)) ?? nil ?? .pause
         laptopOnBattery = (try? c.decodeIfPresent(GSPlayback.self, forKey: .laptopOnBattery)) ?? nil ?? .keepRunning
+        lowPowerConditions = (try? c.decodeIfPresent(GSPlayback.self, forKey: .lowPowerConditions)) ?? nil ?? .pause
         autoStart = (try? c.decodeIfPresent(Bool.self, forKey: .autoStart)) ?? nil ?? false
-        safeMode = (try? c.decodeIfPresent(Bool.self, forKey: .safeMode)) ?? nil ?? false
         inboxNtfyTopic = (try? c.decodeIfPresent(String.self, forKey: .inboxNtfyTopic)) ?? nil ?? ""
         adjustMenuBarTint = (try? c.decodeIfPresent(Bool.self, forKey: .adjustMenuBarTint)) ?? nil ?? true
         appearance = (try? c.decodeIfPresent(GSAppearance.self, forKey: .appearance)) ?? nil ?? .followSystem
@@ -358,6 +361,7 @@ class GlobalSettingsViewModel: ObservableObject {
     var didOtherAudioChangeCancellable: Cancellable?
     var otherAudioPolicyCancellable: Cancellable?
     var didBatteryStatusChangeCancellable: Cancellable?
+    var didPowerConditionChangeCancellable: Cancellable?
     var didFullscreenChangeCancellable: Cancellable?
     var didDisplaySleepChangeCancellable: Cancellable?
     var didChangeHotkeysCancellable: Cancellable?
@@ -419,6 +423,7 @@ class GlobalSettingsViewModel: ObservableObject {
         didOtherAudioChangeCancellable?.cancel()
         otherAudioPolicyCancellable?.cancel()
         didBatteryStatusChangeCancellable?.cancel()
+        didPowerConditionChangeCancellable?.cancel()
         didFullscreenChangeCancellable?.cancel()
         didDisplaySleepChangeCancellable?.cancel()
         didChangeHotkeysCancellable?.cancel()
@@ -516,6 +521,14 @@ class GlobalSettingsViewModel: ObservableObject {
         // unplugs again.
         batteryStatusDidChange()
 
+        // Same shape as the battery wiring just above — thermal/low-battery/near-zero-brightness
+        // via one combined signal (see `PowerConditionMonitor`).
+        PowerConditionMonitor.shared.startIfNeeded()
+        self.didPowerConditionChangeCancellable =
+        NotificationCenter.default.publisher(for: PowerConditionMonitor.didChangeNotification)
+            .sink { [weak self] _ in self?.powerConditionDidChange() }
+        powerConditionDidChange()
+
         // "Other Application Fullscreen" and "Display asleep" — same story as laptopOnBattery:
         // both pickers, both saving a value nothing consumed. Wired the same way.
         FullscreenAppMonitor.shared.startIfNeeded()
@@ -563,6 +576,7 @@ class GlobalSettingsViewModel: ObservableObject {
     private var shouldWallpaperStayPaused: Bool {
         if AppDelegate.shared.wallpaperViewModel.isPausedByUser { return true }
         if BatteryMonitor.shared.isOnBattery && settings.laptopOnBattery == .pause { return true }
+        if PowerConditionMonitor.shared.shouldPause && settings.lowPowerConditions == .pause { return true }
         if FullscreenAppMonitor.shared.isOtherAppFullscreen && settings.otherApplicationFullscreen == .pause { return true }
         if isDisplayAsleep && settings.displayAsleep == .pause { return true }
         return false
@@ -582,6 +596,9 @@ class GlobalSettingsViewModel: ObservableObject {
         }
         if BatteryMonitor.shared.isOnBattery && settings.laptopOnBattery == .pause {
             return String(localized: "Paused — on battery")
+        }
+        if PowerConditionMonitor.shared.shouldPause && settings.lowPowerConditions == .pause {
+            return String(localized: "Paused — power-saving")
         }
         if FullscreenAppMonitor.shared.isOtherAppFullscreen && settings.otherApplicationFullscreen == .pause {
             return String(localized: "Paused — another app is covering the screen")
@@ -647,6 +664,34 @@ class GlobalSettingsViewModel: ObservableObject {
             }
         } else {
             switch settings.laptopOnBattery {
+            case .pause:
+                guard !shouldWallpaperStayPaused else { break }
+                AppDelegate.shared.resume()
+            case .stop:
+                for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
+                guard !shouldWallpaperStayPaused else { break }
+                AppDelegate.shared.resume()
+            case .keepRunning, .mute:
+                break
+            }
+        }
+    }
+
+    /// Applies the "Low Power Conditions" policy (thermal throttling or critically low battery —
+    /// see `PowerConditionMonitor`) — same shape as `batteryStatusDidChange` above.
+    func powerConditionDidChange() {
+        if PowerConditionMonitor.shared.shouldPause {
+            switch settings.lowPowerConditions {
+            case .pause:
+                AppDelegate.shared.pause()
+            case .stop:
+                AppDelegate.shared.pause()
+                for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
+            case .keepRunning, .mute:
+                break
+            }
+        } else {
+            switch settings.lowPowerConditions {
             case .pause:
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
@@ -873,8 +918,4 @@ class GlobalSettingsViewModel: ObservableObject {
         }
     }
     
-    private func saveAndValidate() {
-        save()
-        validate()
-    }
 }

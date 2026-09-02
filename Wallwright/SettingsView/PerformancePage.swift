@@ -75,6 +75,13 @@ struct PerformancePage: SettingsPage {
                     Text("Pause").tag(GSPlayback.pause)
                     Text("Stop (free memory)").tag(GSPlayback.stop)
                 }
+
+                Picker("Low power conditions", selection: $viewModel.settings.lowPowerConditions) {
+                    Text("Keep Running").tag(GSPlayback.keepRunning)
+                    Text("Pause").tag(GSPlayback.pause)
+                    Text("Stop (free memory)").tag(GSPlayback.stop)
+                }
+                .help("Thermal throttling or battery under 20%")
             } header: {
                 Label("Playback", systemImage: "play.fill")
             }

@@ -72,6 +72,7 @@ this project:
 - **MrWindDog**, **[Haren Chen](https://github.com/haren724)**, **[Chen Chia Yang](https://github.com/Unayung)**: original architecture and scene rendering this project was forked from
 - **[1ris_W](https://github.com/Erica-Iris)**, **[Klaus Zhu](https://github.com/klauszhu1105)**, **[baysonfox](https://github.com/baysonfox)**, **[Toby Shi](https://github.com/Toby-Shi-cloud)**, **Keria**: localization, icons, and other pieces present in the original fork
 - **[Raunak Gupta](https://github.com/Raunik2)**: lock-screen sync, Aerial registration, and the command-pipe listener are adapted from [LivePaper](https://github.com/Raunik2/LivePaper) (MIT)
+- **[kageroumado](https://github.com/kageroumado)**: the low-power-conditions auto-pause policy is modeled on [Phosphene](https://github.com/kageroumado/phosphene)'s PowerMonitor (MIT)
 
 ## License
 

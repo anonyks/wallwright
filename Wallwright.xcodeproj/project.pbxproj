@@ -74,6 +74,7 @@
 		EE0000000000000000000003 /* LockScreenSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000004 /* LockScreenSync.swift */; };
 		EE0000000000000000000005 /* CommandListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000006 /* CommandListener.swift */; };
 		EE0000000000000000000007 /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000008 /* BatteryMonitor.swift */; };
+		EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000090 /* PowerConditionMonitor.swift */; };
 		EE0000000000000000000009 /* ClockOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000A /* ClockOverlay.swift */; };
 		EE000000000000000000000B /* ClockSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000C /* ClockSettings.swift */; };
 		EE000000000000000000000E /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000D /* Fonts */; };
@@ -115,6 +116,7 @@
 		EE0000000000000000000039 /* PopupCardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003A /* PopupCardStyle.swift */; };
 		EE0000000000000000000073 /* FadingTitleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000074 /* FadingTitleText.swift */; };
 		EE0000000000000000000075 /* BrowseStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000076 /* BrowseStateView.swift */; };
+		EE000000000000000000008D /* LoadMoreTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008E /* LoadMoreTrigger.swift */; };
 		EE0000000000000000000077 /* LibraryEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000078 /* LibraryEmptyStateView.swift */; };
 		EE0000000000000000000079 /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007A /* CommandPaletteView.swift */; };
 		EE000000000000000000007B /* PopupHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007C /* PopupHeader.swift */; };
@@ -202,6 +204,7 @@
 		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
 		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
 		EE0000000000000000000008 /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000090 /* PowerConditionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerConditionMonitor.swift; sourceTree = "<group>"; };
 		EE000000000000000000000A /* ClockOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockOverlay.swift; sourceTree = "<group>"; };
 		EE000000000000000000000C /* ClockSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockSettings.swift; sourceTree = "<group>"; };
 		EE000000000000000000000D /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
@@ -243,6 +246,7 @@
 		EE000000000000000000003A /* PopupCardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupCardStyle.swift; sourceTree = "<group>"; };
 		EE0000000000000000000074 /* FadingTitleText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingTitleText.swift; sourceTree = "<group>"; };
 		EE0000000000000000000076 /* BrowseStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseStateView.swift; sourceTree = "<group>"; };
+		EE000000000000000000008E /* LoadMoreTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadMoreTrigger.swift; sourceTree = "<group>"; };
 		EE0000000000000000000078 /* LibraryEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEmptyStateView.swift; sourceTree = "<group>"; };
 		EE000000000000000000007A /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteView.swift; sourceTree = "<group>"; };
 		EE000000000000000000007C /* PopupHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupHeader.swift; sourceTree = "<group>"; };
@@ -364,6 +368,7 @@
 				EE0000000000000000000004 /* LockScreenSync.swift */,
 				EE0000000000000000000006 /* CommandListener.swift */,
 				EE0000000000000000000008 /* BatteryMonitor.swift */,
+				EE0000000000000000000090 /* PowerConditionMonitor.swift */,
 				EE0000000000000000000012 /* OtherAudioMonitor.swift */,
 				EE000000000000000000007E /* ThumbnailDownsampler.swift */,
 				EE0000000000000000000080 /* InboxLinksStore.swift */,
@@ -482,6 +487,7 @@
 				EE000000000000000000003A /* PopupCardStyle.swift */,
 				EE0000000000000000000074 /* FadingTitleText.swift */,
 				EE0000000000000000000076 /* BrowseStateView.swift */,
+				EE000000000000000000008E /* LoadMoreTrigger.swift */,
 				EE0000000000000000000078 /* LibraryEmptyStateView.swift */,
 				EE000000000000000000007A /* CommandPaletteView.swift */,
 				EE000000000000000000007C /* PopupHeader.swift */,
@@ -653,6 +659,7 @@
 				EE0000000000000000000003 /* LockScreenSync.swift in Sources */,
 				EE0000000000000000000005 /* CommandListener.swift in Sources */,
 				EE0000000000000000000007 /* BatteryMonitor.swift in Sources */,
+				EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */,
 				EE0000000000000000000011 /* OtherAudioMonitor.swift in Sources */,
 				EE000000000000000000007D /* ThumbnailDownsampler.swift in Sources */,
 				EE0000000000000000000009 /* ClockOverlay.swift in Sources */,
@@ -686,6 +693,7 @@
 				EE000000000000000000004F /* WallperViewModel.swift in Sources */,
 				EE0000000000000000000037 /* SteamWorkshopImportViewModel.swift in Sources */,
 				EE0000000000000000000039 /* PopupCardStyle.swift in Sources */,
+				EE000000000000000000008D /* LoadMoreTrigger.swift in Sources */,
 				EE0000000000000000000073 /* FadingTitleText.swift in Sources */,
 				EE0000000000000000000075 /* BrowseStateView.swift in Sources */,
 				EE0000000000000000000077 /* LibraryEmptyStateView.swift in Sources */,
