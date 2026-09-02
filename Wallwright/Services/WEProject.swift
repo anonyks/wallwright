@@ -8,32 +8,6 @@
 import SwiftUI
 import ImageIO
 
-struct WEProjectPropertyOption: Codable, Equatable, Hashable {
-    var label: String
-    var value: String
-}
-
-struct WEProjectProperty: Codable, Equatable, Hashable {
-    // optional
-    var condition: String?
-    var index: Int?
-    var options: [WEProjectPropertyOption]?
-    var order: Int?
-    
-    // must have
-    var text: String
-    var type: String
-    var value: String
-}
-
-struct WEProjectProperties: Codable, Equatable, Hashable {
-    var schemecolor: WEProjectProperty?
-}
-
-struct WEProjectGeneral: Codable, Equatable, Hashable {
-    var properties: WEProjectProperties
-}
-
 enum WorkshopId: Codable, Equatable, Hashable, RawRepresentable {
     case int(Int)
     case string(String)
@@ -77,19 +51,13 @@ enum WorkshopId: Codable, Equatable, Hashable, RawRepresentable {
 }
 
 struct WEProject: Codable, Equatable, Hashable {
-    var approved: Bool?
-    var contentrating: String?
     var description: String?
     var file: String
-    var general: WEProjectGeneral?
     var preview: String
     var tags: [String]?
     var title: String
-    var visibility: String?
     var workshopid: WorkshopId?
-    var workshopurl: String?
     var type: String
-    var version: Int?
 
     /// Wallpaper types Wallwright can actually import and render — video (AVFoundation playback)
     /// and image (static). Anything else (e.g. "scene"/"web" from a Steam Workshop package) is
@@ -242,23 +210,4 @@ enum WEWallpaperSortingMethod: String, CaseIterable, Identifiable {
 
 enum WEWallpaperSortingSequence: Int {
     case decrease = 0, increase = 1
-}
-
-enum WEInitError: Error {
-    enum WEJSONProjectInitError: Error {
-        case notFound, corrupted, mismatched, unkownError
-    }
-    
-    enum WEResourcesInitError: Error {
-        case notFound, mismatchedFormat, corrupted, unkownError
-    }
-    
-    enum WEPreviewInitError: Error {
-        case notFound, notImage, unkownError
-    }
-    
-    case badDirectoryPath
-    case JSONProject(was: WEJSONProjectInitError)
-    case resources(was: WEResourcesInitError)
-    case preview(was: WEPreviewInitError)
 }

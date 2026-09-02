@@ -88,10 +88,6 @@ final class ShortcutMenuItemView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setTitle(_ text: String) {
-        titleLabel.stringValue = text
-    }
-
     func setShortcut(_ text: String) {
         shortcutLabel.stringValue = text
     }
