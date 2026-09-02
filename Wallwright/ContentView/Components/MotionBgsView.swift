@@ -10,6 +10,7 @@ import SwiftUI
 struct MotionBgsView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var motionBgsVM: MotionBgsViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -151,6 +152,12 @@ struct MotionBgsView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(motionBgsVM.visibleItems) { item in
                         MotionBgsItemCard(item: item, viewModel: motionBgsVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == motionBgsVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: !motionBgsVM.isLoading,
+                                load: motionBgsVM.loadNextPage
+                            ))
                     }
                 }
                 .padding()

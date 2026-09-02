@@ -10,6 +10,7 @@ import SwiftUI
 struct WallperView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var wallperVM: WallperViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -124,6 +125,12 @@ struct WallperView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(wallperVM.visibleItems) { item in
                         WallperItemCard(item: item, viewModel: wallperVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == wallperVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: wallperVM.hasMore,
+                                load: wallperVM.loadMore
+                            ))
                     }
                 }
                 .padding()

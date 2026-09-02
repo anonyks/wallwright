@@ -10,6 +10,7 @@ import SwiftUI
 struct UhdPaperView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var uhdPaperVM: UhdPaperViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -125,6 +126,12 @@ struct UhdPaperView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(uhdPaperVM.visibleItems) { item in
                         UhdPaperItemCard(item: item, viewModel: uhdPaperVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == uhdPaperVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: !uhdPaperVM.isLoading,
+                                load: uhdPaperVM.loadNextPage
+                            ))
                     }
                 }
                 .padding()

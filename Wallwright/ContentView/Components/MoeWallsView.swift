@@ -10,6 +10,7 @@ import SwiftUI
 struct MoeWallsView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var moeWallsVM: MoeWallsViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -125,6 +126,12 @@ struct MoeWallsView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(moeWallsVM.visibleItems) { item in
                         MoeWallsItemCard(item: item, viewModel: moeWallsVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == moeWallsVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: !moeWallsVM.isLoading,
+                                load: moeWallsVM.loadNextPage
+                            ))
                     }
                 }
                 .padding()

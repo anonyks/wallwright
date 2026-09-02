@@ -12,6 +12,7 @@ import SwiftUI
 struct AlphaCodersView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var alphaCodersVM: AlphaCodersViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -127,6 +128,12 @@ struct AlphaCodersView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(alphaCodersVM.visibleItems) { item in
                         AlphaCodersItemCard(item: item, viewModel: alphaCodersVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == alphaCodersVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: !alphaCodersVM.isLoading,
+                                load: alphaCodersVM.loadNextPage
+                            ))
                     }
                 }
                 .padding()

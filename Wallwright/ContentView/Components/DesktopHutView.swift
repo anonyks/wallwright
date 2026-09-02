@@ -10,6 +10,7 @@ import SwiftUI
 struct DesktopHutView: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject private var desktopHutVM: DesktopHutViewModel
+    @State private var loadMoreVisible = false
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -125,6 +126,12 @@ struct DesktopHutView: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(desktopHutVM.visibleItems) { item in
                         DesktopHutItemCard(item: item, viewModel: desktopHutVM)
+                            .modifier(LoadMoreTrigger(
+                                isLast: item.id == desktopHutVM.visibleItems.last?.id,
+                                visible: $loadMoreVisible,
+                                canLoad: !desktopHutVM.isLoading,
+                                load: desktopHutVM.loadNextPage
+                            ))
                     }
                 }
                 .padding()
