@@ -46,7 +46,6 @@ struct ExplorerItem: SubviewOfContentView {
                     ? Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
                     : wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview))
                 .resizable()
-                .scaleEffect(isHovered && !reduceMotion ? 1.08 : 1.0)
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
                 .clipped()
                 // `preview.jpg`'s filename never changes when its content is regenerated (see

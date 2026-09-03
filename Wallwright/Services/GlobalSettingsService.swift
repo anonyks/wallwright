@@ -264,7 +264,6 @@ struct GlobalSettings: Codable, Equatable {
     }
 
     // MARK: Misc
-    var autoRefresh = true
     /// The `steamcmd` login name used for Workshop downloads — a one-time setup step happens
     /// outside the app (installing steamcmd and logging in once in Terminal, which caches
     /// credentials locally and handles Steam Guard interactively), and this is just which cached
@@ -332,7 +331,6 @@ struct GlobalSettings: Codable, Equatable {
         clockSummitLineLength = (try? c.decodeIfPresent(Double.self, forKey: .clockSummitLineLength)) ?? nil ?? 30
         clockDraggable = (try? c.decodeIfPresent(Bool.self, forKey: .clockDraggable)) ?? nil ?? false
         clockCustomOrigins = (try? c.decodeIfPresent([String: CGPoint].self, forKey: .clockCustomOrigins)) ?? nil
-        autoRefresh = (try? c.decodeIfPresent(Bool.self, forKey: .autoRefresh)) ?? nil ?? true
         steamUsername = (try? c.decodeIfPresent(String.self, forKey: .steamUsername)) ?? nil
         pauseHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .pauseHotkey)) ?? nil ?? Self.defaultPauseHotkey
         muteHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .muteHotkey)) ?? nil ?? Self.defaultMuteHotkey

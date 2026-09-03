@@ -33,16 +33,24 @@ struct ExplorerItemMenu: SubviewOfContentView {
 
             Section {
                 Button {
+                    AppDelegate.shared.playlistViewModel.addWallpapers([hoveredWallpaper.wallpaperDirectory])
+                } label: {
+                    Label("Add to Playlist", systemImage: "text.badge.plus")
+                }
+            }
+
+            Section {
+                Button(role: .destructive) {
                     viewModel.hoveredWallpaper = hoveredWallpaper
                     viewModel.isRemoveConfirming = true
                 } label: {
-                    Label("Remove", systemImage: "xmark")
+                    Label("Delete…", systemImage: "trash")
                 }
                 if viewModel.selectedWallpapers.count > 1 {
                     Button(role: .destructive) {
                         viewModel.isBatchRemoveConfirming = true
                     } label: {
-                        Label("Remove Selected (\(viewModel.selectedWallpapers.count))", systemImage: "xmark.circle")
+                        Label("Delete \(viewModel.selectedWallpapers.count) Selected…", systemImage: "trash")
                     }
                 }
             }
@@ -52,7 +60,7 @@ struct ExplorerItemMenu: SubviewOfContentView {
                     NSWorkspace.shared.selectFile(nil,
                                                   inFileViewerRootedAtPath: hoveredWallpaper.wallpaperDirectory.path(percentEncoded: false))
                 } label: {
-                    Label("Open in Finder", systemImage: "folder.badge.gearshape")
+                    Label("Show in Finder", systemImage: "folder")
                 }
             }
         }

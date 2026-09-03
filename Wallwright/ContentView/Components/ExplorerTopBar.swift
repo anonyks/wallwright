@@ -9,8 +9,7 @@ import SwiftUI
 
 struct ExplorerTopBar: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
-
-    @EnvironmentObject var globalSettingsViewModel: GlobalSettingsViewModel
+    @FocusState private var isSearchFocused: Bool
 
     init(contentViewModel viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -24,6 +23,15 @@ struct ExplorerTopBar: SubviewOfContentView {
                         .foregroundStyle(.secondary)
                     TextField("Search", text: $viewModel.searchText)
                         .textFieldStyle(.plain)
+                        .focused($isSearchFocused)
+                        // Only claims Escape while there's actually something to clear — an empty
+                        // search field returning `.ignored` lets it bubble up to whatever else
+                        // (a popup sheet) already handles Escape, same as before this existed.
+                        .onKeyPress(.escape) {
+                            guard !viewModel.searchText.isEmpty else { return .ignored }
+                            viewModel.searchText = ""
+                            return .handled
+                        }
                     if !viewModel.searchText.isEmpty {
                         Button {
                             viewModel.searchText = ""
@@ -50,18 +58,20 @@ struct ExplorerTopBar: SubviewOfContentView {
                 .help("Filter Results")
                 .accessibilityLabel("Filter Results")
 
-                if globalSettingsViewModel.settings.autoRefresh {
-                    Button {
-                        viewModel.refresh()
-                    } label: {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .frame(width: 16, height: 16)
-                    }
-                    .buttonStyle(.glass)
-                    .controlSize(.regular)
-                    .help("Refresh")
-                    .accessibilityLabel("Refresh")
+                // `settings.autoRefresh` used to gate this — always true in practice (never
+                // exposed as a toggle anywhere in Settings UI), so the button was effectively
+                // always shown anyway; the condition was dead weight, not a real manual/automatic
+                // distinction.
+                Button {
+                    viewModel.refresh()
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .frame(width: 16, height: 16)
                 }
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+                .help("Refresh")
+                .accessibilityLabel("Refresh")
 
                 Spacer(minLength: 10)
 
@@ -90,6 +100,14 @@ struct ExplorerTopBar: SubviewOfContentView {
                 .frame(height: 30)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 9))
             }
+        }
+        .background {
+            // Standard macOS "focus search" shortcut — invisible, zero-size; only exists to carry
+            // the keyboard shortcut binding, not to be seen or clicked.
+            Button("") { isSearchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
         }
     }
 }
