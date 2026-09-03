@@ -251,8 +251,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         wallpaperDebugLog.notice("applicationShouldHandleReopen fired — hasVisibleWindows=\(flag), mainWindow.isVisible=\(self.mainWindowController.window.isVisible), settingsWindow.isVisible=\(self.settingsWindow.isVisible)")
         if !self.mainWindowController.window.isVisible && !settingsWindow.isVisible {
-            wallpaperDebugLog.notice("applicationShouldHandleReopen — calling makeKeyAndOrderFront")
-            self.mainWindowController.window?.makeKeyAndOrderFront(nil)
+            // `openMainWindow()`, not a bare `makeKeyAndOrderFront` — that call alone doesn't
+            // activate the app, so the window appeared but keyboard focus silently stayed on
+            // whatever was frontmost before (Terminal, Finder, ...) until the user clicked inside
+            // it. `openMainWindow()` already does both.
+            wallpaperDebugLog.notice("applicationShouldHandleReopen — calling openMainWindow()")
+            openMainWindow()
         }
 
         return true
@@ -503,7 +507,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     func windowWillClose(_ notification: Notification) {
-        globalSettingsViewModel.reset()
+        // Was `globalSettingsViewModel.reset()` — that reloads `settings` from disk, discarding
+        // anything still sitting in the 300ms save debounce (see `settingsSaveCancellable`'s doc
+        // comment). A real, easily-reachable bug: change a toggle/slider in Settings, then close
+        // the window (⌘W or the red button) within 300ms, and the change silently reverted the
+        // next time anything read `settings`. `save()` is the correct flush here — same pattern
+        // `applicationWillTerminate` already uses for exactly this class of "don't lose a pending
+        // debounced write" situation, just on window close instead of quit.
+        globalSettingsViewModel.save()
     }
     
     func saveCurrentWallpaper() {
