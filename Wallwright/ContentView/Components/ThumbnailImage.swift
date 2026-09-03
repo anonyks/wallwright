@@ -27,12 +27,15 @@ import SwiftUI
 /// memory pressure" never actually had anything to act on: an app-lifetime cache of every distinct
 /// wallpaper's decoded preview ever viewed, at ~30MB+ uncompressed per 4K image, is exactly how a
 /// long browsing session turns into gigabytes of resident memory with nothing technically "leaked."
-/// 300MB comfortably holds a full typical library's worth of thumbnails without constant re-decode
-/// thrashing, while still actually bounding the cache instead of it growing for the process's
-/// entire lifetime.
+///
+/// 64MB, not the originally-picked 300MB — this is a wallpaper switcher, not a photo browser:
+/// wallpapers get changed rarely, so the re-decode this cache avoids is a once-in-a-while few-
+/// hundred-ms cost, not something worth carrying 300MB of idle residency for. 64MB still comfortably
+/// covers a full visit to the Library tab (dozens of ~1024px-max thumbnails) without re-decoding on
+/// every hover; it just doesn't try to also hold every browse-tab thumbnail seen all session.
 private let thumbnailImageCache: NSCache<NSString, NSImage> = {
     let cache = NSCache<NSString, NSImage>()
-    cache.totalCostLimit = 300 * 1024 * 1024
+    cache.totalCostLimit = 64 * 1024 * 1024
     return cache
 }()
 
