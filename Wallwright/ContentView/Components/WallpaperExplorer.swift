@@ -41,8 +41,13 @@ struct WallpaperExplorer: SubviewOfContentView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: viewModel.explorerIconSize,
                                                        maximum: viewModel.explorerIconSize * 2),
                                               spacing: 16)], alignment: .leading, spacing: 16) {
-                    ForEach(Array(items.enumerated()), id: \.0) { (index, wallpaper) in
-                        ExplorerItem(viewModel: viewModel, wallpaperViewModel: wallpaperViewModel, wallpaper: wallpaper, index: index)
+                    // Keyed by the wallpaper's own `Identifiable` id, not array position — a
+                    // position-keyed `ForEach` reuses a grid slot's view identity for whatever
+                    // wallpaper now lands at that index on any reorder (sort/filter change, an
+                    // import landing mid-list), which can transiently show a card's hover/border
+                    // `@State` and in-flight thumbnail `.task` against the wrong wallpaper.
+                    ForEach(items) { wallpaper in
+                        ExplorerItem(viewModel: viewModel, wallpaperViewModel: wallpaperViewModel, wallpaper: wallpaper)
                             .contextMenu {
                                 ExplorerItemMenu(contentViewModel: viewModel, wallpaperViewModel: wallpaperViewModel, current: wallpaper)
                             }

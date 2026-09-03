@@ -125,7 +125,7 @@ struct DesktopHutView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(desktopHutVM.visibleItems) { item in
-                        DesktopHutItemCard(item: item, viewModel: desktopHutVM)
+                        DesktopHutItemCard(item: item, viewModel: desktopHutVM, downloadState: desktopHutVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == desktopHutVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -157,7 +157,9 @@ struct DesktopHutView: SubviewOfContentView {
 
 private struct DesktopHutItemCard: View {
     let item: DesktopHutItem
-    @ObservedObject var viewModel: DesktopHutViewModel
+    // Not @ObservedObject — see MotionBgsItemCard's identical doc comment.
+    let viewModel: DesktopHutViewModel
+    let downloadState: DesktopHutViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -225,7 +227,7 @@ private struct DesktopHutItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

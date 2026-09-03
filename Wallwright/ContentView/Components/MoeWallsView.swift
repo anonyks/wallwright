@@ -125,7 +125,7 @@ struct MoeWallsView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(moeWallsVM.visibleItems) { item in
-                        MoeWallsItemCard(item: item, viewModel: moeWallsVM)
+                        MoeWallsItemCard(item: item, viewModel: moeWallsVM, downloadState: moeWallsVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == moeWallsVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -157,7 +157,11 @@ struct MoeWallsView: SubviewOfContentView {
 
 private struct MoeWallsItemCard: View {
     let item: MoeWallsItem
-    @ObservedObject var viewModel: MoeWallsViewModel
+    // Not @ObservedObject — see MotionBgsItemCard's identical doc comment: subscribing here would
+    // re-render every visible card on any change to `viewModel` at all, not just this item's own
+    // download state.
+    let viewModel: MoeWallsViewModel
+    let downloadState: MoeWallsViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -222,7 +226,7 @@ private struct MoeWallsItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

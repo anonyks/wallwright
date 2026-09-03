@@ -13,7 +13,6 @@ struct ExplorerItem: SubviewOfContentView {
     @ObservedObject var wallpaperViewModel: WallpaperViewModel
     
     var wallpaper: WEWallpaper
-    var index: Int
 
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

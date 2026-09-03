@@ -125,7 +125,7 @@ struct UhdPaperView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(uhdPaperVM.visibleItems) { item in
-                        UhdPaperItemCard(item: item, viewModel: uhdPaperVM)
+                        UhdPaperItemCard(item: item, viewModel: uhdPaperVM, downloadState: uhdPaperVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == uhdPaperVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -157,7 +157,9 @@ struct UhdPaperView: SubviewOfContentView {
 
 private struct UhdPaperItemCard: View {
     let item: UhdPaperItem
-    @ObservedObject var viewModel: UhdPaperViewModel
+    // Not @ObservedObject — see MotionBgsItemCard's identical doc comment.
+    let viewModel: UhdPaperViewModel
+    let downloadState: UhdPaperViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -224,7 +226,7 @@ private struct UhdPaperItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

@@ -151,7 +151,7 @@ struct MotionBgsView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(motionBgsVM.visibleItems) { item in
-                        MotionBgsItemCard(item: item, viewModel: motionBgsVM)
+                        MotionBgsItemCard(item: item, viewModel: motionBgsVM, downloadState: motionBgsVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == motionBgsVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -183,7 +183,16 @@ struct MotionBgsView: SubviewOfContentView {
 
 private struct MotionBgsItemCard: View {
     let item: MotionBgsItem
-    @ObservedObject var viewModel: MotionBgsViewModel
+    // Not @ObservedObject — subscribing here would re-render every visible card on any change to
+    // `viewModel` at all (any item's download progress, search text, category, etc.), since
+    // @ObservedObject forces its whole view to re-render on ANY publish from the object,
+    // regardless of which properties that view's body actually reads. `downloadState` below is
+    // the one piece of `viewModel` this card's body needs, read by the parent (which does observe
+    // the VM) and passed down as a plain value, so SwiftUI's own diffing can skip this card
+    // whenever ITS item's state hasn't changed. Still fine to call methods (hide/download) on a
+    // plain reference — those don't need a subscription, just a live object to call into.
+    let viewModel: MotionBgsViewModel
+    let downloadState: MotionBgsViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -251,7 +260,7 @@ private struct MotionBgsItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

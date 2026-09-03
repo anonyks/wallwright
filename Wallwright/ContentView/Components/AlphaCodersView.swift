@@ -127,7 +127,7 @@ struct AlphaCodersView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(alphaCodersVM.visibleItems) { item in
-                        AlphaCodersItemCard(item: item, viewModel: alphaCodersVM)
+                        AlphaCodersItemCard(item: item, viewModel: alphaCodersVM, downloadState: alphaCodersVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == alphaCodersVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -159,7 +159,9 @@ struct AlphaCodersView: SubviewOfContentView {
 
 private struct AlphaCodersItemCard: View {
     let item: AlphaCodersItem
-    @ObservedObject var viewModel: AlphaCodersViewModel
+    // Not @ObservedObject — see MotionBgsItemCard's identical doc comment.
+    let viewModel: AlphaCodersViewModel
+    let downloadState: AlphaCodersViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -228,7 +230,7 @@ private struct AlphaCodersItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

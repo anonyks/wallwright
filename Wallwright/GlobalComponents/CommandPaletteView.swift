@@ -196,8 +196,14 @@ struct CommandPaletteView: SubviewOfContentView {
             // nothing visibly tracking it. The list itself never followed the selection.
             ScrollViewReader { scrollProxy in
                 ScrollView {
+                    // Computed once per render, not once per row — `sections` re-filters the
+                    // entire library (via `filtered`), and the old code called `allRows`
+                    // (`sections.flatMap`) inside the inner `ForEach` to look up each row's index,
+                    // recomputing that whole filter once per displayed row instead of once total.
+                    let currentSections = sections
+                    let rows = currentSections.flatMap(\.rows)
                     LazyVStack(alignment: .leading, spacing: 10) {
-                        if allRows.isEmpty {
+                        if rows.isEmpty {
                             // Icon + message — every other empty/error state in the app pairs the
                             // two (BrowseStateView, LibraryEmptyStateView, WallpaperExplorer's own
                             // "no matches"); this was the one place that didn't.
@@ -211,7 +217,7 @@ struct CommandPaletteView: SubviewOfContentView {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 24)
                         } else {
-                            ForEach(sections, id: \.title) { section in
+                            ForEach(currentSections, id: \.title) { section in
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(section.title)
                                         .font(.caption.weight(.semibold))
@@ -220,7 +226,7 @@ struct CommandPaletteView: SubviewOfContentView {
                                         .padding(.horizontal, 10)
                                         .padding(.top, 4)
                                     ForEach(section.rows) { row in
-                                        let index = allRows.firstIndex(where: { $0.id == row.id }) ?? 0
+                                        let index = rows.firstIndex(where: { $0.id == row.id }) ?? 0
                                         paletteRow(row, isSelected: index == selectedIndex)
                                             .id(row.id)
                                             .onTapGesture {

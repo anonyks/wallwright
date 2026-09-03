@@ -75,9 +75,11 @@ private struct PlaylistFile: Codable {
 }
 
 final class PlaylistViewModel: ObservableObject {
-    @Published var playlist = Playlist() {
-        didSet { save() }
-    }
+    // `save()` no longer runs directly from `didSet` — see `playlistSaveCancellable`'s doc comment
+    // in `init` for why.
+    @Published var playlist = Playlist()
+
+    private var playlistSaveCancellable: AnyCancellable?
     @Published var isActive = false {
         didSet {
             if isActive != oldValue {
@@ -122,10 +124,23 @@ final class PlaylistViewModel: ObservableObject {
         self.isActive = loaded.isActive
         self.isPinned = loaded.isPinned
         if isActive { startTicking() }
+
+        // `playlist.timedIntervalMinutes` binds directly to a Slider (PlaylistSettings.swift),
+        // which updates its binding on every tick of a drag, not just on release — `didSet {
+        // save() }` used to fire a full synchronous JSONEncoder pass + atomic file write on every
+        // one of those ticks. Debounced the same way GlobalSettingsService's own settings save is:
+        // collapse a rapid burst into one write once the value settles.
+        // `applicationWillTerminate` flushes any still-pending write synchronously on a normal
+        // quit.
+        self.playlistSaveCancellable = $playlist
+            .dropFirst()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.save() }
     }
 
     deinit {
         tickTimer?.invalidate()
+        playlistSaveCancellable?.cancel()
     }
 
     // MARK: - Persistence
@@ -146,7 +161,9 @@ final class PlaylistViewModel: ObservableObject {
         return file
     }
 
-    private func save() {
+    /// Not private — `AppDelegate.applicationWillTerminate` calls this directly to flush any
+    /// still-pending debounced write on a normal quit.
+    func save() {
         let file = PlaylistFile(playlist: playlist, isActive: isActive, isPinned: isPinned)
         guard let data = try? JSONEncoder().encode(file) else { return }
         try? data.write(to: Self.playlistFileURL, options: .atomic)

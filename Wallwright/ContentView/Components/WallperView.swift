@@ -124,7 +124,7 @@ struct WallperView: SubviewOfContentView {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(wallperVM.visibleItems) { item in
-                        WallperItemCard(item: item, viewModel: wallperVM)
+                        WallperItemCard(item: item, viewModel: wallperVM, downloadState: wallperVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
                                 isLast: item.id == wallperVM.visibleItems.last?.id,
                                 visible: $loadMoreVisible,
@@ -149,7 +149,9 @@ struct WallperView: SubviewOfContentView {
 
 private struct WallperItemCard: View {
     let item: WallperItem
-    @ObservedObject var viewModel: WallperViewModel
+    // Not @ObservedObject — see MotionBgsItemCard's identical doc comment.
+    let viewModel: WallperViewModel
+    let downloadState: WallperViewModel.DownloadState?
 
     @State private var isHovered = false
 
@@ -217,7 +219,7 @@ private struct WallperItemCard: View {
 
     @ViewBuilder
     private var downloadControl: some View {
-        switch viewModel.downloadState[item.id] {
+        switch downloadState {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 3) {
                 if let progress {

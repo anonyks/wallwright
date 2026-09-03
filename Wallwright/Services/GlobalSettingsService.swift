@@ -345,8 +345,16 @@ struct GlobalSettings: Codable, Equatable {
 class GlobalSettingsViewModel: ObservableObject {
     @Published var settings: GlobalSettings
     {
-        didSet { save(); validate() }
+        // `save()` no longer runs here directly — see `settingsSaveCancellable`'s doc comment in
+        // `init` for why. `validate()` stays synchronous: it's cheap (no disk I/O) and some of what
+        // it does (`NSApp.appearance`) should track the live value immediately, not lag behind a
+        // debounce.
+        didSet { validate() }
     }
+
+    /// Debounces the actual disk write for `settings` — see its own doc comment where it's wired
+    /// up in `init`.
+    var settingsSaveCancellable: Cancellable?
     
     @Published var selection = 0
     
@@ -427,6 +435,7 @@ class GlobalSettingsViewModel: ObservableObject {
         didFullscreenChangeCancellable?.cancel()
         didDisplaySleepChangeCancellable?.cancel()
         didChangeHotkeysCancellable?.cancel()
+        settingsSaveCancellable?.cancel()
     }
     
     func didFinishLaunchingNotification() {
@@ -493,6 +502,22 @@ class GlobalSettingsViewModel: ObservableObject {
             // rapid changes into a single rebuild once the value settles.
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .sink { _ in AppDelegate.shared.rebuildClockWindows() }
+
+        // `settings` used to call `save()` — a full `JSONEncoder` pass + atomic file write +
+        // `UserDefaults` write, all synchronous on the main thread — directly from its own
+        // `didSet`, on every single mutation. Several Settings sliders (clock opacity/size/spacing
+        // in ClockSettings.swift) bind straight to fields inside this struct, and a SwiftUI
+        // `Slider` updates its binding continuously through a drag, not just on release — so
+        // dragging one fired that full disk write dozens of times per second. Debounced the exact
+        // same way the clock-window-rebuild subscription just above already is: collapse a rapid
+        // burst into a single write once the value settles. `applicationWillTerminate` (see
+        // AppDelegate) flushes any still-pending write synchronously on a normal quit, so this only
+        // trades a normal quit's write timing by up to 300ms — a hard kill already couldn't be
+        // covered by any app-level code regardless of how `save()` is triggered.
+        self.settingsSaveCancellable = self.$settings
+            .dropFirst()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.save() }
 
         // `.keepRunning` (the default — most users never touch this picker) means nothing ever
         // consumes `OtherAudioMonitor.isOtherAppPlaying`, so there's no reason to run its 2s
