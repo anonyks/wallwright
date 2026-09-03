@@ -450,21 +450,28 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// pattern — turns that into O(n) calls regardless of comparator cost.
     private var sortedWallpapers: [WEWallpaper] {
         let items = filteredWallpapers
+        // Every case here used to compare via `if a <= b, increase { return false }` / `if a >= b,
+        // decrease { return false }` — not a valid strict-weak-ordering predicate, and one that
+        // happens to invert both directions: traced through by hand (e.g. "Apple"/"Zebra" under
+        // `.increase`), `.increase` — labeled "Ascending" in ExplorerTopBar's own tooltip —
+        // actually sorted Z-to-A, largest-first, and newest-first, while `.decrease` ("Descending")
+        // produced the reverse. Every sort option in the app was backwards. Replaced with plain
+        // `<`/`>` comparisons — a real strict-weak ordering, and impossible to accidentally invert
+        // the same way. `.name` also switches to `localizedStandardCompare`, matching Finder's
+        // natural sort (was raw Unicode-ordinal `<=`, which put "Wallpaper 10" before "Wallpaper 2"
+        // and every uppercase letter before every lowercase one).
         switch sortingBy {
         case .name:
             return items.sorted {
-                if $0.project.title <= $1.project.title, sortingSequence == .increase { return false }
-                if $0.project.title >= $1.project.title, sortingSequence == .decrease { return false }
-                return true
+                let order = $0.project.title.localizedStandardCompare($1.project.title)
+                return sortingSequence == .increase ? order == .orderedAscending : order == .orderedDescending
             }
         case .fileSize:
             let sizes = Dictionary(uniqueKeysWithValues: items.map { ($0.wallpaperDirectory, $0.wallpaperSize) })
             return items.sorted {
                 let lhs = sizes[$0.wallpaperDirectory] ?? 0
                 let rhs = sizes[$1.wallpaperDirectory] ?? 0
-                if lhs <= rhs, sortingSequence == .increase { return false }
-                if lhs >= rhs, sortingSequence == .decrease { return false }
-                return true
+                return sortingSequence == .increase ? lhs < rhs : lhs > rhs
             }
         case .estimatedImpact:
             let impacts = Dictionary(uniqueKeysWithValues: items.map {
@@ -473,17 +480,13 @@ class ContentViewModel: ObservableObject, DropDelegate {
             return items.sorted {
                 let lhs = impacts[$0.wallpaperDirectory] ?? 0
                 let rhs = impacts[$1.wallpaperDirectory] ?? 0
-                if lhs <= rhs, sortingSequence == .increase { return false }
-                if lhs >= rhs, sortingSequence == .decrease { return false }
-                return true
+                return sortingSequence == .increase ? lhs < rhs : lhs > rhs
             }
         case .recentlyAdded:
             return items.sorted {
                 let lhsDate = $0.dateAdded ?? .distantPast
                 let rhsDate = $1.dateAdded ?? .distantPast
-                if lhsDate <= rhsDate, sortingSequence == .increase { return false }
-                if lhsDate >= rhsDate, sortingSequence == .decrease { return false }
-                return true
+                return sortingSequence == .increase ? lhsDate < rhsDate : lhsDate > rhsDate
             }
         }
     }
@@ -533,65 +536,100 @@ class ContentViewModel: ObservableObject, DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let itemProvider = info.itemProviders(for: [UTType.fileURL]).first
-        else {
+        let itemProviders = info.itemProviders(for: [UTType.fileURL])
+        guard !itemProviders.isEmpty else {
             alertImportModal(which: .unkown)
             return false
         }
-        itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] item, _ in
-            guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil)
-            else {
-                self?.alertImportModal(which: .unkown)
-                return
-            }
-            // Do something with the file url
-            // remember to dispatch on main in case of a @State change
-            guard let wallpaper = try? FileWrapper(url: url)
-            else{
-                self?.alertImportModal(which: .unkown)
-                return
-            }
-            
-            if wallpaper.isDirectory {
-                guard wallpaper.fileWrappers?["project.json"] != nil
-                else{
-                    self?.alertImportModal(which: .doesNotContainWallpaper)
+        // Was `.first` — silently dropping every file past the first one in a multi-file Finder
+        // drag, with zero feedback that anything was skipped. Confirmed live: dragging 5 videos
+        // onto the grid imported exactly 1. `NSItemProvider.loadItem` is completion-handler based
+        // with no guaranteed callback thread, so each one is wrapped into async/await here and the
+        // whole batch gathered before any of it runs, rather than trying to fire N independent
+        // completion handlers that each individually touch `self`.
+        Task { @MainActor [weak self] in
+            await self?.handleDroppedItemProviders(itemProviders)
+        }
+        return true
+    }
+
+    private static func loadFileURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                    continuation.resume(returning: nil)
                     return
                 }
-                DispatchQueue.main.async {
-                    try? FileManager.default.copyItem(
-                        at: url,
-                        to: FileManager.default.wallpapersDirectory
-                            .appending(path: url.lastPathComponent)
-                    )
-                    self?.refresh()
+                continuation.resume(returning: url)
+            }
+        }
+    }
+
+    /// The batch half of `performDrop` — gathers every dropped item provider's URL first, then
+    /// routes each by type. Directories and zips are still imported one at a time (each is its own
+    /// self-contained package), but video/image files are collected into one array apiece and
+    /// handed to `enqueueImports`/`enqueueImageImports` as a single batch, the same review-queue
+    /// path a multi-select Finder "Open With" already uses.
+    private func handleDroppedItemProviders(_ itemProviders: [NSItemProvider]) async {
+        var urls: [URL] = []
+        for provider in itemProviders {
+            guard let url = await Self.loadFileURL(from: provider) else { continue }
+            urls.append(url)
+        }
+        guard !urls.isEmpty else {
+            alertImportModal(which: .unkown)
+            return
+        }
+
+        var videoURLs: [URL] = []
+        var imageURLs: [URL] = []
+        var didImportPackage = false
+
+        for url in urls {
+            guard let wallpaper = try? FileWrapper(url: url) else {
+                alertImportModal(which: .unkown)
+                continue
+            }
+
+            if wallpaper.isDirectory {
+                guard wallpaper.fileWrappers?["project.json"] != nil else {
+                    alertImportModal(which: .doesNotContainWallpaper)
+                    continue
                 }
+                // Was a raw `wallpapersDirectory.appending(path: url.lastPathComponent)` +
+                // `try?` — silently failed the whole import whenever the SOURCE folder's own name
+                // (not the wallpaper's title) collided with anything already in the library, with
+                // zero feedback. `uniqueWallpaperDestination` sanitizes and de-collides instead.
+                try? FileManager.default.copyItem(
+                    at: url,
+                    to: FileManager.default.uniqueWallpaperDestination(forTitle: url.lastPathComponent)
+                )
+                didImportPackage = true
             } else if wallpaper.isRegularFile, url.pathExtension.lowercased() == "zip" {
                 // Off-main — `ZipImporter.importZip` shells out to `ditto` and blocks on
                 // `waitUntilExit()`, which can take a long time for a large archive. Running that
                 // on the main thread froze the whole app (unresponsive window, no way to cancel)
-                // for as long as extraction took. `notifyLibraryChanged()` inside `importZip` is
-                // safe to post from here — `ContentViewModel`'s own subscriber already hops to
-                // main via `.receive(on: DispatchQueue.main)`.
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let count = ZipImporter.importZip(at: url)
-                    DispatchQueue.main.async {
-                        if count == 0 {
-                            self?.alertImportModal(which: .doesNotContainWallpaper)
-                        }
-                    }
+                // for as long as extraction took.
+                let count = await Task.detached(priority: .userInitiated) { ZipImporter.importZip(at: url) }.value
+                if count == 0 {
+                    alertImportModal(which: .doesNotContainWallpaper)
                 }
             } else if wallpaper.isRegularFile, VideoImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
-                Task { @MainActor in
-                    await self?.enqueueImports([url])
-                }
+                videoURLs.append(url)
             } else if wallpaper.isRegularFile, ImageImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
-                Task { @MainActor in
-                    await self?.enqueueImageImports([url])
-                }
+                imageURLs.append(url)
             }
         }
-        return true
+
+        if didImportPackage {
+            refresh()
+        }
+        if !videoURLs.isEmpty {
+            await enqueueImports(videoURLs)
+        }
+        if !imageURLs.isEmpty {
+            await enqueueImageImports(imageURLs)
+        }
     }
     
     /// Re-scans the wallpapers directory and re-decodes every project.json — the one place that
