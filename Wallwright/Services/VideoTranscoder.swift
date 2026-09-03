@@ -171,11 +171,15 @@ enum VideoTranscoder {
         process.standardOutput = Pipe()
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
+        // `syncQueue` serializes access to `stderrData` between this handler (fires on its own
+        // background queue) and the read below — same fix as the identical pattern in
+        // YtDlpService/SteamWorkshopService.
+        let syncQueue = DispatchQueue(label: "VideoTranscoder.subprocess-sync")
         var stderrData = Data()
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
 
         try process.run()
@@ -204,7 +208,7 @@ enum VideoTranscoder {
             // ffmpeg always prints its full version/build banner to stderr before any real error,
             // so surfacing the whole blob is nearly useless — pull out the actual failure lines
             // (anything ffmpeg itself flags with "Error"/"Invalid"/"failed") instead.
-            let fullMessage = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fullMessage = syncQueue.sync { String(data: stderrData, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines)
             let relevantLines = fullMessage?
                 .split(separator: "\n")
                 .filter { $0.localizedCaseInsensitiveContains("error") || $0.localizedCaseInsensitiveContains("invalid") || $0.localizedCaseInsensitiveContains("failed") }

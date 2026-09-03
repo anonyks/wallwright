@@ -40,11 +40,15 @@ enum VideoCropDetector {
         process.standardOutput = Pipe()
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
+        // `syncQueue` serializes access to `stderrData` between this handler (fires on its own
+        // background queue) and the read below — same fix as the identical pattern in
+        // YtDlpService/SteamWorkshopService/VideoTranscoder.
+        let syncQueue = DispatchQueue(label: "VideoCropDetector.detectBlackBars-sync")
         var stderrData = Data()
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
         guard (try? process.run()) != nil else { return nil }
         // Same class of bug as `YtDlpService.fetchInfo`'s missing timeout (see its doc comment) —
@@ -64,7 +68,7 @@ enum VideoCropDetector {
         timeoutTask.cancel()
         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-        guard let output = String(data: stderrData, encoding: .utf8),
+        guard let output = syncQueue.sync(execute: { String(data: stderrData, encoding: .utf8) }),
               let regex = try? NSRegularExpression(pattern: #"crop=\d+:\d+:\d+:\d+"#)
         else { return nil }
 
@@ -110,11 +114,14 @@ enum VideoCropDetector {
         process.standardOutput = Pipe()
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
+        // `syncQueue` serializes access to `stderrData` — see `detectBlackBars`'s identical fix
+        // above for why.
+        let syncQueue = DispatchQueue(label: "VideoCropDetector.crop-sync")
         var stderrData = Data()
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
         try process.run()
         // A generous 5-minute ceiling, not a tight one — unlike `detectBlackBars`'s fixed 200-frame
@@ -136,7 +143,7 @@ enum VideoCropDetector {
         stderrPipe.fileHandleForReading.readabilityHandler = nil
         guard process.terminationStatus == 0, !timedOut else {
             if timedOut { throw VideoTranscoderError.transcodeFailed("Timed out after 5 minutes") }
-            let message = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = syncQueue.sync { String(data: stderrData, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines)
             throw VideoTranscoderError.transcodeFailed(message?.isEmpty == false ? message! : "ffmpeg exited with status \(process.terminationStatus)")
         }
     }

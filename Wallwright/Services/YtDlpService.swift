@@ -207,11 +207,19 @@ enum YtDlpService {
         // Must also be drained continuously (not just read after exit) — yt-dlp's own stderr
         // warnings can exceed the pipe buffer during a long download and deadlock the process
         // otherwise, same as the stdout JSON blob in fetchInfo's run().
+        //
+        // `syncQueue` serializes access to `stderrData` between this handler (fires on its own
+        // background queue) and the read below (after `terminationHandler` resumes, on whatever
+        // queue Foundation calls it from) — an unsynchronized `Data.append` racing a concurrent
+        // read is undefined behavior, not just "might miss a few final bytes." Same fix as the
+        // (more severe, since it could double-resume a continuation) version of this pattern in
+        // SteamWorkshopService.
+        let syncQueue = DispatchQueue(label: "YtDlpService.subprocess-sync")
         var stderrData = Data()
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
 
         // Everything from here on can throw before ever producing a result the caller will take
@@ -228,7 +236,7 @@ enum YtDlpService {
             stderrPipe.fileHandleForReading.readabilityHandler = nil
 
             guard process.terminationStatus == 0 else {
-                let message = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let message = syncQueue.sync { String(data: stderrData, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines)
                 throw YtDlpError.downloadFailed(message?.isEmpty == false ? message! : "yt-dlp exited with status \(process.terminationStatus)")
             }
 
@@ -309,17 +317,22 @@ enum YtDlpService {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        // `syncQueue` serializes access to `stdoutData`/`stderrData` between these handlers (each
+        // fires on its own background queue) and the final read below — see the identical fix's
+        // doc comment earlier in this file for why an unsynchronized `Data.append` racing a
+        // concurrent read is a real correctness issue, not just theoretical.
+        let syncQueue = DispatchQueue(label: "YtDlpService.run-subprocess-sync")
         var stdoutData = Data()
         var stderrData = Data()
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stdoutData.append(chunk)
+            syncQueue.sync { stdoutData.append(chunk) }
         }
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
 
         try process.run()
@@ -340,6 +353,6 @@ enum YtDlpService {
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-        return (stdoutData, stderrData, process.terminationStatus)
+        return syncQueue.sync { (stdoutData, stderrData, process.terminationStatus) }
     }
 }

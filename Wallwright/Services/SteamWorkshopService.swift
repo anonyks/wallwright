@@ -176,11 +176,22 @@ enum SteamWorkshopService {
 
         // Drained continuously, not read after exit — same pipe-buffer-deadlock hazard already
         // hit (and fixed) in YtDlpService: steamcmd's own update-check chatter can exceed 64KB.
+        //
+        // `syncQueue` serializes every read/write of `stdoutData`/`stderrData`/`didResume` below —
+        // `readabilityHandler` (fires on its own background queue), `terminationHandler` (fires on
+        // a queue Foundation owns), and the `asyncAfter` timeout below all run concurrently with
+        // each other with no inherent ordering. Without this, `terminationHandler` and the timeout
+        // could both pass their `!didResume` check before either set it, and both call
+        // `continuation.resume()` — a checked continuation resumed twice is a hard runtime crash,
+        // not just a data race; confirmed via Swift 6 strict-concurrency diagnostics on this exact
+        // code (`mutation of captured var ... in concurrently-executing code`), which correctly
+        // flags this as a real, reachable bug, not a false positive.
+        let syncQueue = DispatchQueue(label: "SteamWorkshopService.subprocess-sync")
         var stdoutData = Data()
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stdoutData.append(chunk)
+            syncQueue.sync { stdoutData.append(chunk) }
             if let text = String(data: chunk, encoding: .utf8) {
                 for line in text.split(separator: "\n") {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -193,7 +204,7 @@ enum SteamWorkshopService {
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             guard !chunk.isEmpty else { return }
-            stderrData.append(chunk)
+            syncQueue.sync { stderrData.append(chunk) }
         }
 
         try process.run()
@@ -207,17 +218,21 @@ enum SteamWorkshopService {
         let timeoutTail: String? = await withCheckedContinuation { continuation in
             var didResume = false
             process.terminationHandler = { _ in
-                guard !didResume else { return }
-                didResume = true
-                continuation.resume(returning: nil)
+                syncQueue.sync {
+                    guard !didResume else { return }
+                    didResume = true
+                    continuation.resume(returning: nil)
+                }
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + 300) {
-                guard !didResume else { return }
-                didResume = true
-                let tail = String(data: stdoutData, encoding: .utf8)?
-                    .split(separator: "\n").suffix(6).joined(separator: "\n") ?? ""
-                if process.isRunning { process.terminate() }
-                continuation.resume(returning: tail)
+                syncQueue.sync {
+                    guard !didResume else { return }
+                    didResume = true
+                    let tail = String(data: stdoutData, encoding: .utf8)?
+                        .split(separator: "\n").suffix(6).joined(separator: "\n") ?? ""
+                    if process.isRunning { process.terminate() }
+                    continuation.resume(returning: tail)
+                }
             }
         }
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
@@ -225,7 +240,7 @@ enum SteamWorkshopService {
 
         if let timeoutTail { throw SteamWorkshopError.timedOut(timeoutTail) }
 
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+        let stdout = syncQueue.sync { String(data: stdoutData, encoding: .utf8) ?? "" }
 
         if stdout.contains("Missing decryption key") {
             throw SteamWorkshopError.notOwned
@@ -240,7 +255,7 @@ enum SteamWorkshopService {
         guard let marker = stdout.range(of: "Downloaded item \(itemId) to \""),
               let closingQuote = stdout[marker.upperBound...].range(of: "\"")
         else {
-            let message = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = syncQueue.sync { String(data: stderrData, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines)
             let tail = stdout.split(separator: "\n").suffix(3).joined(separator: " ")
             throw SteamWorkshopError.downloadFailed(message?.isEmpty == false ? message! : (tail.isEmpty ? "unknown error" : tail))
         }
