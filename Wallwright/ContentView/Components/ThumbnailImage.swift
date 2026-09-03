@@ -31,11 +31,20 @@ import SwiftUI
 /// 64MB, not the originally-picked 300MB — this is a wallpaper switcher, not a photo browser:
 /// wallpapers get changed rarely, so the re-decode this cache avoids is a once-in-a-while few-
 /// hundred-ms cost, not something worth carrying 300MB of idle residency for. 64MB still comfortably
-/// covers a full visit to the Library tab (dozens of ~1024px-max thumbnails) without re-decoding on
-/// every hover; it just doesn't try to also hold every browse-tab thumbnail seen all session.
+/// covers a full visit to the Library tab (dozens of ~640px-max thumbnails, see
+/// ThumbnailDownsampler.maxDimension) without re-decoding on every hover; it just doesn't try to
+/// also hold every browse-tab thumbnail seen all session.
+///
+/// `countLimit` alongside `totalCostLimit`, not instead of it — `NSCache` documents
+/// `totalCostLimit` as advisory (it "may not evict... even if total cost exceeds this limit" absent
+/// real memory pressure), confirmed live: real footprint sat well above 64MB of thumbnail cost
+/// after a normal browsing session with nothing forcing eviction. `countLimit` is enforced more
+/// eagerly in practice, so it bounds the same worst case a different way — 60 comfortably covers
+/// one full Library-tab visit for a typical library without constantly evicting-then-redecoding.
 private let thumbnailImageCache: NSCache<NSString, NSImage> = {
     let cache = NSCache<NSString, NSImage>()
     cache.totalCostLimit = 64 * 1024 * 1024
+    cache.countLimit = 60
     return cache
 }()
 

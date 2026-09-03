@@ -25,7 +25,16 @@ enum ThumbnailDownsampler {
     /// Comfortably larger than any place a generated thumbnail is actually displayed (grid cells,
     /// the 420pt-wide import review sheet, hover previews) while avoiding ever holding or writing
     /// a full 4K/8K decode just to show one.
-    static let maxDimension: CGFloat = 1024
+    ///
+    /// 640, not the original 1024 — the grid's largest card size (explorerIconSize's "Large"
+    /// option, 280pt) tops out around 560-640px on a 2x Retina display even accounting for the
+    /// adaptive grid's own column stretch, so 1024 was decoding real, held-in-memory bitmaps at
+    /// roughly double the pixels any card can actually show. At 4 bytes/pixel that's the
+    /// difference between a ~4.2MB and a ~1.6MB thumbnail — with dozens of thumbnails realistically
+    /// resident at once during a browsing session (NSCache's totalCostLimit is advisory, not an
+    /// immediate hard cap — see ThumbnailImage.swift), that multiplies into a real difference in
+    /// peak memory, not just a per-image rounding error.
+    static let maxDimension: CGFloat = 640
 
     /// For rendering a static image wallpaper on an actual screen — not a thumbnail, so this
     /// intentionally decodes much larger than `maxDimension`, capped to the screen's own native
