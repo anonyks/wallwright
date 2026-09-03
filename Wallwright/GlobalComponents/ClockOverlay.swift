@@ -121,6 +121,10 @@ final class ClockOverlayView: NSView {
 
     private static let dayFormatter: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEEE"; return f }()
     private static let dateFormatter: DateFormatter = { let f = DateFormatter(); f.dateFormat = "d MMMM, yyyy"; return f }()
+    // Shared by draw() and drawSummitFormat() — the two are mutually exclusive per draw() call
+    // (draw() returns early into drawSummitFormat() when that format is selected), so one cached
+    // instance is safe; only .dateFormat needs to change per call, not the whole formatter.
+    private static let timeFormatter: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); return f }()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -211,14 +215,12 @@ final class ClockOverlayView: NSView {
             .kern: 3.5 as NSNumber, .shadow: textShadow,
         ]
 
-        let timeFormatter = DateFormatter()
         // Without a fixed locale, DateFormatter silently overrides a literal "HH" pattern back to
         // the system's 12/24-hour preference — this is what actually makes the toggle take effect.
-        timeFormatter.locale = Locale(identifier: "en_US_POSIX")
-        timeFormatter.dateFormat = settings.clockUse24HourTime
+        Self.timeFormatter.dateFormat = settings.clockUse24HourTime
             ? (settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")
             : (settings.clockShowSeconds ? "h:mm:ss a" : "h:mm a")
-        let timeString = NSAttributedString(string: "- " + timeFormatter.string(from: now).uppercased() + " -", attributes: timeAttrs)
+        let timeString = NSAttributedString(string: "- " + Self.timeFormatter.string(from: now).uppercased() + " -", attributes: timeAttrs)
 
         let dateSize = dateString.size()
         let timeSize = timeString.size()
@@ -308,16 +310,14 @@ final class ClockOverlayView: NSView {
         let dayString = NSAttributedString(string: Self.summitDayFormatter.string(from: now).uppercased(), attributes: dayAttrs)
         let dateString = NSAttributedString(string: Self.summitDateFormatter.string(from: now).uppercased(), attributes: bodyAttrs)
 
-        let timeFormatter = DateFormatter()
-        timeFormatter.locale = Locale(identifier: "en_US_POSIX")
-        timeFormatter.dateFormat = settings.clockUse24HourTime
+        Self.timeFormatter.dateFormat = settings.clockUse24HourTime
             ? (settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")
             : (settings.clockShowSeconds ? "h:mm:ss a" : "h:mm a")
         let timeAttrs: [NSAttributedString.Key: Any] = [
             .font: clockFont(.summit, size: timeFontSize, fallbackWeight: .semibold), .foregroundColor: textColor,
             .kern: (timeFontSize * 0.2) as NSNumber, .shadow: textShadow,
         ]
-        let timeString = NSAttributedString(string: timeFormatter.string(from: now).uppercased(), attributes: timeAttrs)
+        let timeString = NSAttributedString(string: Self.timeFormatter.string(from: now).uppercased(), attributes: timeAttrs)
 
         let greetingSize = greetingString.size()
         let timeOfDaySize = timeOfDayString.size()
