@@ -49,5 +49,13 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
     override func windowDidLoad() {
         super.windowDidLoad()
     }
-    
+
+    /// Evicts the shared thumbnail cache (library grid + every browse tab) once nothing can be
+    /// looking at it — keeps the app's footprint down while it's just sitting in the menu bar,
+    /// without touching per-source state (e.g. WallperViewModel's fetched sitemap) that would cost
+    /// a real re-fetch over the network to rebuild on the next window open.
+    func windowWillClose(_ notification: Notification) {
+        ThumbnailImage.clearCache()
+    }
+
 }

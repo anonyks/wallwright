@@ -40,6 +40,13 @@ private let thumbnailImageCache: NSCache<NSString, NSImage> = {
 }()
 
 struct ThumbnailImage: NSViewRepresentable {
+    /// Evicts every cached decoded thumbnail — called on the main window closing (see
+    /// `MainWindowController.windowWillClose`), since nothing can be looking at a thumbnail grid
+    /// while that window is gone. Safe to call any time: a cell just re-decodes (from the already-
+    /// downsampled preview file, not a fresh full-res source) the next time it becomes visible.
+    static func clearCache() {
+        thumbnailImageCache.removeAllObjects()
+    }
 
     var url: URL
 
