@@ -52,3 +52,8 @@ references/*/repo/
 ## Third-party competitor app binaries/DMGs gathered for local resource-usage comparison — not
 ## ours to redistribute, and not project source.
 references/dmgs/
+
+## Sibling macOS wallpaper-engine repos cloned for architecture research (singular "reference/",
+## a flat structure — separate from the "references/*/repo/" convention above). Disposable,
+## easily re-cloned, not project source.
+reference/
