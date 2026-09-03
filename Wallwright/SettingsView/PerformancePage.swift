@@ -89,7 +89,7 @@ struct PerformancePage: SettingsPage {
         .formStyle(.grouped)
     }
 
-    /// `SystemUsageMonitor.sample()`'s CPU reading spans a full second of wall-clock time, so
+    /// `SystemUsageMonitor.sample()`'s CPU reading spans several seconds of wall-clock time, so
     /// calling it directly from `.onAppear`/a button action would block the main thread right as
     /// this page appeared or the refresh button was clicked. Dispatching it off-main and updating
     /// state on completion keeps the page itself responsive; `usageSnapshot` starting `nil` already

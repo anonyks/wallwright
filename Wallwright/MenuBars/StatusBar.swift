@@ -262,12 +262,12 @@ extension AppDelegate: NSMenuDelegate {
         }
 
         // Sample CPU/memory only while the menu is actually open being looked at — not on a timer.
-        // `sample()`'s CPU reading spans a full second of wall-clock time (see its own doc comment
-        // for why), so doing that synchronously here would visibly freeze the menu right as it
-        // opens. Showing a placeholder immediately and filling in the real value a beat later off
-        // the main thread keeps the menu itself opening instantly.
+        // `sample()`'s CPU reading spans several seconds of wall-clock time (see its own doc
+        // comment for why), so doing that synchronously here would visibly freeze the menu right
+        // as it opens. Showing a placeholder immediately and filling in the real value a beat
+        // later off the main thread keeps the menu itself opening instantly.
         systemUsageMenuItem.title = String(localized: "System Usage: …")
-        // A short head start before the CPU sample's own 1s window begins — confirmed live
+        // A short head start before the CPU sample's own window begins — confirmed live
         // (2026-08-09) that without this, the menu's own construction (this method, plus AppKit's
         // subsequent layout/draw of the menu appearing on screen) could still be finishing up right
         // as `getrusage(RUSAGE_SELF, ...)` took its first snapshot. That call sums CPU time across
