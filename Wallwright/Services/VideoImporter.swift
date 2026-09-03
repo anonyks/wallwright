@@ -159,12 +159,8 @@ enum VideoImporter {
         wallpaperDirectoryWrapper.addRegularFile(withContents: previewData, preferredFilename: "preview.jpg")
         wallpaperDirectoryWrapper.addRegularFile(withContents: (try? JSONEncoder().encode(projectData)) ?? Data(), preferredFilename: "project.json")
 
-        let destination = FileManager.default.wallpapersDirectory.appending(path: title)
+        let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
         do {
-            // FileWrapper.write throws if something's already there — without this, retrying an
-            // import after any prior failure (or re-importing the same title) always fails with
-            // exactly this error, since the earlier attempt's directory never gets cleared.
-            try? FileManager.default.removeItem(at: destination)
             try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
             notifyLibraryChanged()
             return true
@@ -242,11 +238,7 @@ enum VideoImporter {
 
                 await MainActor.run {
                     do {
-                        let destination = FileManager.default.wallpapersDirectory.appending(path: title)
-                        // Same fix as commitImport above — clear any stale directory from a prior
-                        // failed/partial attempt before writing, since FileWrapper.write throws
-                        // otherwise, which is exactly what turned every retry into "Import failed".
-                        try? FileManager.default.removeItem(at: destination)
+                        let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
                         try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
                         notifyLibraryChanged()
                         completion(true)
@@ -360,8 +352,28 @@ enum VideoImporter {
     private static func applyCrop(_ crop: VideoCropRect, for wallpaper: WEWallpaper) async -> WEProject? {
         let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
         let croppedURL = wallpaper.wallpaperDirectory.appending(path: "cropped-\(UUID().uuidString).mp4")
+        // Clamped here, the one choke point both crop entry points (auto black-bar detection and
+        // EditWallpaperSheet's manual overlay) already funnel through — ffmpeg's crop filter
+        // strictly requires x + width <= in_w (and the same for y/height), aborting the whole
+        // crop otherwise. EditWallpaperSheet computes x/width from independent `.rounded()` calls
+        // on normalized [0...1] coordinates, which can sum to nativeWidth + 1 in edge cases
+        // (dragging a crop handle flush to an edge is the easy way to hit this) — confirmed live:
+        // "Invalid position or size for width 960 and position 961" on exactly that kind of
+        // off-by-one. Width/height are capped to the frame first, then x/y clamped against the
+        // now-safe width/height, so this holds even if width/height themselves were oversized.
+        let safeCrop: VideoCropRect
+        if let nativeWidth = wallpaper.project.videoWidth, let nativeHeight = wallpaper.project.videoHeight,
+           nativeWidth > 0, nativeHeight > 0 {
+            let safeWidth = min(crop.width, nativeWidth)
+            let safeHeight = min(crop.height, nativeHeight)
+            let safeX = max(0, min(crop.x, nativeWidth - safeWidth))
+            let safeY = max(0, min(crop.y, nativeHeight - safeHeight))
+            safeCrop = VideoCropRect(x: safeX, y: safeY, width: safeWidth, height: safeHeight)
+        } else {
+            safeCrop = crop
+        }
         do {
-            try await VideoCropDetector.crop(videoURL, to: crop, destination: croppedURL)
+            try await VideoCropDetector.crop(videoURL, to: safeCrop, destination: croppedURL)
             // Preserves `videoURL`'s exact name/location — `project.file` never needs to change.
             _ = try FileManager.default.replaceItemAt(videoURL, withItemAt: croppedURL)
         } catch {
