@@ -70,9 +70,7 @@ extension AppDelegate {
 
     /// "Next Wallpaper" — advances the active playlist if one's running; otherwise falls back to
     /// cycling through the whole library, so this hotkey/menu item does something useful even when
-    /// you're not using a playlist at all. Deliberately no "previous" counterpart for the fallback
-    /// case (only the playlist has a meaningful "previous" — a plain library cycle has no natural
-    /// order to walk backwards through beyond what "next" already retraces).
+    /// you're not using a playlist at all.
     @objc func skipToNextPlaylistItem() {
         if playlistViewModel.isActive {
             playlistViewModel.skip(direction: .next)
@@ -81,8 +79,15 @@ extension AppDelegate {
         }
     }
 
+    /// Same fallback as `skipToNextPlaylistItem` above — was missing entirely, so this hotkey/menu
+    /// item/CLI command silently did nothing whenever no playlist was active (`PlaylistViewModel
+    /// .skip` no-ops via its own `guard isActive`).
     @objc func skipToPreviousPlaylistItem() {
-        playlistViewModel.skip(direction: .previous)
+        if playlistViewModel.isActive {
+            playlistViewModel.skip(direction: .previous)
+        } else {
+            wallpaperViewModel.advanceToPreviousWallpaper()
+        }
     }
 
     @objc func togglePlaylistPin() {

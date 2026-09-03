@@ -129,7 +129,7 @@ class WallpaperViewModel: ObservableObject {
     /// (whatever order/filter the grid is currently showing), wrapping around at the end. Used by
     /// the Next Wallpaper hotkey/menu item when no playlist is active; when one is, that hotkey
     /// drives `PlaylistViewModel.skip(direction:)` instead, which has its own shuffle/sequential
-    /// logic. Deliberately one-directional (no "previous") — see that call site's own comment.
+    /// logic.
     func advanceToNextWallpaper() {
         let library = AppDelegate.shared.contentViewModel.autoRefreshWallpapers
         guard !library.isEmpty else { return }
@@ -139,6 +139,24 @@ class WallpaperViewModel: ObservableObject {
         let next = library[nextIndex]
         setWallpaperForEnabledScreens(next)
         AppDelegate.shared.playlistViewModel.wallpaperWasManuallyPicked(next)
+    }
+
+    /// The symmetric counterpart to `advanceToNextWallpaper()` — this used to not exist, on the
+    /// stated reasoning that "a plain library cycle has no natural order to walk backwards
+    /// through." That doesn't actually hold: `autoRefreshWallpapers` is already a well-defined,
+    /// stable order (whatever sort the user has active), so walking it backwards is exactly as
+    /// meaningful as walking it forwards. Without this, the "Previous Wallpaper" hotkey/menu
+    /// item/CLI command silently did nothing at all whenever no playlist was running — confirmed
+    /// live via `PlaylistViewModel.skip(direction:)`'s own `guard isActive else { return }`.
+    func advanceToPreviousWallpaper() {
+        let library = AppDelegate.shared.contentViewModel.autoRefreshWallpapers
+        guard !library.isEmpty else { return }
+        let current = currentWallpaper
+        let currentIndex = library.firstIndex { $0.wallpaperDirectory.isSameWallpaperDirectory(as: current.wallpaperDirectory) }
+        let previousIndex = (((currentIndex ?? 0) - 1) + library.count) % library.count
+        let previous = library[previousIndex]
+        setWallpaperForEnabledScreens(previous)
+        AppDelegate.shared.playlistViewModel.wallpaperWasManuallyPicked(previous)
     }
 
     func isScreenEnabled(_ screenId: String) -> Bool {

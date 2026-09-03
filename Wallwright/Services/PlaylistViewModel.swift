@@ -280,7 +280,21 @@ final class PlaylistViewModel: ObservableObject {
         elapsedSeconds = 0
 
         let directory = playlist.itemDirectories[nextIndex]
-        guard let wallpaper = resolveWallpaper(at: directory) else { return }
+        guard let wallpaper = resolveWallpaper(at: directory) else {
+            // This directory no longer resolves to a real wallpaper — deleted externally
+            // (Finder/Terminal) or living on an unmounted external drive. Just returning here
+            // used to deadlock the playlist permanently: `currentIndex` above is computed from
+            // whatever wallpaper is actually on screen, which never changed, so the very next
+            // advance() call (the next timer tick, or the next manual skip) recomputed this exact
+            // same dead index and failed the same way — forever. Pruning it and retrying moves
+            // rotation on to the next real candidate instead; each retry strictly shrinks
+            // `itemDirectories`, so this can't recurse further than the playlist's own length even
+            // if several consecutive entries are dead.
+            playlist.itemDirectories.remove(at: nextIndex)
+            guard !playlist.itemDirectories.isEmpty else { return }
+            advance(direction: direction)
+            return
+        }
         AppDelegate.shared.wallpaperViewModel.setWallpaperForEnabledScreens(wallpaper)
     }
 

@@ -612,8 +612,12 @@ class VideoWallpaperViewModel: ObservableObject {
         // set (the notification itself already fires at `trimEnd` instead of the file's real end,
         // via `applyTrimEnd`'s `forwardPlaybackEndTime`) rather than always the file's actual start.
         let restartTime = currentWallpaper.project.trimStart.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .zero
-        self.player.seek(to: restartTime)
-        self.audioPlayer.seek(to: restartTime)
+        // Zero tolerance, same as the trim-start seed seek above — without it, AVFoundation is
+        // free to snap to the nearest keyframe instead of the exact requested time, which on a
+        // video with a multi-second keyframe interval means every loop restart visibly jumps
+        // forward a beat instead of landing exactly back at the start.
+        self.player.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        self.audioPlayer.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero)
         Self.apply(rate: playRate, to: player, audioPlayer)
     }
 
