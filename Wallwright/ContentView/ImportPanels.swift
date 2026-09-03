@@ -42,52 +42,61 @@ extension AppDelegate {
         panel.beginSheetModal(for: self.mainWindowController.window) { [weak self] response in
             if response != .OK { return }
             guard !panel.urls.isEmpty else { return }
+            let urls = panel.urls
 
-            let fm = FileManager.default
-            let docsDir = fm.wallpapersDirectory
+            // Off-main — `beginSheetModal`'s completion handler already runs on the main thread,
+            // so the `DispatchQueue.main.async` this used to have below was a main-to-main no-op,
+            // not an actual offload: the directory scan (including a recursive listing for
+            // wallpaper folders), the wallpaper-folder copy loop, AND the zip extraction loop were
+            // all running synchronously on the main thread from the moment the panel closed.
+            // Confirmed the same real freeze risk as the drag-and-drop zip path (see
+            // `ContentViewModel.performDrop`'s identical fix) — several folders or a zip archive
+            // can make this take real, visible time.
+            DispatchQueue.global(qos: .userInitiated).async {
+                let fm = FileManager.default
+                let docsDir = fm.wallpapersDirectory
 
-            var wallpaperURLs: [URL] = []
-            var zipURLs: [URL] = []
-            var videoURLs: [URL] = []
-            var imageURLs: [URL] = []
+                var wallpaperURLs: [URL] = []
+                var zipURLs: [URL] = []
+                var videoURLs: [URL] = []
+                var imageURLs: [URL] = []
 
-            for url in panel.urls {
-                var isDir: ObjCBool = false
-                let exists = fm.fileExists(atPath: url.path, isDirectory: &isDir)
+                for url in urls {
+                    var isDir: ObjCBool = false
+                    let exists = fm.fileExists(atPath: url.path, isDirectory: &isDir)
 
-                if url.pathExtension.lowercased() == "zip" {
-                    zipURLs.append(url)
-                } else if exists && !isDir.boolValue && VideoImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
-                    videoURLs.append(url)
-                } else if exists && !isDir.boolValue && ImageImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
-                    imageURLs.append(url)
-                } else if fm.fileExists(atPath: url.appending(path: "project.json").path) {
-                    wallpaperURLs.append(url)
-                } else {
-                    // Scan immediate children for wallpaper folders
-                    guard let children = try? fm.contentsOfDirectory(
-                        at: url, includingPropertiesForKeys: [.isDirectoryKey],
-                        options: .skipsHiddenFiles
-                    ) else { continue }
-                    for child in children {
-                        var isChildDir: ObjCBool = false
-                        if fm.fileExists(atPath: child.path, isDirectory: &isChildDir),
-                           isChildDir.boolValue,
-                           fm.fileExists(atPath: child.appending(path: "project.json").path) {
-                            wallpaperURLs.append(child)
+                    if url.pathExtension.lowercased() == "zip" {
+                        zipURLs.append(url)
+                    } else if exists && !isDir.boolValue && VideoImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
+                        videoURLs.append(url)
+                    } else if exists && !isDir.boolValue && ImageImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
+                        imageURLs.append(url)
+                    } else if fm.fileExists(atPath: url.appending(path: "project.json").path) {
+                        wallpaperURLs.append(url)
+                    } else {
+                        // Scan immediate children for wallpaper folders
+                        guard let children = try? fm.contentsOfDirectory(
+                            at: url, includingPropertiesForKeys: [.isDirectoryKey],
+                            options: .skipsHiddenFiles
+                        ) else { continue }
+                        for child in children {
+                            var isChildDir: ObjCBool = false
+                            if fm.fileExists(atPath: child.path, isDirectory: &isChildDir),
+                               isChildDir.boolValue,
+                               fm.fileExists(atPath: child.appending(path: "project.json").path) {
+                                wallpaperURLs.append(child)
+                            }
                         }
                     }
                 }
-            }
 
-            guard !wallpaperURLs.isEmpty || !zipURLs.isEmpty || !videoURLs.isEmpty || !imageURLs.isEmpty else {
-                DispatchQueue.main.async {
-                    self?.contentViewModel.alertImportModal(which: .doesNotContainWallpaper)
+                guard !wallpaperURLs.isEmpty || !zipURLs.isEmpty || !videoURLs.isEmpty || !imageURLs.isEmpty else {
+                    DispatchQueue.main.async {
+                        self?.contentViewModel.alertImportModal(which: .doesNotContainWallpaper)
+                    }
+                    return
                 }
-                return
-            }
 
-            DispatchQueue.main.async {
                 var copiedAny = false
                 for url in wallpaperURLs {
                     // Only video/image wallpapers are supported — skip anything else (scene, web,
@@ -104,6 +113,8 @@ extension AppDelegate {
                     }
                 }
                 if copiedAny {
+                    // Safe to post off-main — `ContentViewModel`'s subscriber already hops to
+                    // main via `.receive(on: DispatchQueue.main)`.
                     VideoImporter.notifyLibraryChanged()
                 }
                 for url in zipURLs {

@@ -341,7 +341,16 @@ class ContentViewModel: ObservableObject, DropDelegate {
     func enqueueImageImports(_ urls: [URL]) async {
         for url in urls {
             do {
-                let pending = try ImageImporter.prepareImport(at: url)
+                // Off the main actor — `prepareImport`'s decode is already efficient (see
+                // ThumbnailDownsampler's own doc comment, confirmed via `vmmap`: decode-at-size,
+                // never a full-resolution bitmap), but it's still real synchronous CPU work, and
+                // this function runs on `@MainActor` with no `await` before this call — so
+                // whatever time it does take blocks the main thread regardless of how memory-
+                // efficient the decode itself is. Same fix as `RetryingAsyncImage`'s remote
+                // thumbnail decode elsewhere this session.
+                let pending = try await Task.detached(priority: .userInitiated) {
+                    try ImageImporter.prepareImport(at: url)
+                }.value
                 pendingImageImports.append(pending)
             } catch {
                 alertImportModal(which: WPImportError(
@@ -584,10 +593,18 @@ class ContentViewModel: ObservableObject, DropDelegate {
                     self?.refresh()
                 }
             } else if wallpaper.isRegularFile, url.pathExtension.lowercased() == "zip" {
-                DispatchQueue.main.async {
+                // Off-main — `ZipImporter.importZip` shells out to `ditto` and blocks on
+                // `waitUntilExit()`, which can take a long time for a large archive. Running that
+                // on the main thread froze the whole app (unresponsive window, no way to cancel)
+                // for as long as extraction took. `notifyLibraryChanged()` inside `importZip` is
+                // safe to post from here — `ContentViewModel`'s own subscriber already hops to
+                // main via `.receive(on: DispatchQueue.main)`.
+                DispatchQueue.global(qos: .userInitiated).async {
                     let count = ZipImporter.importZip(at: url)
-                    if count == 0 {
-                        self?.alertImportModal(which: .doesNotContainWallpaper)
+                    DispatchQueue.main.async {
+                        if count == 0 {
+                            self?.alertImportModal(which: .doesNotContainWallpaper)
+                        }
                     }
                 }
             } else if wallpaper.isRegularFile, VideoImporter.importableExtensions.contains(url.pathExtension.lowercased()) {
@@ -615,6 +632,20 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// `packageSizeBytes`. Every call site already treats this as fire-and-forget (nothing reads
     /// `wallpapers` in the same call stack right after calling this), so hopping to a background
     /// queue and back is safe.
+    /// Updates a single entry in `wallpapers` in place from an already-known-correct in-memory
+    /// value — used by title/tag edits (`WallpaperPreview`, `EditWallpaperSheet`) instead of a
+    /// full `refresh()`. Those edits update `wallpaper.project` directly (no disk round-trip
+    /// needed to know the new value), then separately dispatch the actual `project.json` write to
+    /// a background queue for durability. Calling `refresh()` there raced that write: its
+    /// background directory scan could reach this exact file before the edit's own write landed,
+    /// reading back the pre-edit content and silently reverting the just-made edit — confirmed via
+    /// code trace (2026-09-02), not yet hit live, but a real, reachable race, not hypothetical.
+    /// This avoids the disk read entirely, so there's nothing left to race.
+    public func updateWallpaperInPlace(_ wallpaper: WEWallpaper) {
+        guard let index = wallpapers.firstIndex(where: { $0.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) }) else { return }
+        wallpapers[index] = wallpaper
+    }
+
     public func refresh() {
         let urls = self.urls
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in

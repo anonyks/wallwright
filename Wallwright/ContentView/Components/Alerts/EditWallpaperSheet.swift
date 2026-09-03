@@ -253,7 +253,10 @@ struct EditWallpaperSheet: SubviewOfContentView {
         if wallpaperViewModel.currentWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) {
             wallpaperViewModel.currentWallpaper = updatedWallpaper
         }
-        viewModel.refresh()
+        // `updateWallpaperInPlace`, not `refresh()` — see its own doc comment: a full library
+        // rescan here could race the background `project.json` write just below and read back
+        // stale (pre-edit) content, silently reverting the edit that was just made.
+        viewModel.updateWallpaperInPlace(updatedWallpaper)
     }
 
     private var frameChooserControls: some View {

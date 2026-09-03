@@ -79,6 +79,15 @@ enum VideoImporter {
         // wherever they picked it from (Downloads, an external drive, etc.), not ours to touch.
         let scratchDir = FileManager.default.temporaryDirectory.appending(path: "wallwright-import-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: scratchDir, withIntermediateDirectories: true)
+        // Cleanup only happens on the SUCCESS path elsewhere (`ContentViewModel.cleanupScratchSource`,
+        // called from `commitCurrentImport`/`skipCurrentImport` once a `PendingVideoImport` exists to
+        // call it on) — if this function itself throws below (a corrupt/malformed source video,
+        // reachable via ordinary drag-and-drop), no `PendingVideoImport` is ever returned, so nothing
+        // outside this function has a reference to clean up what can already be a fully re-encoded,
+        // multi-hundred-MB scratch file at that point. `didSucceed` guards against removing it out
+        // from under a genuinely successful return.
+        var didSucceed = false
+        defer { if !didSucceed { try? FileManager.default.removeItem(at: scratchDir) } }
 
         let (playableURL, transcodedFrom): (URL, VideoFileInfo?)
         do {
@@ -89,7 +98,7 @@ enum VideoImporter {
             throw VideoImportPreparationError.transcodeFailed(error.errorDescription ?? "Conversion failed")
         }
 
-        let asset = AVAsset(url: playableURL)
+        let asset = AVURLAsset(url: playableURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
         // Decodes directly at this size instead of decoding the full frame (up to the source
@@ -105,6 +114,7 @@ enum VideoImporter {
         let thumbnail = NSImage(cgImage: cgImage, size: .zero)
         let metadata = await probeVideoMetadata(asset: asset)
 
+        didSucceed = true
         return PendingVideoImport(
             sourceURL: playableURL,
             title: url.deletingPathExtension().lastPathComponent,
@@ -204,7 +214,7 @@ enum VideoImporter {
         projectData.sourceId = sourceId
         projectData.dateAdded = ISO8601DateFormatter().string(from: Date())
 
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
         imageGenerator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
@@ -265,7 +275,7 @@ enum VideoImporter {
         else { return nil }
 
         let videoURL = wallpaper.wallpaperDirectory.appending(path: project.file)
-        let metadata = await probeVideoMetadata(asset: AVAsset(url: videoURL))
+        let metadata = await probeVideoMetadata(asset: AVURLAsset(url: videoURL))
         guard metadata.width != nil || metadata.duration != nil else { return nil }
 
         project.videoWidth = project.videoWidth ?? metadata.width
@@ -289,7 +299,7 @@ enum VideoImporter {
         guard wallpaper.project.type.lowercased() == "video" else { return nil }
 
         let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
-        let generator = AVAssetImageGenerator(asset: AVAsset(url: videoURL))
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: videoURL))
         generator.appliesPreferredTrackTransform = true
         // Exact frame, not "nearest cheap keyframe" — the whole point is the precise moment the
         // user picked, unlike the two fixed-1-second call sites above which never needed this.
@@ -366,7 +376,7 @@ enum VideoImporter {
         // Regenerates the thumbnail from the now-cropped file so the grid/preview stop showing the
         // old bars too — same frame-grab-and-downsample `regenerateThumbnail` above uses, at
         // whatever timestamp was already chosen (or 1s, `prepareImport`'s own default) if none was.
-        let generator = AVAssetImageGenerator(asset: AVAsset(url: videoURL))
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: videoURL))
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
         let time = CMTimeMake(value: Int64(wallpaper.project.thumbnailTimestamp ?? 1), timescale: 1)

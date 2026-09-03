@@ -133,7 +133,10 @@ struct WallpaperPreview: SubviewOfContentView {
                                         wallpaper.project.title = title
 
                                         wallpaperViewModel.currentWallpaper = wallpaper
-                                        viewModel.refresh()
+                                        // `updateWallpaperInPlace`, not `refresh()` — a full
+                                        // library rescan here could race the background write
+                                        // just below and read back the pre-edit title.
+                                        viewModel.updateWallpaperInPlace(wallpaper)
 
                                         // Off-main — confirmed live (2026-08-31) this synchronous
                                         // encode+write was blocking the main thread on every title
@@ -292,7 +295,9 @@ struct WallpaperPreview: SubviewOfContentView {
                                     wallpaper.project.tags = tags.sorted()
 
                                     wallpaperViewModel.currentWallpaper = wallpaper
-                                    viewModel.refresh()
+                                    // `updateWallpaperInPlace`, not `refresh()` — see the title
+                                    // editor's identical fix above.
+                                    viewModel.updateWallpaperInPlace(wallpaper)
 
                                     // Off-main — see the title editor's identical fix above.
                                     let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
@@ -409,7 +414,9 @@ struct WallpaperPreview: SubviewOfContentView {
                                     wallpaper.project.tags = tags
 
                                     wallpaperViewModel.currentWallpaper = wallpaper
-                                    viewModel.refresh()
+                                    // `updateWallpaperInPlace`, not `refresh()` — see the title
+                                    // editor's identical fix above.
+                                    viewModel.updateWallpaperInPlace(wallpaper)
 
                                     // Off-main — see the title editor's identical fix above.
                                     let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
