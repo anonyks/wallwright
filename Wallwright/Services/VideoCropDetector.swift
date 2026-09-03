@@ -107,11 +107,19 @@ enum VideoCropDetector {
     /// quality/behavior — written to `destination`. Audio is stream-copied, untouched.
     static func crop(_ source: URL, to crop: VideoCropRect, destination: URL) async throws {
         guard let ffmpeg = VideoTranscoder.ffmpegPath else { throw VideoTranscoderError.ffmpegMissing }
+        // `h264_videotoolbox` requires even width/height for 4:2:0 chroma subsampling (error
+        // -12908 otherwise) — `VideoTranscoder.convert`'s own scale filter already guards against
+        // this via `force_divisible_by=2`, but that's a `scale`-filter-specific parameter with no
+        // equivalent on `crop`, so an odd crop rectangle (a real, reachable case: both
+        // `detectBlackBars` and `EditWallpaperSheet`'s manual crop round normalized coordinates to
+        // integers) reached ffmpeg here unguarded and failed the whole crop.
+        let evenWidth = (crop.width / 2) * 2
+        let evenHeight = (crop.height / 2) * 2
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ffmpeg)
         process.arguments = [
             "-y", "-i", source.path,
-            "-vf", "crop=\(crop.width):\(crop.height):\(crop.x):\(crop.y)",
+            "-vf", "crop=\(evenWidth):\(evenHeight):\(crop.x):\(crop.y)",
             "-c:v", "h264_videotoolbox", "-q:v", "65",
             "-c:a", "copy",
             destination.path,
