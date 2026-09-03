@@ -33,7 +33,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var wallpaperViewModel = WallpaperViewModel()
     var globalSettingsViewModel = GlobalSettingsViewModel()
     var playlistViewModel = PlaylistViewModel()
-    var inboxLinksStore = InboxLinksStore()
+    // Implicitly-unwrapped, constructed in `applicationDidFinishLaunching` instead of as a plain
+    // stored-property default — `InboxLinksStore` is `@MainActor`-isolated (its own async import
+    // pipeline mutates `@Published` state and needs that guarantee), and a stored property's
+    // default-value expression runs before `AppDelegate` has any actor context of its own, which
+    // the compiler correctly rejects. `applicationDidFinishLaunching` is AppKit-guaranteed main
+    // thread, same pattern already used here for `mainWindowController`/`settingsWindow`.
+    var inboxLinksStore: InboxLinksStore!
     
     var importOpenPanel: NSOpenPanel!
 
@@ -61,6 +67,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     static var shared = AppDelegate()
     
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Constructed here, first thing — `MainWindowController` (built at the bottom of this same
+        // method) hosts `TopTabBar`/`InboxView`, both of which read `AppDelegate.shared.inboxLinksStore`
+        // from a SwiftUI property initializer the moment they're constructed. Confirmed live: leaving
+        // this in `applicationDidFinishLaunching` (which actually runs AFTER this method, not before
+        // it) left `inboxLinksStore` nil when `MainWindowController()` at the bottom of this same
+        // method force-unwrapped it, crashing on every launch.
+        inboxLinksStore = InboxLinksStore()
+
         // Every browse tab (MotionBgs, MoeWalls, Wallper, DesktopHut, UHDPaper, AlphaCoders) loads
         // its thumbnails through plain `AsyncImage`/`RetryingAsyncImage`, which both go through
         // `URLSession.shared` and, by default, Foundation's own `URLCache.shared` — never

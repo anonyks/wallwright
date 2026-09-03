@@ -50,6 +50,7 @@ struct InboxLink: Codable, Identifiable, Equatable {
     }
 }
 
+@MainActor
 final class InboxLinksStore: ObservableObject {
     @Published private(set) var links: [InboxLink] = []
 
