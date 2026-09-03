@@ -28,6 +28,9 @@ final class MoeWallsViewModel: ObservableObject {
     var visibleItems: [MoeWallsItem] { items.filter { !hiddenItemIDs.contains($0.id) } }
 
     private var currentPage = 1
+    /// Guards against a stale response overwriting a newer one — see MotionBgsViewModel's
+    /// identical property doc comment for the exact mechanism and trigger.
+    private var loadGeneration = 0
     private let service = MoeWallsService()
     private static let hiddenIDsKey = "MoeWallsHiddenItemIDs"
 
@@ -78,24 +81,33 @@ final class MoeWallsViewModel: ObservableObject {
     }
 
     func load() async {
+        loadGeneration += 1
+        let generation = loadGeneration
         isLoading = true
         errorMessage = nil
         do {
-            items = try await fetchCurrentPage()
+            let fetched = try await fetchCurrentPage()
+            guard generation == loadGeneration else { return }
+            items = fetched
             markAlreadyDownloaded()
+            isLoading = false
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = error.localizedDescription
+            isLoading = false
         }
-        isLoading = false
     }
 
     func loadNextPage() {
         guard !isLoading else { return }
         currentPage += 1
+        loadGeneration += 1
+        let generation = loadGeneration
         Task {
             isLoading = true
             do {
                 let nextItems = try await fetchCurrentPage()
+                guard generation == loadGeneration else { return }
                 let existingIDs = Set(items.map(\.id))
                 let newItems = nextItems.filter { !existingIDs.contains($0.id) }
                 if newItems.isEmpty {
@@ -104,12 +116,14 @@ final class MoeWallsViewModel: ObservableObject {
                     items.append(contentsOf: newItems)
                 }
                 markAlreadyDownloaded()
+                isLoading = false
             } catch {
+                guard generation == loadGeneration else { return }
                 // Silently stop paginating on failure (e.g. past the last page) rather than
                 // surfacing an error for what's often just "no more pages".
                 currentPage -= 1
+                isLoading = false
             }
-            isLoading = false
         }
     }
 
@@ -123,10 +137,18 @@ final class MoeWallsViewModel: ObservableObject {
     /// Marks items already present in the library as `.completed` so the grid shows "Added"
     /// instead of "Download" for them, and `download(item:)` is never invoked for a duplicate.
     private func markAlreadyDownloaded() {
-        let index = MoeWallsService.existingLibraryIndex()
-        for item in items {
-            if index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
-                downloadState[item.id] = .completed
+        // Full library scan+decode moved off the main thread — see MotionBgsViewModel's identical
+        // fix and its doc comment for why (this ran synchronously on main after every page load,
+        // category switch, and search).
+        let currentItems = items
+        DispatchQueue.global(qos: .utility).async {
+            let index = MoeWallsService.existingLibraryIndex()
+            let matchedIds = currentItems
+                .filter { index.sourceIds.contains($0.id) || index.titles.contains($0.title.lowercased()) }
+                .map(\.id)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                for id in matchedIds { self.downloadState[id] = .completed }
             }
         }
     }

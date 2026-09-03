@@ -33,6 +33,13 @@ final class MotionBgsViewModel: ObservableObject {
     var visibleItems: [MotionBgsItem] { items.filter { !hiddenItemIDs.contains($0.id) } }
 
     private var currentPage = 1
+    /// Guards against a stale response overwriting a newer one — bumped at the start of every
+    /// `load()`/`loadNextPage()` call, captured locally, and checked before applying that call's
+    /// result. Without this, clicking category A then quickly clicking category B before A's
+    /// response returns could let A's (now-stale) result land after B's and silently show A's
+    /// items under B's selected tab — a real race confirmed via code trace (2026-09-02), triggered
+    /// by ordinary fast clicking, not a contrived worst case.
+    private var loadGeneration = 0
     private let service = MotionBgsService()
     private static let hiddenIDsKey = "MotionBgsHiddenItemIDs"
 
@@ -84,24 +91,35 @@ final class MotionBgsViewModel: ObservableObject {
     }
 
     func load() async {
+        loadGeneration += 1
+        let generation = loadGeneration
         isLoading = true
         errorMessage = nil
         do {
-            items = try await fetchCurrentPage()
+            let fetched = try await fetchCurrentPage()
+            // Superseded by a newer load/loadNextPage while this one was in flight — its result
+            // is stale, so leave `items`/`isLoading` alone entirely and let the newer call own them.
+            guard generation == loadGeneration else { return }
+            items = fetched
             markAlreadyDownloaded()
+            isLoading = false
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = error.localizedDescription
+            isLoading = false
         }
-        isLoading = false
     }
 
     func loadNextPage() {
         guard !isLoading else { return }
         currentPage += 1
+        loadGeneration += 1
+        let generation = loadGeneration
         Task {
             isLoading = true
             do {
                 let nextItems = try await fetchCurrentPage()
+                guard generation == loadGeneration else { return }
                 // motionbgs.com's search endpoint doesn't paginate once results run out — it just
                 // returns the same first-page results again instead of an empty set (confirmed
                 // live: /search?q=...&page=2 == page=1 for a query with fewer than a page of
@@ -115,12 +133,14 @@ final class MotionBgsViewModel: ObservableObject {
                     items.append(contentsOf: newItems)
                 }
                 markAlreadyDownloaded()
+                isLoading = false
             } catch {
+                guard generation == loadGeneration else { return }
                 // Silently stop paginating on failure (e.g. past the last page) rather than
                 // surfacing an error for what's often just "no more pages".
                 currentPage -= 1
+                isLoading = false
             }
-            isLoading = false
         }
     }
 
@@ -136,10 +156,22 @@ final class MotionBgsViewModel: ObservableObject {
     /// Matches by source ID when available, falling back to title for wallpapers downloaded
     /// before source-ID tracking existed.
     private func markAlreadyDownloaded() {
-        let index = MotionBgsService.existingLibraryIndex()
-        for item in items {
-            if index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
-                downloadState[item.id] = .completed
+        // `existingLibraryIndex()` does a full `contentsOfDirectory` scan plus a `project.json`
+        // read+decode for every wallpaper in the library — this used to run synchronously on the
+        // main thread, from here, after every single page load, category switch, and search
+        // (`load()`/`loadNextPage()` above both call this), scaling with library size on every one
+        // of those. Same anti-pattern as `ContentViewModel.refresh()` already fixed elsewhere this
+        // session — the scan itself moves to a background queue; only the resulting
+        // `downloadState` assignment (cheap) comes back to the main actor.
+        let currentItems = items
+        DispatchQueue.global(qos: .utility).async {
+            let index = MotionBgsService.existingLibraryIndex()
+            let matchedIds = currentItems
+                .filter { index.sourceIds.contains($0.id) || index.titles.contains($0.title.lowercased()) }
+                .map(\.id)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                for id in matchedIds { self.downloadState[id] = .completed }
             }
         }
     }
