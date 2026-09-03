@@ -436,6 +436,9 @@ final class ClockOverlayWindow: NSWindow {
         isMovableByWindowBackground = false
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
+        // See WallpaperWindow's identical setting in AppDelegate.swift — same class of desktop-
+        // level overlay window, same reason to opt out of macOS's window state-restoration system.
+        isRestorable = false
         contentView = ClockOverlayView(frame: NSRect(x: 0, y: 0, width: width, height: height))
 
         NotificationCenter.default.addObserver(

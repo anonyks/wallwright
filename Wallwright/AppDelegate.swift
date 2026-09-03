@@ -245,6 +245,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        // Flush GlobalSettingsService's and PlaylistViewModel's own saves synchronously — both now
+        // debounce their disk write (see `settingsSaveCancellable`/`playlistSaveCancellable`) so a
+        // slider drag doesn't hammer disk, which means a change made right before quit could still
+        // be sitting in the debounce window otherwise.
+        globalSettingsViewModel.save()
+        playlistViewModel.save()
+
         // Backstop for every UserDefaults write in the app, not just GlobalSettingsService's own
         // (which already synchronizes on every save) — covers recent wallpapers, hidden MotionBgs
         // items, and anything else written to standard defaults elsewhere.
@@ -331,8 +338,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let window = WallpaperWindow()
             window.styleMask = [.borderless, .fullSizeContentView]
             window.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)))
-            window.collectionBehavior = [.stationary, .canJoinAllSpaces]
-            window.setFrame(screen.frame, display: true)
+            // `.fullScreenNone`, not `.fullScreenAuxiliary` (tried first, didn't help) — matches
+            // `ClockOverlayWindow`'s already-established `collectionBehavior` in this exact
+            // codebase, which explicitly opts OUT of fullscreen-Space participation. A genuinely
+            // fullscreen app covers 100% of its own Space, so this window was never visible there
+            // either way — `.canJoinAllSpaces` was still pulling it into that Space's WindowServer
+            // bookkeeping for zero visual benefit, which is what made it a plausible vector for a
+            // reported artifact (rectangular strip corruption across several unrelated windows at
+            // once in Mission Control, right after this window gets abruptly destroyed/recreated).
+            // No regression expected on exiting fullscreen: that returns focus to a normal desktop
+            // Space, where this window is already present via `.canJoinAllSpaces` regardless —
+            // nothing about the now-gone fullscreen Space's own wallpaper visibility was ever real.
+            window.collectionBehavior = [.stationary, .canJoinAllSpaces, .fullScreenNone]
             window.isMovable = false
             // Never left at NSWindow's default background (a light system color) — anything the
             // player layer doesn't cover for even a moment (a frame swap, the brief gap before the
@@ -352,11 +369,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.canHide = false
             window.canBecomeVisibleWithoutLogin = true
             window.isReleasedWhenClosed = false
+            // Found via reference/macos-wallpaperengine (Paradox07127), a sibling macOS wallpaper
+            // engine: its own wallpaper window explicitly disables macOS's window state-restoration
+            // system. Without this, the OS can cache a snapshot of this window to restore after a
+            // crash/relaunch — exactly the kind of stale cached window state that was a plausible
+            // contributor to the rectangular-strip Mission Control artifact already fixed via the
+            // alpha fade-in above. Zero downside: nothing about a wallpaper window should ever be
+            // "restored" from a prior session's snapshot regardless.
+            window.isRestorable = false
             window.ignoresMouseEvents = true
+            // Starts fully transparent, faded in below — verified pattern from MirageWallpaper (a
+            // sibling macOS wallpaper engine in the same `wallpaper-engine-mac` lineage, reference/
+            // MirageWallpaper in this repo): its own wallpaper window starts at `alphaValue = 0` and
+            // is only revealed once its render pipeline confirms real content is ready, specifically
+            // to avoid ever presenting an in-flux window during creation. Two earlier attempts at
+            // this app's own reported artifact (rectangular strip corruption in Mission Control,
+            // right after this window is destroyed/recreated) — reordering `setFrame` after
+            // `contentView`, then two different `collectionBehavior` fullscreen-Space flags — were
+            // both unverified guesses that didn't help; this is copying a working pattern instead.
+            window.alphaValue = 0
             window.contentView = NSHostingView(rootView:
                 WallpaperView(viewModel: self.wallpaperViewModel, screenId: screenId)
             )
+            window.setFrame(screen.frame, display: true)
             wallpaperWindows[screenId] = window
+            // Waits for `VideoWallpaperViewModel`'s real first-decoded-frame signal (see its own
+            // doc comment — an `AVPlayerItemVideoOutput`-based check, not a status flag) rather than
+            // a fixed guessed delay: reveals as soon as there's genuinely something to show, and
+            // still reveals a static-image wallpaper (which never posts this notification, having
+            // no video pipeline) or a wallpaper whose first frame is unusually slow, via the 0.8s
+            // fallback. Whichever fires first wins; `revealOnce` guards against both firing.
+            var revealOnce: (() -> Void)?
+            var readyObserver: NSObjectProtocol?
+            revealOnce = { [weak window] in
+                window?.animator().alphaValue = 1
+                if let readyObserver { NotificationCenter.default.removeObserver(readyObserver) }
+                revealOnce = nil
+            }
+            readyObserver = NotificationCenter.default.addObserver(
+                forName: VideoWallpaperViewModel.didProduceFirstFrameNotification, object: nil, queue: .main
+            ) { notification in
+                guard notification.userInfo?["screenId"] as? String == screenId else { return }
+                revealOnce?()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                revealOnce?()
+            }
         }
     }
 
@@ -396,6 +454,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             for id in connectedIds where !self.wallpaperViewModel.enabledScreens.contains(id) {
                 self.wallpaperViewModel.enabledScreens.insert(id)
             }
+            self.wallpaperViewModel.pruneOrphanedLegacyScreenIDs()
             wallpaperDebugLog.notice("screensChanged() — signature CHANGED, rebuilding wallpaper windows")
             self.rebuildWallpaperWindows()
             self.rebuildClockWindows()
@@ -463,7 +522,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func setPlacehoderWallpaper(with wallpaper: WEWallpaper) {
         switch wallpaper.project.type {
         case "video":
-            let asset = AVAsset(url: wallpaper.wallpaperDirectory.appending(component: wallpaper.project.file))
+            let asset = AVURLAsset(url: wallpaper.wallpaperDirectory.appending(component: wallpaper.project.file))
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
             
