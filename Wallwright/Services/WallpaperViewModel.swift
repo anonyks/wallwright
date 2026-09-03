@@ -5,6 +5,7 @@
 //  Created by Haren on 2023/8/14.
 //
 
+import CoreGraphics
 import SwiftUI
 
 /// Provide Wallpaper Database for WallpaperView and ContentView etc.
@@ -16,7 +17,7 @@ class WallpaperViewModel: ObservableObject {
         }
     }
 
-    /// Per-screen wallpaper assignments, keyed by CGDirectDisplayID as String.
+    /// Per-screen wallpaper assignments, keyed by a stable per-display UUID string (see `screenId(for:)`).
     @Published var wallpapers: [String: WEWallpaper] = [:] {
         didSet { saveWallpapers() }
     }
@@ -236,13 +237,14 @@ class WallpaperViewModel: ObservableObject {
             // Filter out any compound keys (screenId_spaceId) from previous per-space experiment,
             // and fall back to default for any wallpaper whose directory no longer exists (e.g. a
             // stale reference left over from before wallpaper storage moved to a new location).
-            self.wallpapers = saved
+            let cleaned = saved
                 .filter { !$0.key.contains("_") }
                 .mapValues { wallpaper in
                     FileManager.default.fileExists(atPath: wallpaper.wallpaperDirectory.path)
                         ? wallpaper
                         : Self.defaultWallpaper
                 }
+            self.wallpapers = Self.migratingLegacyDisplayIDKeys(cleaned)
         }
         // Migrate legacy single wallpaper
         else if let json = UserDefaults.standard.data(forKey: "CurrentWallpaper"),
@@ -254,7 +256,15 @@ class WallpaperViewModel: ObservableObject {
 
         // Load enabled screens (default: all connected screens enabled)
         if let saved = UserDefaults.standard.array(forKey: "EnabledScreens") as? [String] {
-            self.enabledScreens = Set(saved)
+            var migrated = Set(saved)
+            for screen in NSScreen.screens {
+                let legacyId = String(Self.legacyDisplayId(for: screen))
+                let stableId = Self.screenId(for: screen)
+                if legacyId != stableId, migrated.contains(legacyId), !migrated.contains(stableId) {
+                    migrated.insert(stableId)
+                }
+            }
+            self.enabledScreens = migrated
         } else {
             self.enabledScreens = Set(NSScreen.screens.map { Self.screenId(for: $0) })
         }
@@ -268,9 +278,55 @@ class WallpaperViewModel: ObservableObject {
 
     // MARK: - Screen ID helpers
 
+    /// `CGDirectDisplayID` is only stable for the current boot/hot-plug session — it can be
+    /// reassigned across a reboot or when displays are reconnected in a different order, which
+    /// would silently scramble per-display wallpaper assignments on a multi-monitor setup.
+    /// `CGDisplayCreateUUIDFromDisplayID` ties the ID to the physical display instead, so it
+    /// survives reboots and reordering. Falls back to the raw ID for the rare display that
+    /// doesn't vend a UUID (e.g. some virtual/adapter displays).
     static func screenId(for screen: NSScreen) -> String {
-        let displayId = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+        let displayId = legacyDisplayId(for: screen)
+        if let uuidRef = CGDisplayCreateUUIDFromDisplayID(displayId) {
+            return CFUUIDCreateString(nil, uuidRef.takeRetainedValue()) as String
+        }
         return String(displayId)
+    }
+
+    private static func legacyDisplayId(for screen: NSScreen) -> CGDirectDisplayID {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+    }
+
+    /// One-time upgrade path from the old raw-`CGDirectDisplayID`-keyed format: for each
+    /// currently connected screen, if data is still sitting under its legacy key but nothing's
+    /// under its new stable key yet, copy it over — otherwise upgrading this app would look like
+    /// it reset every per-display wallpaper assignment.
+    private static func migratingLegacyDisplayIDKeys<Value>(_ dict: [String: Value]) -> [String: Value] {
+        var migrated = dict
+        for screen in NSScreen.screens {
+            let legacyId = String(legacyDisplayId(for: screen))
+            let stableId = screenId(for: screen)
+            guard legacyId != stableId, migrated[stableId] == nil, let legacyValue = migrated[legacyId] else { continue }
+            migrated[stableId] = legacyValue
+        }
+        return migrated
+    }
+
+    /// Prunes `wallpapers`/`enabledScreens` entries left behind by a display that never got a
+    /// stable UUID from `screenId(for:)` (its raw-`CGDirectDisplayID` fallback — confirmed to
+    /// affect KVM switches and some USB/DisplayLink adapters) once it disconnects. Such a display
+    /// gets a new, different raw ID on every reconnect, so an old raw-ID-keyed entry can never be
+    /// "reunited" with its display again — left alone, every reconnect adds one more permanently
+    /// orphaned entry to two persisted collections, forever. UUID-keyed entries (the normal case,
+    /// any display with a real EDID) are never touched here — a display's own UUID is worth
+    /// remembering even while it's unplugged, so its wallpaper choice is still there next time it
+    /// reconnects. Called from `AppDelegate.screensChanged()` on every debounced reconfiguration.
+    func pruneOrphanedLegacyScreenIDs() {
+        let connectedLegacyIds = Set(NSScreen.screens.map { String(Self.legacyDisplayId(for: $0)) })
+        func isOrphanedLegacyId(_ id: String) -> Bool {
+            !id.contains("-") && !connectedLegacyIds.contains(id)
+        }
+        enabledScreens = enabledScreens.filter { !isOrphanedLegacyId($0) }
+        wallpapers = wallpapers.filter { !isOrphanedLegacyId($0.key) }
     }
 
     static func mainScreenId() -> String {

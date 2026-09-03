@@ -6,9 +6,11 @@
 //
 
 import AVKit
+import CoreMedia
 import SwiftUI
 import Combine
 import os
+import VideoToolbox
 
 /// Temporary diagnostic logging for the lock/screensaver "paused but not paused" bug — uses
 /// `os.Logger` (not `print`) specifically so it's captured by the unified log and queryable via
@@ -39,6 +41,28 @@ class VideoWallpaperViewModel: ObservableObject {
     private var pendingWallpaperChangeWorkItem: DispatchWorkItem?
 
     private func applyCurrentWallpaperChange() {
+        didRetryCurrentItemAfterFailure = false
+        swapInFreshItems()
+        // Force-apply rate and volume — replaceCurrentItem resets both players to paused.
+        // Reads `AppDelegate.shared.wallpaperViewModel.playRate` (the global source of truth), not
+        // `self.playRate` — same stale-mirror race documented on `seedInitialFrameIfStartingPaused`
+        // above: `VideoWallpaperView.updateNSView` assigns `viewModel.currentWallpaper` before it
+        // reassigns `viewModel.playRate` in the same call, so `self.playRate` can still hold a
+        // value from before the most recent slider/rate change at the exact moment this fires.
+        // Confirmed live (2026-08-08): dragging Playback Rate to its max then immediately picking a
+        // new wallpaper applied a stale intermediate rate instead of the one actually set.
+        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
+        self.audioPlayer.volume = self.playVolume
+        applyBatteryMode()
+    }
+
+    /// Builds a fresh video-only/audio-only item pair from `currentWallpaper`'s file and swaps
+    /// them into `player`/`audioPlayer`, wiring up the end-of-play and playback-failure observers.
+    /// Shared by the normal wallpaper-change path above and `retryAfterPlaybackFailure()` below —
+    /// deliberately does NOT touch `didRetryCurrentItemAfterFailure` itself, since a retry needs
+    /// this same swap without resetting the guard that bounds it to one attempt.
+    @discardableResult
+    private func swapInFreshItems() -> AVPlayerItem {
         // Explicit autorelease pool around the whole swap — confirmed live (2026-08-08) that
         // repeated wallpaper switches leave the process's resting footprint permanently elevated
         // even after the old item is replaced (a single switch measured a ~500MB transient spike,
@@ -48,6 +72,7 @@ class VideoWallpaperViewModel: ObservableObject {
         // for the audio-only player every single switch is a lot of churn to leave for the run
         // loop's own pool to drain on its own schedule. Forcing it to drain deterministically right
         // here, instead of waiting, is a real, standard mitigation for exactly this pattern.
+        var builtItem: AVPlayerItem!
         autoreleasepool {
             // Remove observer for old item before replacing
             if let oldItem = self.player.currentItem {
@@ -62,18 +87,100 @@ class VideoWallpaperViewModel: ObservableObject {
             seedTrimStartIfNeeded(project: currentWallpaper.project, item: newItem)
             NotificationCenter.default.addObserver(self, selector: #selector(playerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: newItem)
             self.audioPlayer.replaceCurrentItem(with: newAudioItem)
+            observeForPlaybackFailure(item: newItem)
+            builtItem = newItem
         }
-        // Force-apply rate and volume — replaceCurrentItem resets both players to paused.
-        // Reads `AppDelegate.shared.wallpaperViewModel.playRate` (the global source of truth), not
-        // `self.playRate` — same stale-mirror race documented on `seedInitialFrameIfStartingPaused`
-        // above: `VideoWallpaperView.updateNSView` assigns `viewModel.currentWallpaper` before it
-        // reassigns `viewModel.playRate` in the same call, so `self.playRate` can still hold a
-        // value from before the most recent slider/rate change at the exact moment this fires.
-        // Confirmed live (2026-08-08): dragging Playback Rate to its max then immediately picking a
-        // new wallpaper applied a stale intermediate rate instead of the one actually set.
-        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
+        return builtItem
+    }
+
+    /// Guards against retrying a failed item forever if the file is genuinely unplayable (e.g.
+    /// corrupted, or the undecodable-codec case `warnIfCodecMayNotDecode` already flags) — one
+    /// retry per wallpaper is enough to recover from a transient failure (a flaky read on an
+    /// external/network volume, the file briefly unavailable) without looping forever against a
+    /// permanently broken one. Reset only when the wallpaper actually changes (in
+    /// `applyCurrentWallpaperChange`/`init`), never by the retry itself.
+    private var didRetryCurrentItemAfterFailure = false
+
+    /// Cancels/replaces itself automatically when reassigned, same pattern as
+    /// `pendingFrameSeekCancellable` — a status observer from a superseded item should never fire
+    /// after a newer item replaces it.
+    private var itemStatusCancellable: AnyCancellable?
+
+    /// Posted once per screen, the first time that screen's very first wallpaper item produces a
+    /// real decoded frame — `AppDelegate.setWallpaperWindows` waits for this (with a timeout
+    /// fallback) before fading its window in, instead of guessing a fixed delay. `userInfo["screenId"]`
+    /// carries which screen. See `observeFirstFrameReady` for the detection mechanism.
+    static let didProduceFirstFrameNotification = Notification.Name("VideoWallpaperViewModel.didProduceFirstFrame")
+
+    private var readinessVideoOutput: AVPlayerItemVideoOutput?
+    private var readinessTimer: Timer?
+
+    /// Detects when `item` has produced a real decoded frame — pattern from MirageWallpaper (a
+    /// sibling macOS wallpaper engine in the same lineage as this app, reference/MirageWallpaper in
+    /// this repo): attach a separate `AVPlayerItemVideoOutput` to the same item (doesn't interfere
+    /// with the real rendering path — an item can have multiple outputs) and poll
+    /// `hasNewPixelBuffer(forItemTime:)` against the item's own current time, rather than a fixed
+    /// delay before revealing the wallpaper window. `.status == .readyToPlay` alone isn't enough —
+    /// it means the item COULD start, not that a frame has actually been decoded yet. Bounded by a
+    /// 2s timeout so a wallpaper that's slow or never produces a frame (corrupt file, thermal
+    /// throttling) still eventually reveals instead of leaving the desktop blank forever. Only
+    /// called from `init` — a later wallpaper switch (`swapInFreshItems`) doesn't need this, the
+    /// window is already visible by then.
+    private func observeFirstFrameReady(item: AVPlayerItem, screenId: String) {
+        readinessTimer?.invalidate()
+        if let oldOutput = readinessVideoOutput { item.remove(oldOutput) }
+
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+        item.add(output)
+        readinessVideoOutput = output
+
+        let deadline = Date().addingTimeInterval(2)
+        let timer = Timer(timeInterval: 0.03, repeats: true) { [weak self, weak item] timer in
+            guard let self, let item else { timer.invalidate(); return }
+            let ready = output.hasNewPixelBuffer(forItemTime: item.currentTime())
+            guard ready || Date() >= deadline else { return }
+            timer.invalidate()
+            item.remove(output)
+            if self.readinessVideoOutput === output { self.readinessVideoOutput = nil }
+            NotificationCenter.default.post(
+                name: Self.didProduceFirstFrameNotification, object: nil, userInfo: ["screenId": screenId]
+            )
+        }
+        readinessTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// `.readyToPlay` only means the item COULD start — it says nothing about a later failure. A
+    /// corrupt read, a dropped external/network volume, or the file being deleted out from under
+    /// the player mid-playback all surface as a `.status` transition to `.failed`, and until this
+    /// fix nothing observed that at all: the desktop would just silently freeze on whatever frame
+    /// was last decoded, with nothing in the player's own state to explain why and no attempt to
+    /// recover — the exact class of gap a deep dive into a sibling macOS wallpaper engine's own
+    /// renderer-crash handling (2026-09-02) surfaced as unaddressed there too.
+    private func observeForPlaybackFailure(item: AVPlayerItem) {
+        itemStatusCancellable = item.publisher(for: \.status)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                guard let self, status == .failed, self.player.currentItem === item else { return }
+                let reason = item.error?.localizedDescription ?? "unknown"
+                guard !self.didRetryCurrentItemAfterFailure else {
+                    wallpaperDebugLog.error("[\(self.screenId, privacy: .public)] wallpaper item failed again after retry (\(reason, privacy: .public)) — giving up, desktop stays on last good frame")
+                    return
+                }
+                wallpaperDebugLog.error("[\(self.screenId, privacy: .public)] wallpaper item failed (\(reason, privacy: .public)) — retrying once")
+                self.didRetryCurrentItemAfterFailure = true
+                self.retryAfterPlaybackFailure()
+            }
+    }
+
+    /// The recovery half of `observeForPlaybackFailure` — rebuilds the same wallpaper's items and
+    /// swaps them back in. Uses `self.playRate`, not the global mirror `applyCurrentWallpaperChange`
+    /// reads: this isn't a wallpaper switch racing a rate change, just recovering the one already
+    /// playing, so the local value is already correct.
+    private func retryAfterPlaybackFailure() {
+        swapInFreshItems()
+        Self.apply(rate: playRate, to: player, audioPlayer)
         self.audioPlayer.volume = self.playVolume
-        applyBatteryMode()
     }
 
     /// `.rate = 0` alone doesn't cancel AVPlayer's internal "waiting to minimize stalling" state —
@@ -136,6 +243,7 @@ class VideoWallpaperViewModel: ObservableObject {
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             return AVPlayerItem(url: url)
         }
+        warnIfCodecMayNotDecode(videoTrack: videoTrack, url: url)
         guard !asset.tracks(withMediaType: .audio).isEmpty else {
             // Already video-only — nothing to strip, no benefit to building a composition.
             return AVPlayerItem(url: url)
@@ -154,6 +262,35 @@ class VideoWallpaperViewModel: ObservableObject {
         compositionTrack.preferredTransform = videoTrack.preferredTransform
         wallpaperDebugLog.notice("videoOnlyItem: composition built successfully, using video-only item")
         return AVPlayerItem(asset: composition)
+    }
+
+    /// VP8/VP9 have no AVFoundation decode path on macOS at all (hardware or software) — an item
+    /// built from one can still reach `.readyToPlay` and even advance its own play head with
+    /// nothing in the player's own status/error to explain it, producing a wallpaper that just
+    /// looks like a frozen/black desktop with no diagnostic anywhere. AV1 support is real but
+    /// hardware-dependent (only recent Apple Silicon), so it's checked dynamically via
+    /// VideoToolbox rather than assumed either way. This is detection/logging only, not a fix —
+    /// making the actual codec play would need transcoding, which is out of scope here.
+    private static func warnIfCodecMayNotDecode(videoTrack: AVAssetTrack, url: URL) {
+        guard let raw = videoTrack.formatDescriptions.first, let formatDescription = raw as! CMFormatDescription? else {
+            return
+        }
+        let codec = CMFormatDescriptionGetMediaSubType(formatDescription)
+        let fourCC = fourCCString(codec)
+        switch fourCC {
+        case "vp08", "vp09":
+            wallpaperDebugLog.error("'\(url.lastPathComponent, privacy: .public)' uses video codec '\(fourCC, privacy: .public)' — macOS has no built-in decoder for this at all; this wallpaper will likely show as black/frozen despite playback appearing to run.")
+        case "av01":
+            guard !VTIsHardwareDecodeSupported(codec) else { return }
+            wallpaperDebugLog.error("'\(url.lastPathComponent, privacy: .public)' uses video codec 'av01' (AV1) and this Mac has no hardware decoder for it — depending on macOS version this may fail to decode, showing as black/frozen despite playback appearing to run.")
+        default:
+            break
+        }
+    }
+
+    private static func fourCCString(_ code: FourCharCode) -> String {
+        let bytes: [UInt8] = [24, 16, 8, 0].map { UInt8((code >> $0) & 0xFF) }
+        return String(bytes: bytes, encoding: .ascii) ?? "????"
     }
 
     private static func apply(rate: Float, to players: AVPlayer...) {
@@ -355,6 +492,8 @@ class VideoWallpaperViewModel: ObservableObject {
             }
             seedInitialFrameIfStartingPaused(project: currentWallpaper.project, item: item)
             seedTrimStartIfNeeded(project: currentWallpaper.project, item: item)
+            observeForPlaybackFailure(item: item)
+            observeFirstFrameReady(item: item, screenId: screenId)
         }
         // `preventsDisplaySleepDuringVideoPlayback` defaults to true on macOS — AVFoundation
         // treats an actively-playing video as something the user is watching and wants the
@@ -414,6 +553,7 @@ class VideoWallpaperViewModel: ObservableObject {
     deinit {
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        readinessTimer?.invalidate()
     }
 
     @objc private func playerDidFinishPlaying(_ notification: Notification) {
