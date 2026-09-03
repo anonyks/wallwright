@@ -46,6 +46,16 @@ struct ExplorerItem: SubviewOfContentView {
                     ? Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
                     : wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview))
                 .resizable()
+                // Removing this (in an earlier attempt to fix the double hover-scale below) broke
+                // the card's whole layout: `.aspectRatio(_, contentMode: .fit)`'s size proposal
+                // depends on something in this exact chain position, even though `.scaleEffect` is
+                // documented as a rendering-only transform — confirmed live via screenshot, every
+                // card's ZStack blew up to fill the grid row instead of matching the 16:9 image,
+                // with the topLeading impact-dot overlay floating far above the actual thumbnail.
+                // Hardcoded to 1.0 (not tied to `isHovered`) so it can't reintroduce the double-
+                // scale-on-hover this was originally trying to fix, while keeping whatever layout
+                // role it plays intact.
+                .scaleEffect(1.0)
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
                 .clipped()
                 // `preview.jpg`'s filename never changes when its content is regenerated (see
