@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */; };
+		192281A7FDCB950BF47612D2 /* ReservedShortcutsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */; };
+		1AD4E921BD6C2F8F8F5F36DE /* VideoCropDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */; };
+		4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */; };
 		5E0700E62A859FAD00ADFE2E /* WallpaperNotFound.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */; };
 		5E2F1E892A57DF2D0081D69D /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5E2F1E882A57DF2D0081D69D /* Localizable.xcstrings */; };
 		5E32ABFE2A4D595D00A0EEEC /* FilterResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E32ABFD2A4D595D00A0EEEC /* FilterResults.swift */; };
@@ -14,15 +18,12 @@
 		5E615E222A7D2F9700A37EB8 /* ImportPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E615E212A7D2F9700A37EB8 /* ImportPanels.swift */; };
 		5E66A0DA2A8ADECC00EE79D6 /* TopTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0D92A8ADECC00EE79D6 /* TopTabBar.swift */; };
 		5E66A0DD2A8ADF7C00EE79D6 /* ExplorerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0DC2A8ADF7C00EE79D6 /* ExplorerTopBar.swift */; };
-		EE0000000000000000000045 /* LibraryQuickControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000046 /* LibraryQuickControls.swift */; };
 		5E66A0DF2A8AE3C900EE79D6 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0DE2A8AE3C900EE79D6 /* ContentViewModel.swift */; };
 		5E66A0E12A8BA18D00EE79D6 /* ThumbnailImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0E02A8BA18D00EE79D6 /* ThumbnailImage.swift */; };
 		5E66A0E42A8BA27600EE79D6 /* FilterResultsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0E32A8BA27600EE79D6 /* FilterResultsViewModel.swift */; };
 		5E66A0E62A8BA69B00EE79D6 /* WallpaperExplorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0E52A8BA69B00EE79D6 /* WallpaperExplorer.swift */; };
 		5E66A0E82A8BA95600EE79D6 /* WallpaperPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0E72A8BA95600EE79D6 /* WallpaperPreview.swift */; };
 		5E66A0ED2A8BABAB00EE79D6 /* DisplaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E66A0EC2A8BABAB00EE79D6 /* DisplaySettings.swift */; };
-		EE000000000000000000003D /* EditWallpaperSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003E /* EditWallpaperSheet.swift */; };
-		EE0000000000000000000053 /* VideoFrameScrubberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000054 /* VideoFrameScrubberView.swift */; };
 		5E7665262A2DC30E00E0E4B4 /* WEProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7665252A2DC30D00E0E4B4 /* WEProject.swift */; };
 		5E76652A2A2E231400E0E4B4 /* AboutUsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7665292A2E231400E0E4B4 /* AboutUsView.swift */; };
 		5E8C82032A9E15D0009E291B /* ExplorerItemMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8C82022A9E15D0009E291B /* ExplorerItemMenu.swift */; };
@@ -30,7 +31,6 @@
 		5E9D40442A2EC68600AB8A0C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9D40432A2EC68600AB8A0C /* AppDelegate.swift */; };
 		5EA969A32A7D4BA30027B963 /* FirstLaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA969A22A7D4BA30027B963 /* FirstLaunchView.swift */; };
 		5EAD1DB82A88DFB80067E1D2 /* VideoWallpaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAD1DB72A88DFB80067E1D2 /* VideoWallpaperView.swift */; };
-		EE000000000000000000005B /* StaticImageWallpaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005C /* StaticImageWallpaperView.swift */; };
 		5EAF3F702A870DEC00F85685 /* PerformancePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAF3F6F2A870DEC00F85685 /* PerformancePage.swift */; };
 		5EAF3F722A870ED400F85685 /* GeneralPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAF3F712A870ED400F85685 /* GeneralPage.swift */; };
 		5EB152A12A82ADEB007EA845 /* Wallwright.docc in Sources */ = {isa = PBXBuildFile; fileRef = 5EB152A02A82ADEB007EA845 /* Wallwright.docc */; };
@@ -45,20 +45,65 @@
 		5EFBB0BB2A2F10EA00E39BEC /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFBB0BA2A2F10EA00E39BEC /* main.swift */; };
 		5EFC591D2A81ACBC005F97E2 /* StatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC591C2A81ACBC005F97E2 /* StatusBar.swift */; };
 		5EFC591F2A81ACC3005F97E2 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC591E2A81ACC3005F97E2 /* MainMenu.swift */; };
-		EE0000000000000000000033 /* ShortcutMenuItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000034 /* ShortcutMenuItemView.swift */; };
 		AA1B2C3D4E5F600200ABCD05 /* SpriteKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */; };
 		BB0000000000000000000003 /* ObjCExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* ObjCExceptionCatcher.m */; };
+		BC47E385AF42386CC33C75C7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 957985CF80A1727A04F904D2 /* Foundation.framework */; };
 		CC0000000000000000000001 /* WallpaperDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000002 /* WallpaperDirectory.swift */; };
 		CC0000000000000000000003 /* ZipImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000004 /* ZipImporter.swift */; };
 		CC000000000000000000000D /* VideoImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000E /* VideoImporter.swift */; };
-		EE0000000000000000000057 /* ImageImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000058 /* ImageImporter.swift */; };
-		EE000000000000000000005D /* DynamicDesktopHEIC.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005E /* DynamicDesktopHEIC.swift */; };
 		CC000000000000000000000F /* MotionBgsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000010 /* MotionBgsService.swift */; };
 		CC0000000000000000000011 /* MotionBgsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000012 /* MotionBgsViewModel.swift */; };
 		CC0000000000000000000013 /* MotionBgsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000014 /* MotionBgsView.swift */; };
+		CC0000000000000000000015 /* WallpaperImpactEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000016 /* WallpaperImpactEstimator.swift */; };
+		CC0000000000000000000017 /* SystemUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000018 /* SystemUsageMonitor.swift */; };
+		E536FDFF8651C7C8409B3B07 /* InboxClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */; };
+		EE0000000000000000000001 /* AerialsInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000002 /* AerialsInjector.swift */; };
+		EE0000000000000000000003 /* LockScreenSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000004 /* LockScreenSync.swift */; };
+		EE0000000000000000000005 /* CommandListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000006 /* CommandListener.swift */; };
+		EE0000000000000000000007 /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000008 /* BatteryMonitor.swift */; };
+		EE0000000000000000000009 /* ClockOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000A /* ClockOverlay.swift */; };
+		EE000000000000000000000B /* ClockSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000C /* ClockSettings.swift */; };
+		EE000000000000000000000E /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000D /* Fonts */; };
+		EE000000000000000000000F /* ImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000010 /* ImportReviewSheet.swift */; };
+		EE0000000000000000000011 /* OtherAudioMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000012 /* OtherAudioMonitor.swift */; };
+		EE0000000000000000000013 /* Hotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000014 /* Hotkey.swift */; };
+		EE0000000000000000000015 /* ReservedShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000016 /* ReservedShortcuts.swift */; };
+		EE0000000000000000000017 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000018 /* GlobalHotkeyManager.swift */; };
+		EE0000000000000000000019 /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001A /* HotkeyRecorderView.swift */; };
+		EE000000000000000000001B /* HotkeysPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001C /* HotkeysPage.swift */; };
+		EE000000000000000000001D /* ClockColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001E /* ClockColorPicker.swift */; };
+		EE000000000000000000001F /* YtDlpService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000020 /* YtDlpService.swift */; };
+		EE0000000000000000000021 /* YouTubeImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000022 /* YouTubeImportSheet.swift */; };
+		EE0000000000000000000023 /* VideoTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000024 /* VideoTranscoder.swift */; };
+		EE0000000000000000000025 /* FullscreenAppMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000026 /* FullscreenAppMonitor.swift */; };
+		EE0000000000000000000027 /* SteamWorkshopService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000028 /* SteamWorkshopService.swift */; };
+		EE0000000000000000000029 /* PackageImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002A /* PackageImporter.swift */; };
+		EE000000000000000000002B /* SteamWorkshopImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002C /* SteamWorkshopImportSheet.swift */; };
+		EE000000000000000000002D /* PackageImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002E /* PackageImportReviewSheet.swift */; };
+		EE000000000000000000002F /* PlaylistViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000030 /* PlaylistViewModel.swift */; };
+		EE0000000000000000000031 /* PlaylistSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000032 /* PlaylistSettings.swift */; };
+		EE0000000000000000000033 /* ShortcutMenuItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000034 /* ShortcutMenuItemView.swift */; };
+		EE0000000000000000000035 /* YouTubeImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000036 /* YouTubeImportViewModel.swift */; };
+		EE0000000000000000000037 /* SteamWorkshopImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000038 /* SteamWorkshopImportViewModel.swift */; };
+		EE0000000000000000000039 /* PopupCardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003A /* PopupCardStyle.swift */; };
+		EE000000000000000000003B /* AppMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003C /* AppMotion.swift */; };
+		EE000000000000000000003D /* EditWallpaperSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003E /* EditWallpaperSheet.swift */; };
+		EE000000000000000000003F /* DirectURLImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000040 /* DirectURLImporter.swift */; };
+		EE0000000000000000000041 /* DirectURLImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000042 /* DirectURLImportViewModel.swift */; };
+		EE0000000000000000000043 /* DirectURLImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000044 /* DirectURLImportSheet.swift */; };
+		EE0000000000000000000045 /* LibraryQuickControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000046 /* LibraryQuickControls.swift */; };
 		EE0000000000000000000047 /* MoeWallsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000048 /* MoeWallsService.swift */; };
 		EE0000000000000000000049 /* MoeWallsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004A /* MoeWallsViewModel.swift */; };
 		EE000000000000000000004B /* MoeWallsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004C /* MoeWallsView.swift */; };
+		EE000000000000000000004D /* WallperService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004E /* WallperService.swift */; };
+		EE000000000000000000004F /* WallperViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000050 /* WallperViewModel.swift */; };
+		EE0000000000000000000051 /* WallperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000052 /* WallperView.swift */; };
+		EE0000000000000000000053 /* VideoFrameScrubberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000054 /* VideoFrameScrubberView.swift */; };
+		EE0000000000000000000055 /* RetryingAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000056 /* RetryingAsyncImage.swift */; };
+		EE0000000000000000000057 /* ImageImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000058 /* ImageImporter.swift */; };
+		EE0000000000000000000059 /* ImageImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005A /* ImageImportReviewSheet.swift */; };
+		EE000000000000000000005B /* StaticImageWallpaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005C /* StaticImageWallpaperView.swift */; };
+		EE000000000000000000005D /* DynamicDesktopHEIC.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005E /* DynamicDesktopHEIC.swift */; };
 		EE000000000000000000005F /* DesktopHutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000060 /* DesktopHutService.swift */; };
 		EE0000000000000000000061 /* DesktopHutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000062 /* DesktopHutViewModel.swift */; };
 		EE0000000000000000000063 /* DesktopHutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000064 /* DesktopHutView.swift */; };
@@ -68,19 +113,11 @@
 		EE000000000000000000006D /* AlphaCodersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000006E /* AlphaCodersService.swift */; };
 		EE000000000000000000006F /* AlphaCodersViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000070 /* AlphaCodersViewModel.swift */; };
 		EE0000000000000000000071 /* AlphaCodersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000072 /* AlphaCodersView.swift */; };
-		CC0000000000000000000015 /* WallpaperImpactEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000016 /* WallpaperImpactEstimator.swift */; };
-		CC0000000000000000000017 /* SystemUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000018 /* SystemUsageMonitor.swift */; };
-		EE0000000000000000000001 /* AerialsInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000002 /* AerialsInjector.swift */; };
-		EE0000000000000000000003 /* LockScreenSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000004 /* LockScreenSync.swift */; };
-		EE0000000000000000000005 /* CommandListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000006 /* CommandListener.swift */; };
-		EE0000000000000000000007 /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000008 /* BatteryMonitor.swift */; };
-		EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000090 /* PowerConditionMonitor.swift */; };
-		EE0000000000000000000009 /* ClockOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000A /* ClockOverlay.swift */; };
-		EE000000000000000000000B /* ClockSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000C /* ClockSettings.swift */; };
-		EE000000000000000000000E /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000D /* Fonts */; };
-		EE000000000000000000000F /* ImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000010 /* ImportReviewSheet.swift */; };
-		EE0000000000000000000059 /* ImageImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000005A /* ImageImportReviewSheet.swift */; };
-		EE0000000000000000000011 /* OtherAudioMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000012 /* OtherAudioMonitor.swift */; };
+		EE0000000000000000000073 /* FadingTitleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000074 /* FadingTitleText.swift */; };
+		EE0000000000000000000075 /* BrowseStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000076 /* BrowseStateView.swift */; };
+		EE0000000000000000000077 /* LibraryEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000078 /* LibraryEmptyStateView.swift */; };
+		EE0000000000000000000079 /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007A /* CommandPaletteView.swift */; };
+		EE000000000000000000007B /* PopupHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007C /* PopupHeader.swift */; };
 		EE000000000000000000007D /* ThumbnailDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007E /* ThumbnailDownsampler.swift */; };
 		EE000000000000000000007F /* InboxLinksStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000080 /* InboxLinksStore.swift */; };
 		EE0000000000000000000081 /* InboxClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000082 /* InboxClassifier.swift */; };
@@ -89,42 +126,24 @@
 		EE0000000000000000000087 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000088 /* InboxView.swift */; };
 		EE0000000000000000000089 /* VideoCropDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008A /* VideoCropDetector.swift */; };
 		EE000000000000000000008B /* BrowseSourceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008C /* BrowseSourceSession.swift */; };
-		EE0000000000000000000013 /* Hotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000014 /* Hotkey.swift */; };
-		EE0000000000000000000015 /* ReservedShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000016 /* ReservedShortcuts.swift */; };
-		EE0000000000000000000017 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000018 /* GlobalHotkeyManager.swift */; };
-		EE0000000000000000000019 /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001A /* HotkeyRecorderView.swift */; };
-		EE000000000000000000001B /* HotkeysPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001C /* HotkeysPage.swift */; };
-		EE000000000000000000001D /* ClockColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001E /* ClockColorPicker.swift */; };
-		EE000000000000000000001F /* YtDlpService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000020 /* YtDlpService.swift */; };
-		EE0000000000000000000021 /* YouTubeImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000022 /* YouTubeImportSheet.swift */; };
-		EE000000000000000000003F /* DirectURLImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000040 /* DirectURLImporter.swift */; };
-		EE0000000000000000000041 /* DirectURLImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000042 /* DirectURLImportViewModel.swift */; };
-		EE0000000000000000000043 /* DirectURLImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000044 /* DirectURLImportSheet.swift */; };
-		EE000000000000000000004D /* WallperService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004E /* WallperService.swift */; };
-		EE000000000000000000004F /* WallperViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000050 /* WallperViewModel.swift */; };
-		EE0000000000000000000051 /* WallperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000052 /* WallperView.swift */; };
-		EE0000000000000000000023 /* VideoTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000024 /* VideoTranscoder.swift */; };
-		EE0000000000000000000025 /* FullscreenAppMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000026 /* FullscreenAppMonitor.swift */; };
-		EE0000000000000000000027 /* SteamWorkshopService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000028 /* SteamWorkshopService.swift */; };
-		EE0000000000000000000029 /* PackageImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002A /* PackageImporter.swift */; };
-		EE000000000000000000002F /* PlaylistViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000030 /* PlaylistViewModel.swift */; };
-		EE000000000000000000002B /* SteamWorkshopImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002C /* SteamWorkshopImportSheet.swift */; };
-		EE000000000000000000002D /* PackageImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000002E /* PackageImportReviewSheet.swift */; };
-		EE0000000000000000000031 /* PlaylistSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000032 /* PlaylistSettings.swift */; };
-		EE0000000000000000000035 /* YouTubeImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000036 /* YouTubeImportViewModel.swift */; };
-		EE0000000000000000000037 /* SteamWorkshopImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000038 /* SteamWorkshopImportViewModel.swift */; };
-		EE0000000000000000000039 /* PopupCardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003A /* PopupCardStyle.swift */; };
-		EE0000000000000000000073 /* FadingTitleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000074 /* FadingTitleText.swift */; };
-		EE0000000000000000000075 /* BrowseStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000076 /* BrowseStateView.swift */; };
 		EE000000000000000000008D /* LoadMoreTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008E /* LoadMoreTrigger.swift */; };
-		EE0000000000000000000077 /* LibraryEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000078 /* LibraryEmptyStateView.swift */; };
-		EE0000000000000000000079 /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007A /* CommandPaletteView.swift */; };
-		EE000000000000000000007B /* PopupHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000007C /* PopupHeader.swift */; };
-		EE000000000000000000003B /* AppMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003C /* AppMotion.swift */; };
-		EE0000000000000000000055 /* RetryingAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000056 /* RetryingAsyncImage.swift */; };
+		EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000090 /* PowerConditionMonitor.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2CAC903C568AF452E3BACAA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5EC47E6E2A2DB2E600120CCC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5EC47E752A2DB2E600120CCC;
+			remoteInfo = Wallwright;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		2F2E51FBB128F2B70D417CFA /* WallwrightTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WallwrightTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InboxClassifierTests.swift; sourceTree = "<group>"; };
+		3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicDesktopHEICTests.swift; sourceTree = "<group>"; };
 		5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = WallpaperNotFound.mp4; sourceTree = "<group>"; };
 		5E1670732A88EBEF00D1B199 /* change-signing-certificate.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "change-signing-certificate.png"; sourceTree = "<group>"; };
 		5E1670742A88ED8400D1B199 /* import-menu.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "import-menu.png"; sourceTree = "<group>"; };
@@ -137,15 +156,12 @@
 		5E615E212A7D2F9700A37EB8 /* ImportPanels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ImportPanels.swift; sourceTree = "<group>"; };
 		5E66A0D92A8ADECC00EE79D6 /* TopTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopTabBar.swift; sourceTree = "<group>"; };
 		5E66A0DC2A8ADF7C00EE79D6 /* ExplorerTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplorerTopBar.swift; sourceTree = "<group>"; };
-		EE0000000000000000000046 /* LibraryQuickControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryQuickControls.swift; sourceTree = "<group>"; };
 		5E66A0DE2A8AE3C900EE79D6 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
 		5E66A0E02A8BA18D00EE79D6 /* ThumbnailImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailImage.swift; sourceTree = "<group>"; };
 		5E66A0E32A8BA27600EE79D6 /* FilterResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterResultsViewModel.swift; sourceTree = "<group>"; };
 		5E66A0E52A8BA69B00EE79D6 /* WallpaperExplorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperExplorer.swift; sourceTree = "<group>"; };
 		5E66A0E72A8BA95600EE79D6 /* WallpaperPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperPreview.swift; sourceTree = "<group>"; };
 		5E66A0EC2A8BABAB00EE79D6 /* DisplaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettings.swift; sourceTree = "<group>"; };
-		EE000000000000000000003E /* EditWallpaperSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditWallpaperSheet.swift; sourceTree = "<group>"; };
-		EE0000000000000000000054 /* VideoFrameScrubberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameScrubberView.swift; sourceTree = "<group>"; };
 		5E7665252A2DC30D00E0E4B4 /* WEProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WEProject.swift; sourceTree = "<group>"; };
 		5E7665292A2E231400E0E4B4 /* AboutUsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutUsView.swift; sourceTree = "<group>"; };
 		5E8C82022A9E15D0009E291B /* ExplorerItemMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplorerItemMenu.swift; sourceTree = "<group>"; };
@@ -153,7 +169,6 @@
 		5E9D40432A2EC68600AB8A0C /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5EA969A22A7D4BA30027B963 /* FirstLaunchView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirstLaunchView.swift; sourceTree = "<group>"; };
 		5EAD1DB72A88DFB80067E1D2 /* VideoWallpaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoWallpaperView.swift; sourceTree = "<group>"; };
-		EE000000000000000000005C /* StaticImageWallpaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaticImageWallpaperView.swift; sourceTree = "<group>"; };
 		5EAF3F6F2A870DEC00F85685 /* PerformancePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformancePage.swift; sourceTree = "<group>"; };
 		5EAF3F712A870ED400F85685 /* GeneralPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPage.swift; sourceTree = "<group>"; };
 		5EB152A02A82ADEB007EA845 /* Wallwright.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Wallwright.docc; sourceTree = "<group>"; };
@@ -173,7 +188,10 @@
 		5EFBB0BA2A2F10EA00E39BEC /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		5EFC591C2A81ACBC005F97E2 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		5EFC591E2A81ACC3005F97E2 /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
-		EE0000000000000000000034 /* ShortcutMenuItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutMenuItemView.swift; sourceTree = "<group>"; };
+		7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReservedShortcutsTests.swift; sourceTree = "<group>"; };
+		8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCropDetectorTests.swift; sourceTree = "<group>"; };
+		8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HotkeyTests.swift; sourceTree = "<group>"; };
+		957985CF80A1727A04F904D2 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SpriteKit.framework; path = System/Library/Frameworks/SpriteKit.framework; sourceTree = SDKROOT; };
 		B4AD1D0F2AA24E8200471AC8 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* ObjCExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCExceptionCatcher.h; sourceTree = "<group>"; };
@@ -181,14 +199,58 @@
 		CC0000000000000000000002 /* WallpaperDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperDirectory.swift; sourceTree = "<group>"; };
 		CC0000000000000000000004 /* ZipImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZipImporter.swift; sourceTree = "<group>"; };
 		CC000000000000000000000E /* VideoImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoImporter.swift; sourceTree = "<group>"; };
-		EE0000000000000000000058 /* ImageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImporter.swift; sourceTree = "<group>"; };
-		EE000000000000000000005E /* DynamicDesktopHEIC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicDesktopHEIC.swift; sourceTree = "<group>"; };
 		CC0000000000000000000010 /* MotionBgsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsService.swift; sourceTree = "<group>"; };
 		CC0000000000000000000012 /* MotionBgsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsViewModel.swift; sourceTree = "<group>"; };
 		CC0000000000000000000014 /* MotionBgsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsView.swift; sourceTree = "<group>"; };
+		CC0000000000000000000016 /* WallpaperImpactEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperImpactEstimator.swift; sourceTree = "<group>"; };
+		CC0000000000000000000018 /* SystemUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUsageMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000002 /* AerialsInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialsInjector.swift; sourceTree = "<group>"; };
+		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
+		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
+		EE0000000000000000000008 /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
+		EE000000000000000000000A /* ClockOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockOverlay.swift; sourceTree = "<group>"; };
+		EE000000000000000000000C /* ClockSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockSettings.swift; sourceTree = "<group>"; };
+		EE000000000000000000000D /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
+		EE0000000000000000000010 /* ImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportReviewSheet.swift; sourceTree = "<group>"; };
+		EE0000000000000000000012 /* OtherAudioMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherAudioMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000014 /* Hotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hotkey.swift; sourceTree = "<group>"; };
+		EE0000000000000000000016 /* ReservedShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservedShortcuts.swift; sourceTree = "<group>"; };
+		EE0000000000000000000018 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
+		EE000000000000000000001A /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
+		EE000000000000000000001C /* HotkeysPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeysPage.swift; sourceTree = "<group>"; };
+		EE000000000000000000001E /* ClockColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockColorPicker.swift; sourceTree = "<group>"; };
+		EE0000000000000000000020 /* YtDlpService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YtDlpService.swift; sourceTree = "<group>"; };
+		EE0000000000000000000022 /* YouTubeImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeImportSheet.swift; sourceTree = "<group>"; };
+		EE0000000000000000000024 /* VideoTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTranscoder.swift; sourceTree = "<group>"; };
+		EE0000000000000000000026 /* FullscreenAppMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenAppMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000028 /* SteamWorkshopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopService.swift; sourceTree = "<group>"; };
+		EE000000000000000000002A /* PackageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImporter.swift; sourceTree = "<group>"; };
+		EE000000000000000000002C /* SteamWorkshopImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopImportSheet.swift; sourceTree = "<group>"; };
+		EE000000000000000000002E /* PackageImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImportReviewSheet.swift; sourceTree = "<group>"; };
+		EE0000000000000000000030 /* PlaylistViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistViewModel.swift; sourceTree = "<group>"; };
+		EE0000000000000000000032 /* PlaylistSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistSettings.swift; sourceTree = "<group>"; };
+		EE0000000000000000000034 /* ShortcutMenuItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutMenuItemView.swift; sourceTree = "<group>"; };
+		EE0000000000000000000036 /* YouTubeImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeImportViewModel.swift; sourceTree = "<group>"; };
+		EE0000000000000000000038 /* SteamWorkshopImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopImportViewModel.swift; sourceTree = "<group>"; };
+		EE000000000000000000003A /* PopupCardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupCardStyle.swift; sourceTree = "<group>"; };
+		EE000000000000000000003C /* AppMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMotion.swift; sourceTree = "<group>"; };
+		EE000000000000000000003E /* EditWallpaperSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditWallpaperSheet.swift; sourceTree = "<group>"; };
+		EE0000000000000000000040 /* DirectURLImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImporter.swift; sourceTree = "<group>"; };
+		EE0000000000000000000042 /* DirectURLImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImportViewModel.swift; sourceTree = "<group>"; };
+		EE0000000000000000000044 /* DirectURLImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImportSheet.swift; sourceTree = "<group>"; };
+		EE0000000000000000000046 /* LibraryQuickControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryQuickControls.swift; sourceTree = "<group>"; };
 		EE0000000000000000000048 /* MoeWallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoeWallsService.swift; sourceTree = "<group>"; };
 		EE000000000000000000004A /* MoeWallsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoeWallsViewModel.swift; sourceTree = "<group>"; };
 		EE000000000000000000004C /* MoeWallsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoeWallsView.swift; sourceTree = "<group>"; };
+		EE000000000000000000004E /* WallperService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperService.swift; sourceTree = "<group>"; };
+		EE0000000000000000000050 /* WallperViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperViewModel.swift; sourceTree = "<group>"; };
+		EE0000000000000000000052 /* WallperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperView.swift; sourceTree = "<group>"; };
+		EE0000000000000000000054 /* VideoFrameScrubberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameScrubberView.swift; sourceTree = "<group>"; };
+		EE0000000000000000000056 /* RetryingAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryingAsyncImage.swift; sourceTree = "<group>"; };
+		EE0000000000000000000058 /* ImageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImporter.swift; sourceTree = "<group>"; };
+		EE000000000000000000005A /* ImageImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportReviewSheet.swift; sourceTree = "<group>"; };
+		EE000000000000000000005C /* StaticImageWallpaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaticImageWallpaperView.swift; sourceTree = "<group>"; };
+		EE000000000000000000005E /* DynamicDesktopHEIC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicDesktopHEIC.swift; sourceTree = "<group>"; };
 		EE0000000000000000000060 /* DesktopHutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHutService.swift; sourceTree = "<group>"; };
 		EE0000000000000000000062 /* DesktopHutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHutViewModel.swift; sourceTree = "<group>"; };
 		EE0000000000000000000064 /* DesktopHutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHutView.swift; sourceTree = "<group>"; };
@@ -198,19 +260,11 @@
 		EE000000000000000000006E /* AlphaCodersService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaCodersService.swift; sourceTree = "<group>"; };
 		EE0000000000000000000070 /* AlphaCodersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaCodersViewModel.swift; sourceTree = "<group>"; };
 		EE0000000000000000000072 /* AlphaCodersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaCodersView.swift; sourceTree = "<group>"; };
-		CC0000000000000000000016 /* WallpaperImpactEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperImpactEstimator.swift; sourceTree = "<group>"; };
-		CC0000000000000000000018 /* SystemUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUsageMonitor.swift; sourceTree = "<group>"; };
-		EE0000000000000000000002 /* AerialsInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialsInjector.swift; sourceTree = "<group>"; };
-		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
-		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
-		EE0000000000000000000008 /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
-		EE0000000000000000000090 /* PowerConditionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerConditionMonitor.swift; sourceTree = "<group>"; };
-		EE000000000000000000000A /* ClockOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockOverlay.swift; sourceTree = "<group>"; };
-		EE000000000000000000000C /* ClockSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockSettings.swift; sourceTree = "<group>"; };
-		EE000000000000000000000D /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
-		EE0000000000000000000010 /* ImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportReviewSheet.swift; sourceTree = "<group>"; };
-		EE000000000000000000005A /* ImageImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportReviewSheet.swift; sourceTree = "<group>"; };
-		EE0000000000000000000012 /* OtherAudioMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherAudioMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000074 /* FadingTitleText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingTitleText.swift; sourceTree = "<group>"; };
+		EE0000000000000000000076 /* BrowseStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseStateView.swift; sourceTree = "<group>"; };
+		EE0000000000000000000078 /* LibraryEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEmptyStateView.swift; sourceTree = "<group>"; };
+		EE000000000000000000007A /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteView.swift; sourceTree = "<group>"; };
+		EE000000000000000000007C /* PopupHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupHeader.swift; sourceTree = "<group>"; };
 		EE000000000000000000007E /* ThumbnailDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailDownsampler.swift; sourceTree = "<group>"; };
 		EE0000000000000000000080 /* InboxLinksStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxLinksStore.swift; sourceTree = "<group>"; };
 		EE0000000000000000000082 /* InboxClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxClassifier.swift; sourceTree = "<group>"; };
@@ -219,42 +273,19 @@
 		EE0000000000000000000088 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		EE000000000000000000008A /* VideoCropDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCropDetector.swift; sourceTree = "<group>"; };
 		EE000000000000000000008C /* BrowseSourceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseSourceSession.swift; sourceTree = "<group>"; };
-		EE0000000000000000000014 /* Hotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hotkey.swift; sourceTree = "<group>"; };
-		EE0000000000000000000016 /* ReservedShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservedShortcuts.swift; sourceTree = "<group>"; };
-		EE0000000000000000000018 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
-		EE000000000000000000001A /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
-		EE000000000000000000001C /* HotkeysPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeysPage.swift; sourceTree = "<group>"; };
-		EE000000000000000000001E /* ClockColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockColorPicker.swift; sourceTree = "<group>"; };
-		EE0000000000000000000020 /* YtDlpService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YtDlpService.swift; sourceTree = "<group>"; };
-		EE0000000000000000000022 /* YouTubeImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeImportSheet.swift; sourceTree = "<group>"; };
-		EE0000000000000000000040 /* DirectURLImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImporter.swift; sourceTree = "<group>"; };
-		EE0000000000000000000042 /* DirectURLImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImportViewModel.swift; sourceTree = "<group>"; };
-		EE0000000000000000000044 /* DirectURLImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectURLImportSheet.swift; sourceTree = "<group>"; };
-		EE000000000000000000004E /* WallperService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperService.swift; sourceTree = "<group>"; };
-		EE0000000000000000000050 /* WallperViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperViewModel.swift; sourceTree = "<group>"; };
-		EE0000000000000000000052 /* WallperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallperView.swift; sourceTree = "<group>"; };
-		EE0000000000000000000024 /* VideoTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTranscoder.swift; sourceTree = "<group>"; };
-		EE0000000000000000000026 /* FullscreenAppMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenAppMonitor.swift; sourceTree = "<group>"; };
-		EE0000000000000000000028 /* SteamWorkshopService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopService.swift; sourceTree = "<group>"; };
-		EE000000000000000000002A /* PackageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImporter.swift; sourceTree = "<group>"; };
-		EE0000000000000000000030 /* PlaylistViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistViewModel.swift; sourceTree = "<group>"; };
-		EE000000000000000000002C /* SteamWorkshopImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopImportSheet.swift; sourceTree = "<group>"; };
-		EE000000000000000000002E /* PackageImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImportReviewSheet.swift; sourceTree = "<group>"; };
-		EE0000000000000000000032 /* PlaylistSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistSettings.swift; sourceTree = "<group>"; };
-		EE0000000000000000000036 /* YouTubeImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeImportViewModel.swift; sourceTree = "<group>"; };
-		EE0000000000000000000038 /* SteamWorkshopImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopImportViewModel.swift; sourceTree = "<group>"; };
-		EE000000000000000000003A /* PopupCardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupCardStyle.swift; sourceTree = "<group>"; };
-		EE0000000000000000000074 /* FadingTitleText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingTitleText.swift; sourceTree = "<group>"; };
-		EE0000000000000000000076 /* BrowseStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseStateView.swift; sourceTree = "<group>"; };
 		EE000000000000000000008E /* LoadMoreTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadMoreTrigger.swift; sourceTree = "<group>"; };
-		EE0000000000000000000078 /* LibraryEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEmptyStateView.swift; sourceTree = "<group>"; };
-		EE000000000000000000007A /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteView.swift; sourceTree = "<group>"; };
-		EE000000000000000000007C /* PopupHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupHeader.swift; sourceTree = "<group>"; };
-		EE000000000000000000003C /* AppMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMotion.swift; sourceTree = "<group>"; };
-		EE0000000000000000000056 /* RetryingAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryingAsyncImage.swift; sourceTree = "<group>"; };
+		EE0000000000000000000090 /* PowerConditionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerConditionMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		38914C9CD86C94D960046E2C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC47E385AF42386CC33C75C7 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5EC47E732A2DB2E600120CCC /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -440,6 +471,8 @@
 				5EC47E782A2DB2E600120CCC /* Wallwright */,
 				5EC47E772A2DB2E600120CCC /* Products */,
 				AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */,
+				F864E5A94E91E7521A771767 /* Frameworks */,
+				60C892D0CF1EB401CCA1598F /* WallwrightTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -447,6 +480,7 @@
 			isa = PBXGroup;
 			children = (
 				5EC47E762A2DB2E600120CCC /* Wallwright.app */,
+				2F2E51FBB128F2B70D417CFA /* WallwrightTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -519,9 +553,56 @@
 			path = MenuBars;
 			sourceTree = "<group>";
 		};
+		60C892D0CF1EB401CCA1598F /* WallwrightTests */ = {
+			isa = PBXGroup;
+			children = (
+				3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */,
+				8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */,
+				355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */,
+				7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */,
+				8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */,
+			);
+			name = WallwrightTests;
+			path = WallwrightTests;
+			sourceTree = "<group>";
+		};
+		E3E142835DBD2BE87961D917 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				957985CF80A1727A04F904D2 /* Foundation.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		F864E5A94E91E7521A771767 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E3E142835DBD2BE87961D917 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		24370AAB22B074D31270E44C /* WallwrightTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4C284E98EA0ABBFDC0FA43F9 /* Build configuration list for PBXNativeTarget "WallwrightTests" */;
+			buildPhases = (
+				98732A2F71A7683D1A63EF4A /* Sources */,
+				38914C9CD86C94D960046E2C /* Frameworks */,
+				105C9A918B5C36817A2316C4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4EE8265B5787AFD2E7EDDE82 /* PBXTargetDependency */,
+			);
+			name = WallwrightTests;
+			productName = WallwrightTests;
+			productReference = 2F2E51FBB128F2B70D417CFA /* WallwrightTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		5EC47E752A2DB2E600120CCC /* Wallwright */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5EC47EA02A2DB2E700120CCC /* Build configuration list for PBXNativeTarget "Wallwright" */;
@@ -568,11 +649,19 @@
 			projectRoot = "";
 			targets = (
 				5EC47E752A2DB2E600120CCC /* Wallwright */,
+				24370AAB22B074D31270E44C /* WallwrightTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		105C9A918B5C36817A2316C4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5EC47E742A2DB2E600120CCC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -704,9 +793,50 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		98732A2F71A7683D1A63EF4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */,
+				05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */,
+				E536FDFF8651C7C8409B3B07 /* InboxClassifierTests.swift in Sources */,
+				192281A7FDCB950BF47612D2 /* ReservedShortcutsTests.swift in Sources */,
+				1AD4E921BD6C2F8F8F5F36DE /* VideoCropDetectorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		4EE8265B5787AFD2E7EDDE82 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Wallwright;
+			target = 5EC47E752A2DB2E600120CCC /* Wallwright */;
+			targetProxy = 2CAC903C568AF452E3BACAA8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		072942F5FB3BD620D56D8BE7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = K9W6YX8M37;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wallwright.WallwrightTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wallwright.app/Contents/MacOS/Wallwright";
+			};
+			name = Release;
+		};
 		5EC47E9E2A2DB2E700120CCC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -906,9 +1036,38 @@
 			};
 			name = Release;
 		};
+		F4EBFB5A042688331D0333F8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = K9W6YX8M37;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wallwright.WallwrightTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wallwright.app/Contents/MacOS/Wallwright";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4C284E98EA0ABBFDC0FA43F9 /* Build configuration list for PBXNativeTarget "WallwrightTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				072942F5FB3BD620D56D8BE7 /* Release */,
+				F4EBFB5A042688331D0333F8 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5EC47E712A2DB2E600120CCC /* Build configuration list for PBXProject "Wallwright" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

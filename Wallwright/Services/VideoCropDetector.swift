@@ -68,9 +68,14 @@ enum VideoCropDetector {
         timeoutTask.cancel()
         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-        guard let output = syncQueue.sync(execute: { String(data: stderrData, encoding: .utf8) }),
-              let regex = try? NSRegularExpression(pattern: #"crop=\d+:\d+:\d+:\d+"#)
-        else { return nil }
+        guard let output = syncQueue.sync(execute: { String(data: stderrData, encoding: .utf8) }) else { return nil }
+        return Self.consensusCrop(fromCropdetectOutput: output, nativeWidth: nativeWidth, nativeHeight: nativeHeight)
+    }
+
+    /// Pure parsing/consensus step split out of `detectBlackBars` above so it's testable without a
+    /// real ffmpeg subprocess — `output` is exactly that call's captured stderr text.
+    static func consensusCrop(fromCropdetectOutput output: String, nativeWidth: Int, nativeHeight: Int) -> VideoCropRect? {
+        guard let regex = try? NSRegularExpression(pattern: #"crop=\d+:\d+:\d+:\d+"#) else { return nil }
 
         // cropdetect prints one "crop=W:H:X:Y" line per analyzed frame — tallying and taking the
         // most common exact string is a simple, effective consensus across the sample (a single
