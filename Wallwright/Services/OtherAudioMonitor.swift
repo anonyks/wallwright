@@ -169,13 +169,26 @@ final class OtherAudioMonitor {
     /// Asks each known scriptable app that's currently running for its real transport state.
     /// Returns nil (defer to the generic CoreAudio signal) if none of them are running.
     private static func isKnownAppActuallyPlaying() -> Bool? {
+        // Was `return result.stringValue == "playing"` unconditionally — returning on the FIRST
+        // scriptable app whose query succeeds, regardless of whether it was actually playing.
+        // With Spotify checked before Music, having Spotify merely *open* (paused, idle) made this
+        // return `false` immediately: `poll()`'s `if let knownPlaying = ...` binds just as
+        // successfully to `Optional(false)` as to `Optional(true)`, so it took that as a definitive
+        // "nothing else is playing" and skipped the CoreAudio fallback entirely — silencing
+        // detection for every other app (Chrome, Zoom, Discord, even Apple Music) for as long as
+        // Spotify stayed open, confirmed live by tracing the exact optional-binding mechanics.
+        // `true` only on an actual confirmed "playing" now; every other case — paused, no
+        // scriptable app running, or a query that errored — correctly falls through to `nil`, so
+        // `poll()` defers to CoreAudio instead of treating "Spotify isn't playing" as "nothing is."
         for (bundleID, appName) in scriptableApps {
             guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else { continue }
             guard let script = NSAppleScript(source: "tell application \"\(appName)\" to player state as string") else { continue }
             var error: NSDictionary?
             let result = script.executeAndReturnError(&error)
             guard error == nil else { continue }
-            return result.stringValue == "playing"
+            if result.stringValue == "playing" {
+                return true
+            }
         }
         return nil
     }

@@ -47,6 +47,12 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
             return
         }
         task?.cancel()
+        // `URLSession` holds a strong reference to its `delegate` until explicitly invalidated —
+        // every real caller of `start()` (all four are lifecycle reconnects, per this class's own
+        // header comment) reaches this without necessarily going through `stop()` first, so a
+        // bare `self.session = session` below would silently orphan whatever session was already
+        // here on every reconnect, not just on an explicit `stop()`.
+        session?.invalidateAndCancel()
         let topic = AppDelegate.shared.globalSettingsViewModel.settings.inboxNtfyTopic
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !topic.isEmpty, let url = URL(string: "https://ntfy.sh/\(topic)/sse") else {
@@ -68,6 +74,10 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
     func stop() {
         task?.cancel()
         task = nil
+        // Same reasoning as `start()`'s own `invalidateAndCancel()` call — a plain `session = nil`
+        // drops our own reference but URLSession itself keeps its strong reference to `self` as
+        // delegate alive until actually invalidated.
+        session?.invalidateAndCancel()
         session = nil
         bufferQueue.sync { buffer.removeAll() }
     }
