@@ -12,6 +12,7 @@
 
 import ImageIO
 import Foundation
+import AppKit
 
 enum DynamicDesktopHEIC {
     private static let appleDesktopNamespace = "http://ns.apple.com/namespace/1.0/"
@@ -36,6 +37,20 @@ enum DynamicDesktopHEIC {
     /// lookup) for a visual difference that's negligible for a desktop wallpaper's purposes.
     static func currentFrameIndex(frameCount: Int, now: Date = Date()) -> Int {
         guard frameCount > 0 else { return 0 }
+        // A 2-frame Dynamic Desktop is Apple's plain Light/Dark appearance toggle (tagged
+        // `apple_desktop:apr`), not a chronological solar cycle — confirmed by directly decoding
+        // the real `apple_desktop:apr` metadata on a genuine 2-frame Apple wallpaper
+        // (/System/Library/Desktop Pictures/Sonoma.heic): its own appearance map is
+        // `{"l": 0, "d": 1}`, light is frame 0, dark is frame 1. The generic "evenly divide 24
+        // hours across frameCount" formula below is correct for a real chronological solar set
+        // (confirmed separately: frame 0's own solar-altitude tag is the lowest, rising then
+        // falling across the index range) but silently inverts a 2-frame file — every daylight
+        // hour after noon would show the dark frame and vice versa. Matched to the system's
+        // actual current appearance instead, not time of day at all, since that's what the "apr"
+        // tag itself encodes and a user's light/dark setting doesn't necessarily track daylight.
+        guard frameCount != 2 else {
+            return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 1 : 0
+        }
         let components = Calendar.current.dateComponents([.hour, .minute], from: now)
         let dayFraction = (Double(components.hour ?? 0) + Double(components.minute ?? 0) / 60) / 24
         return min(frameCount - 1, Int(dayFraction * Double(frameCount)))

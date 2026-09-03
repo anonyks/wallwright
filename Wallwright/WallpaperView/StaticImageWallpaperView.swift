@@ -70,6 +70,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         var lastURL: URL?
         private var timer: Timer?
         private var lastFrameIndex: Int?
+        private var appearanceObservation: NSKeyValueObservation?
 
         /// Draws the correct frame for right now, then checks again every 5 minutes — plenty
         /// granular for a 16-frame day (roughly one change per 1.5 hours) without re-decoding the
@@ -81,11 +82,23 @@ struct StaticImageWallpaperView: NSViewRepresentable {
                 self.applyFrame(url: url, view: view, maxPixelSize: maxPixelSize)
             }
             timer?.tolerance = 30
+            // A 2-frame Dynamic Desktop is Apple's Light/Dark appearance toggle (see
+            // DynamicDesktopHEIC.currentFrameIndex's own doc comment) — without this, switching
+            // system appearance (Control Center, a scheduled sunset, Night Shift) left the desktop
+            // stuck on the old frame for up to the full 300s until the timer happened to catch it.
+            // KVO on NSApp.effectiveAppearance re-applies immediately instead. Harmless for any
+            // other (time-based) frame count too — applyFrame just recomputes the same index it
+            // already would have, a no-op via the lastFrameIndex guard below.
+            appearanceObservation = NSApp.observe(\.effectiveAppearance, options: []) { [weak self, weak view] _, _ in
+                guard let self, let view else { return }
+                self.applyFrame(url: url, view: view, maxPixelSize: maxPixelSize)
+            }
         }
 
         func stopCycling() {
             timer?.invalidate()
             timer = nil
+            appearanceObservation = nil
             lastFrameIndex = nil
         }
 
@@ -101,6 +114,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
 
         deinit {
             timer?.invalidate()
+            appearanceObservation = nil
         }
     }
 }

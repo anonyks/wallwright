@@ -40,7 +40,12 @@ struct DisplaySettings: SubviewOfContentView {
                     HStack {
                         Text(WallpaperViewModel.screenName(for: screen))
                             .font(.headline)
-                        Text("\(Int(screen.frame.width))x\(Int(screen.frame.height))")
+                        // `screen.frame` is in points, not physical pixels — on a 2x Retina 14"
+                        // MacBook Pro this would print "1512x982" for what's actually a 3024x1964
+                        // panel, understating it by exactly the scale factor. Misleading
+                        // specifically here: matching a wallpaper's real pixel dimensions to a
+                        // screen is the whole point of this info row.
+                        Text("\(Int(screen.frame.width * screen.backingScaleFactor))\u{00D7}\(Int(screen.frame.height * screen.backingScaleFactor)) (@\(Int(screen.backingScaleFactor))x)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()

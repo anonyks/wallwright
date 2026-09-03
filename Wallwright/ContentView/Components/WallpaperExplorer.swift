@@ -53,16 +53,7 @@ struct WallpaperExplorer: SubviewOfContentView {
                             }
                     }
                 }
-                .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 12))
-
-                // Continuous scrolling (no more page numbers) otherwise ends abruptly against the
-                // bottom padding with nothing telling the user they've actually reached the end —
-                // same "N items" grounding Photos/Finder show at the bottom of a full library.
-                Text("^[\(items.count) Wallpaper](inflect: true)")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
+                .padding(EdgeInsets(top: 4, leading: 2, bottom: 40, trailing: 12))
             }
         }
         // At the ScrollView level, not the LazyVGrid's — a LazyVGrid only has a hit-testable

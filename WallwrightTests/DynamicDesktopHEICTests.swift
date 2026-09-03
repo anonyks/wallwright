@@ -43,4 +43,21 @@ final class DynamicDesktopHEICTests: XCTestCase {
             XCTAssertTrue(idx >= 0 && idx < 16, "index \(idx) out of range for hour \(hour)")
         }
     }
+
+    /// A 2-frame Dynamic Desktop is Apple's Light/Dark appearance toggle, not a chronological
+    /// cycle — confirmed by decoding the real `apple_desktop:apr` metadata on a genuine Apple
+    /// wallpaper (/System/Library/Desktop Pictures/Sonoma.heic), whose own appearance map is
+    /// `{"l": 0, "d": 1}`. `currentFrameIndex` special-cases this to match the system's actual
+    /// current appearance instead of time of day, so — unlike every other frame count — the result
+    /// doesn't depend on `now` at all. This can't assert *which* of 0/1 without controlling the
+    /// test host's actual appearance, but it does guard the one thing that must always hold: the
+    /// result stays in range and doesn't fall through to the time-based formula (which would make
+    /// it vary with `now`, unlike the real, always-in-range appearance-based branch).
+    func testTwoFrameCountStaysInRangeRegardlessOfTime() {
+        let morning = DynamicDesktopHEIC.currentFrameIndex(frameCount: 2, now: date(hour: 3, minute: 0))
+        let evening = DynamicDesktopHEIC.currentFrameIndex(frameCount: 2, now: date(hour: 21, minute: 0))
+        XCTAssertTrue((0...1).contains(morning))
+        XCTAssertTrue((0...1).contains(evening))
+        XCTAssertEqual(morning, evening, "should track system appearance, not time of day")
+    }
 }

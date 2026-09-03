@@ -135,7 +135,25 @@ struct EditWallpaperSheet: SubviewOfContentView {
                                 TextField("New Tag", text: $newTag)
                                     .glassFieldStyle()
                                     .onSubmit(commitNewTag)
+                                    // Without this, Escape had nothing here to consume it, so
+                                    // AppKit bubbled it up to dismiss this entire sheet instead —
+                                    // discarding any other unsaved edits just to back out of
+                                    // adding one tag.
+                                    .onKeyPress(.escape) {
+                                        newTag = ""
+                                        isAddingTag = false
+                                        return .handled
+                                    }
                                 Button("Add", action: commitNewTag)
+                                Button {
+                                    newTag = ""
+                                    isAddingTag = false
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Cancel")
                             }
                         }
                     }

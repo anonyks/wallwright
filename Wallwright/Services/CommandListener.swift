@@ -6,6 +6,8 @@
 //    echo "pause"      > /tmp/wallwright.pipe
 //    echo "resume"     > /tmp/wallwright.pipe
 //    echo "volume 50"  > /tmp/wallwright.pipe
+//    echo "next"       > /tmp/wallwright.pipe
+//    echo "prev"       > /tmp/wallwright.pipe
 //    echo "quit"       > /tmp/wallwright.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
@@ -98,6 +100,8 @@ final class CommandListener {
             if parts.count > 1, let value = Float(parts[1]) {
                 AppDelegate.shared.wallpaperViewModel.playVolume = max(0, min(1, value / 100))
             }
+        case "next", "skip": AppDelegate.shared.skipToNextPlaylistItem()
+        case "prev", "previous": AppDelegate.shared.skipToPreviousPlaylistItem()
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()
