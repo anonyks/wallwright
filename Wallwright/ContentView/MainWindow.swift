@@ -35,27 +35,49 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
         // slider dragged the entire app window. SwiftUI controls like `Slider` don't always
         // reliably report to AppKit's `isMovableByWindowBackground` hit-testing that a click landed
         // on them rather than on "background," a known SwiftUI/AppKit integration gap.
-        self.window.contentView = NSHostingView(rootView: ContentView(
-                viewModel: AppDelegate.shared.contentViewModel,
-                wallpaperViewModel: AppDelegate.shared.wallpaperViewModel
-            ).environmentObject(AppDelegate.shared.globalSettingsViewModel)
-        )
+        self.window.contentView = Self.makeContentView()
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override func windowDidLoad() {
         super.windowDidLoad()
     }
 
-    /// Evicts the shared thumbnail cache (library grid + every browse tab) once nothing can be
-    /// looking at it — keeps the app's footprint down while it's just sitting in the menu bar,
-    /// without touching per-source state (e.g. WallperViewModel's fetched sitemap) that would cost
-    /// a real re-fetch over the network to rebuild on the next window open.
+    private static func makeContentView() -> NSHostingView<some View> {
+        NSHostingView(rootView: ContentView(
+            viewModel: AppDelegate.shared.contentViewModel,
+            wallpaperViewModel: AppDelegate.shared.wallpaperViewModel
+        ).environmentObject(AppDelegate.shared.globalSettingsViewModel))
+    }
+
+    /// Every real call site that shows this window (first-launch reveal, applicationShouldHandleReopen,
+    /// the menu bar's "Show Wallwright") should go through this instead of poking `.window` directly.
+    /// Confirmed live: `windowWillClose` clearing the shared thumbnail cache alone didn't actually
+    /// free anything — `isReleasedWhenClosed = false` (deliberate, for a fast reopen with no rebuild
+    /// cost) means closing the window only ever hides it, so the still-alive `NSHostingView` and
+    /// every `NSImageView` grid cell it ever materialized while scrolling kept its OWN direct strong
+    /// reference to its decoded image, completely independent of what the shared cache does — real
+    /// memory sat well above 400MB with the window fully closed. Rebuilding `contentView` from
+    /// scratch here (paired with `windowWillClose` releasing it) actually deallocates that whole
+    /// view tree, at the cost of the window resetting to a fresh state (search text, scroll
+    /// position) on reopen rather than resuming exactly where it was — a reasonable tradeoff for an
+    /// app that's meant to sit in the menu bar most of the time, not a cosmetic regression to chase.
+    func present() {
+        if window.contentView == nil {
+            window.contentView = Self.makeContentView()
+        }
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Evicts the shared thumbnail cache (library grid + every browse tab) and releases this
+    /// window's own view tree — see `present()`'s doc comment for why both are needed. `present()`
+    /// rebuilds `contentView` the next time this window is actually shown again.
     func windowWillClose(_ notification: Notification) {
         ThumbnailImage.clearCache()
+        window.contentView = nil
     }
 
 }
