@@ -147,7 +147,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// retyping the same query if you want to run it again on the new source.
     @Published var lastBrowseSearchText = ""
 
-    @AppStorage("WallpapersPerPage") var wallpapersPerPage: Int = 50
     
     var importAlertError: WPImportError? = nil
 
@@ -380,12 +379,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
         cleanupScratchSource(pendingImageImports.removeFirst().sourceURL)
     }
 
-    /// current page index number is starting from '1' — clamped against `maxPage` inside
-    /// `autoRefreshWallpapers`, not here (that needs the filtered/sorted count, which isn't
-    /// available yet this early in the file).
-    @Published public var currentPage: Int = 1
-
-
     private var urls: [URL] {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: FileManager.default.wallpapersDirectory,
@@ -495,32 +488,13 @@ class ContentViewModel: ObservableObject, DropDelegate {
         }
     }
     
-    /// Provide wallpapers information for UI, being filtered by FilterResults and divided in pages
+    /// Provide wallpapers information for UI, filtered by FilterResults — no pagination.
+    /// `WallpaperExplorer`'s grid is a plain `LazyVGrid`, which only instantiates views for cells
+    /// actually on screen, so slicing the list into numbered pages bought nothing but a numbered-
+    /// page-button UI that isn't how any native macOS library browser (Photos, Music, Finder)
+    /// presents a local collection — continuous scrolling through the full filtered/sorted list.
     public var autoRefreshWallpapers: [WEWallpaper] {
-        let filtered = sortedWallpapers
-        guard wallpapersPerPage > 0 else { return filtered }
-        let pageCount = max(1, (filtered.count + wallpapersPerPage - 1) / wallpapersPerPage)
-        let page = min(max(currentPage, 1), pageCount)
-        // Snaps back onto a real page (e.g. after a search/filter shrinks the result set below
-        // wherever the user had paged to) — deferred to the next runloop tick since mutating
-        // @Published state directly inside a computed property SwiftUI's already evaluating for
-        // this render would trigger a "modifying state during view update" warning.
-        if page != currentPage {
-            DispatchQueue.main.async { self.currentPage = page }
-        }
-        let startIndex = (page - 1) * wallpapersPerPage
-        let endIndex = min(startIndex + wallpapersPerPage, filtered.count)
-        guard startIndex < endIndex else { return [] }
-        return Array(filtered[startIndex..<endIndex])
-    }
-
-    /// Caculates the maximium possible page index for all wallpapers in your application wallpaper directory.
-    /// Ceiling division — was integer division before, which silently hid the last page whenever
-    /// the count wasn't an exact multiple of `wallpapersPerPage` (e.g. 55 items showed as 1 page,
-    /// stranding the last 5 with no page 2 to reach them).
-    var maxPage: Int {
-        guard wallpapersPerPage > 0 else { return 1 }
-        return max(1, (filteredWallpapers.count + wallpapersPerPage - 1) / wallpapersPerPage)
+        sortedWallpapers
     }
 
     /// Total wallpapers matching the current search/filters — independent of pagination, so it

@@ -53,33 +53,43 @@ struct WallpaperExplorer: SubviewOfContentView {
                             }
                     }
                 }
-                .padding(EdgeInsets(top: 4, leading: 2, bottom: 40, trailing: 12))
+                .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 12))
+
+                // Continuous scrolling (no more page numbers) otherwise ends abruptly against the
+                // bottom padding with nothing telling the user they've actually reached the end —
+                // same "N items" grounding Photos/Finder show at the bottom of a full library.
+                Text("^[\(items.count) Wallpaper](inflect: true)")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
             }
         }
-        .overlay(alignment: .bottom) {
-            if viewModel.maxPage > 1 {
-                GlassEffectContainer(spacing: 2) {
-                    HStack(spacing: 2) {
-                        ForEach(0..<viewModel.maxPage, id: \.self) { page in
-                            let isCurrentPage = viewModel.currentPage == page + 1
-                            Button {
-                                viewModel.currentPage = page + 1
-                            } label: {
-                                Text("\(page + 1)")
-                                    .font(.callout.weight(isCurrentPage ? .semibold : .regular))
-                                    .frame(minWidth: 26, minHeight: 22)
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(isCurrentPage ? Color.accentColor : .secondary)
-                            .glassEffect(
-                                isCurrentPage ? .regular.tint(.accentColor) : .regular,
-                                in: Capsule()
-                            )
-                        }
-                    }
-                    .padding(4)
-                }
-                .padding(.bottom, 12)
+        // At the ScrollView level, not the LazyVGrid's — a LazyVGrid only has a hit-testable
+        // frame around its actual content, so the inter-item spacing and everything below the
+        // last row wouldn't register a right-click at all. ScrollView's own frame fills the whole
+        // visible area, and a card's own separate .contextMenu above still wins when right-
+        // clicking directly on one (SwiftUI resolves nested context menus to the innermost hit).
+        // explorerIconSize already existed and already drove the grid's column sizing — there was
+        // just no control anywhere to actually change it.
+        .contextMenu {
+            Button {
+                viewModel.explorerIconSize = 120
+            } label: {
+                if viewModel.explorerIconSize == 120 { Label("Small", systemImage: "checkmark") }
+                else { Text("Small") }
+            }
+            Button {
+                viewModel.explorerIconSize = 200
+            } label: {
+                if viewModel.explorerIconSize == 200 { Label("Normal", systemImage: "checkmark") }
+                else { Text("Normal") }
+            }
+            Button {
+                viewModel.explorerIconSize = 280
+            } label: {
+                if viewModel.explorerIconSize == 280 { Label("Large", systemImage: "checkmark") }
+                else { Text("Large") }
             }
         }
     }
