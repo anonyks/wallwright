@@ -79,20 +79,35 @@ final class AerialsInjector {
     /// otherwise (`checkHealth()` already no-ops without `lastVideoURL`/`lastVideoName`, but the
     /// timer itself waking the process every 5 minutes for the app's entire lifetime — even for
     /// someone who's never once used a video wallpaper — was needless).
+    /// `Timer.scheduledTimer` attaches to whatever thread calls it — harmless when that's the main
+    /// thread, but every real caller of `inject()` (which calls this at the end) dispatches via
+    /// `DispatchQueue.global(qos: .utility)`, a worker thread with no run loop actively pumping.
+    /// Confirmed live: a `Timer` scheduled there simply never fires, no error, nothing — it just
+    /// silently never checks health again for the rest of the session (and the `healthCheckTimer
+    /// == nil` guard above then blocks any later, main-thread call from replacing it with a working
+    /// one). Forcing the actual creation onto the main thread, regardless of which thread called
+    /// this, fixes that unconditionally.
     private func startHealthMonitoring() {
-        guard healthCheckTimer == nil else { return }
-        // 5 minutes, not 2 — this only recovers a *cosmetic* lock/idle-screen registration, not
-        // anything the user is actively watching for. A few extra minutes before self-healing is
-        // imperceptible, so it's not worth checking this often.
-        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            self?.checkHealth()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.healthCheckTimer == nil else { return }
+            // 5 minutes, not 2 — this only recovers a *cosmetic* lock/idle-screen registration,
+            // not anything the user is actively watching for. A few extra minutes before self-
+            // healing is imperceptible, so it's not worth checking this often.
+            self.healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+                self?.checkHealth()
+            }
+            self.healthCheckTimer?.tolerance = 60
         }
-        healthCheckTimer?.tolerance = 60
     }
 
+    /// Mirrors `startHealthMonitoring()`'s thread handling — `remove()` (this method's only caller)
+    /// runs on a background queue same as `inject()`, but a `Timer` should be invalidated from the
+    /// thread it was scheduled on (now always main), not wherever the caller happens to be.
     private func stopHealthMonitoring() {
-        healthCheckTimer?.invalidate()
-        healthCheckTimer = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.healthCheckTimer?.invalidate()
+            self?.healthCheckTimer = nil
+        }
     }
 
     /// Called once at launch — resumes monitoring immediately if a valid aerial registration is
