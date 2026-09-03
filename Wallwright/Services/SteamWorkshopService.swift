@@ -62,12 +62,16 @@ enum SteamWorkshopError: LocalizedError {
 enum SteamWorkshopService {
     static let wallpaperEngineAppId = "431960"
 
-    /// A GUI-launched app's process environment often doesn't include Homebrew's bin directory on
-    /// PATH the way an interactive Terminal session does, so the common install locations are
-    /// tried directly first — same pattern as YtDlpService/VideoTranscoder.
+    /// A GUI-launched app's process environment often doesn't include Homebrew's (or MacPorts', or
+    /// Nix's) bin directory on PATH the way an interactive Terminal session does, so the common
+    /// install locations are tried directly first — same pattern as YtDlpService/VideoTranscoder.
     private static func resolveBinary(named name: String) -> String? {
-        for path in ["/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", "/usr/bin/\(name)"]
-        where FileManager.default.isExecutableFile(atPath: path) {
+        let candidates = [
+            "/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", "/usr/bin/\(name)",
+            "/opt/local/bin/\(name)",
+            NSString(string: "~/.nix-profile/bin/\(name)").expandingTildeInPath,
+        ]
+        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
             return path
         }
         let which = Process()
