@@ -1,11 +1,52 @@
-Wallwright
-=========
+<div align="center">
 
-[![GitHub license](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+# Wallwright
 
-Wallwright is a live wallpaper engine for macOS. It plays video wallpapers on your desktop, lock screen, and screensaver at once, with a built-in library manager, playlist rotation, and a clock overlay.
+**A native macOS live wallpaper engine.**
+Video wallpapers on your desktop, lock screen, and screensaver — all in sync, all at once.
 
-Fork of [Unayung/wallpaper-engine-mac](https://github.com/Unayung/wallpaper-engine-mac), descended from [haren724/wallpaper-player-mac](https://github.com/haren724/wallpaper-player-mac). Not affiliated with the commercial Wallpaper Engine on Steam.
+[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#build--run)
+[![Latest release](https://img.shields.io/github/v/release/anonyks/wallwright)](https://github.com/anonyks/wallwright/releases/latest)
+
+<!-- Add a screenshot or a short demo GIF here — a wallpaper engine is a visual product and this
+is the single highest-leverage thing missing from this README. A 5-10s screen recording of a
+video wallpaper playing, converted to GIF, in the space below, does more for this project than
+anything else in this file. -->
+
+</div>
+
+---
+
+Wallwright turns any video into a live desktop background — synced across your desktop, the
+lock screen, and the screensaver at once, not just one of the three. It ships with a full
+library manager, playlist rotation, a drag-anywhere clock overlay, and built-in browsers for
+several free wallpaper sites, so you never have to leave the app to find something new.
+
+Written for people who wanted [Wallpaper Engine](https://www.wallpaperengine.io) on Steam
+but run macOS.
+
+## Why Wallwright
+
+Most open-source live-wallpaper projects for macOS are built once and left alone. Wallwright's
+been through repeated, adversarial rounds of live-testing and bug fixing — decode races,
+crash-recovery, per-display stability across reboots — the kind of engineering that a demo
+doesn't show but a week of actual daily use exposes:
+
+- **Survives reboots and monitor swaps.** Wallpaper assignments key off a stable per-display
+  UUID, not the raw display ID macOS hands out fresh every boot — so your monitor setup doesn't
+  get scrambled after a restart or a dock/undock.
+- **Recovers from playback failures instead of freezing.** A corrupt file, a dropped external
+  drive, an unplayable codec — Wallwright detects it and retries once, rather than leaving your
+  desktop silently frozen on the last good frame with no explanation.
+- **Actually pauses when it should.** Thermal throttling, low battery, another app in
+  fullscreen, the display asleep — each is its own configurable trigger, checked live, not
+  polled on a timer burning battery to ask "should I still be running?"
+- **No wasted decode.** Video and audio are decoded once each, not twice — a bug present in
+  most forks of this codebase that went unnoticed until it was profiled and fixed here.
+
+None of that is visible in a screenshot. It's why the desktop stays correct at 3am on day 40,
+not just in the demo.
 
 ## Features
 
@@ -13,7 +54,7 @@ Fork of [Unayung/wallpaper-engine-mac](https://github.com/Unayung/wallpaper-engi
 - Multi-display support with a per-screen wallpaper picker
 - Playlist rotation, pinning, and a recent-wallpapers menu
 - Drag-repositionable clock overlay with custom formats and gradients
-- Battery-aware playback with configurable triggers
+- Battery- and thermal-aware playback with configurable triggers
 - Menu bar controls for playback, volume, and system usage
 - Trim and crop editing, including auto-detection of black bars baked into a video
 - Tag, audio, and media-type filtering in the library grid
@@ -37,7 +78,15 @@ Wallwright is not affiliated with any of these sites. Media remains subject to e
 
 ## Supported Types
 
-Video and static images.
+Video and static images, including HEIC dynamic desktop wallpapers (the time-of-day-shifting
+kind macOS ships by default).
+
+## Install
+
+Grab the latest signed build from **[Releases](https://github.com/anonyks/wallwright/releases/latest)** —
+download, drag to Applications, done. No Xcode required.
+
+Prefer to build it yourself, or want to modify it? See [Build & Run](#build--run) below.
 
 ## External Tools
 
@@ -52,12 +101,17 @@ Optional, used only by the feature that needs them.
 ## Build & Run
 
 ```sh
-git clone <this-repo-url> Wallwright
-cd Wallwright
+git clone https://github.com/anonyks/wallwright.git
+cd wallwright
 open "Wallwright.xcodeproj"
 ```
 
 Requires macOS 26+ and Xcode 26+. Select "Sign to Run Locally", then `Cmd + R`.
+
+## Contributing
+
+Issues and pull requests are welcome — see [open issues](https://github.com/anonyks/wallwright/issues)
+for known gaps. This is a personal project maintained in spare time, so response time varies.
 
 ## Author
 
