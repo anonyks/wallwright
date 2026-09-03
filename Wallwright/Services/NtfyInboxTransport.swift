@@ -24,6 +24,14 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
 
     private var task: URLSessionDataTask?
     private var session: URLSession?
+    // `buffer` is touched both from whatever thread calls `start()`/`stop()` (AppDelegate's
+    // lifecycle hooks — main thread in practice) and from `urlSession(_:dataTask:didReceive:)`,
+    // which fires on URLSession's own private delegate queue (`delegateQueue: nil` below), not
+    // main. Same class of bug already fixed elsewhere in this codebase for subprocess stdout/
+    // stderr (VideoTranscoder/YtDlpService/SteamWorkshopService/VideoCropDetector's `syncQueue`
+    // pattern) — narrower exposure here since reconnects only happen on real lifecycle events, but
+    // still a real unsynchronized-Data race without this.
+    private let bufferQueue = DispatchQueue(label: "NtfyInboxTransport.buffer-sync")
     private var buffer = Data()
 
     func start() {
@@ -46,7 +54,7 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
             return
         }
 
-        buffer.removeAll()
+        bufferQueue.sync { buffer.removeAll() }
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = .infinity // SSE is a long-lived stream, not a normal request
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
@@ -61,20 +69,22 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
         task?.cancel()
         task = nil
         session = nil
-        buffer.removeAll()
+        bufferQueue.sync { buffer.removeAll() }
     }
 }
 
 extension NtfyInboxTransport: URLSessionDataDelegate {
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        buffer.append(data)
-        // SSE frames are newline-delimited; drain every complete line currently in the buffer,
-        // leaving any trailing partial line for the next chunk.
-        while let newlineRange = buffer.range(of: Data([0x0A])) { // "\n"
-            let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
-            buffer.removeSubrange(buffer.startIndex..<newlineRange.upperBound)
-            guard let line = String(data: lineData, encoding: .utf8) else { continue }
-            handle(line: line)
+        bufferQueue.sync {
+            buffer.append(data)
+            // SSE frames are newline-delimited; drain every complete line currently in the
+            // buffer, leaving any trailing partial line for the next chunk.
+            while let newlineRange = buffer.range(of: Data([0x0A])) { // "\n"
+                let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
+                buffer.removeSubrange(buffer.startIndex..<newlineRange.upperBound)
+                guard let line = String(data: lineData, encoding: .utf8) else { continue }
+                handle(line: line)
+            }
         }
     }
 
