@@ -231,7 +231,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if globalSettingsViewModel.isFirstLaunch {
             self.mainWindowController.window.center()
-            self.mainWindowController.present()
+            self.mainWindowController.window.makeKeyAndOrderFront(nil)
         }
     }
     
@@ -251,8 +251,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         wallpaperDebugLog.notice("applicationShouldHandleReopen fired — hasVisibleWindows=\(flag), mainWindow.isVisible=\(self.mainWindowController.window.isVisible), settingsWindow.isVisible=\(self.settingsWindow.isVisible)")
         if !self.mainWindowController.window.isVisible && !settingsWindow.isVisible {
-            wallpaperDebugLog.notice("applicationShouldHandleReopen — calling present()")
-            self.mainWindowController.present()
+            wallpaperDebugLog.notice("applicationShouldHandleReopen — calling makeKeyAndOrderFront")
+            self.mainWindowController.window?.makeKeyAndOrderFront(nil)
         }
 
         return true
@@ -318,7 +318,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     @objc func openMainWindow() {
         wallpaperDebugLog.notice("openMainWindow() called")
-        self.mainWindowController.present()
+        self.mainWindowController.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
     
