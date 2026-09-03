@@ -183,6 +183,17 @@ class WallpaperViewModel: ObservableObject {
     /// auto-resume and silently un-pauses a wallpaper the user paused on purpose moments earlier.
     /// Auto-resume checks this and backs off; auto-pause is unaffected either way.
     @Published var isPausedByUser = false
+
+    /// True while a "Stop (free memory)" policy is currently in effect — every screen's
+    /// `VideoWallpaperViewModel` observes this (same reactive pattern as `playRate`/`playVolume`
+    /// below) and actually tears down/rebuilds its `AVPlayerItem`s in response, releasing the real
+    /// `VTDecoderXPCService` hardware-decoder session and its buffer pool. `GlobalSettingsService`
+    /// owns setting this — see its `shouldWallpaperStayStopped`, the `.stop` mirror of
+    /// `shouldWallpaperStayPaused`. Window visibility (`AppDelegate.wallpaperWindows`) is driven
+    /// separately at each `.stop` call site, gated on this same flag so a window is never shown
+    /// with a torn-down player behind it.
+    @Published var isStopped = false
+
     @Published public var playRate: Float = 1.0 {
         willSet {
             if newValue == 0.0 {

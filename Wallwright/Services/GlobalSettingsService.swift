@@ -607,6 +607,23 @@ class GlobalSettingsViewModel: ObservableObject {
         return false
     }
 
+    /// The `.stop` mirror of `shouldWallpaperStayPaused` above — same shape, same triggers, just
+    /// checking `.stop` instead of `.pause`. Multiple `.stop` policies can be active at once (e.g.
+    /// on battery AND the display asleep); a resume-from-stop call site must not rebuild the
+    /// decoder (or show the window again) while any OTHER `.stop` trigger is still in effect, same
+    /// coordination problem `shouldWallpaperStayPaused` already solves for `.pause`.
+    private var shouldWallpaperStayStopped: Bool {
+        if BatteryMonitor.shared.isOnBattery && settings.laptopOnBattery == .stop { return true }
+        if PowerConditionMonitor.shared.shouldPause && settings.lowPowerConditions == .stop { return true }
+        if FullscreenAppMonitor.shared.isOtherAppFullscreen && settings.otherApplicationFullscreen == .stop { return true }
+        if isDisplayAsleep && settings.displayAsleep == .stop { return true }
+        if let frontmost = NSWorkspace.shared.frontmostApplication,
+           frontmost.bundleIdentifier != Bundle.main.bundleIdentifier,
+           frontmost.bundleIdentifier != "com.apple.finder",
+           settings.otherApplicationFocused == .stop { return true }
+        return false
+    }
+
     /// A short, human-readable reason the wallpaper is *currently* paused for a policy reason —
     /// nil when playing, and nil when paused manually (the Pause/Resume button itself already
     /// makes that self-explanatory; this is specifically for the "why did this pause on its own"
@@ -682,6 +699,7 @@ class GlobalSettingsViewModel: ObservableObject {
             case .pause:
                 AppDelegate.shared.pause()
             case .stop:
+                AppDelegate.shared.wallpaperViewModel.isStopped = true
                 AppDelegate.shared.pause()
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
             case .keepRunning, .mute:
@@ -693,6 +711,8 @@ class GlobalSettingsViewModel: ObservableObject {
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
             case .stop:
+                guard !shouldWallpaperStayStopped else { break }
+                AppDelegate.shared.wallpaperViewModel.isStopped = false
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
@@ -710,6 +730,7 @@ class GlobalSettingsViewModel: ObservableObject {
             case .pause:
                 AppDelegate.shared.pause()
             case .stop:
+                AppDelegate.shared.wallpaperViewModel.isStopped = true
                 AppDelegate.shared.pause()
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
             case .keepRunning, .mute:
@@ -721,6 +742,8 @@ class GlobalSettingsViewModel: ObservableObject {
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
             case .stop:
+                guard !shouldWallpaperStayStopped else { break }
+                AppDelegate.shared.wallpaperViewModel.isStopped = false
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
@@ -738,6 +761,7 @@ class GlobalSettingsViewModel: ObservableObject {
             case .pause:
                 AppDelegate.shared.pause()
             case .stop:
+                AppDelegate.shared.wallpaperViewModel.isStopped = true
                 AppDelegate.shared.pause()
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
             case .keepRunning, .mute:
@@ -749,6 +773,8 @@ class GlobalSettingsViewModel: ObservableObject {
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
             case .stop:
+                guard !shouldWallpaperStayStopped else { break }
+                AppDelegate.shared.wallpaperViewModel.isStopped = false
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
                 guard !shouldWallpaperStayPaused else {
                     wallpaperDebugLog2.notice("otherApplicationFullscreenDidChange() — windows ordered front but shouldWallpaperStayPaused, NOT resuming")
@@ -773,6 +799,7 @@ class GlobalSettingsViewModel: ObservableObject {
             case .pause:
                 AppDelegate.shared.pause()
             case .stop:
+                AppDelegate.shared.wallpaperViewModel.isStopped = true
                 AppDelegate.shared.pause()
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
             case .keepRunning, .mute:
@@ -784,6 +811,8 @@ class GlobalSettingsViewModel: ObservableObject {
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
             case .stop:
+                guard !shouldWallpaperStayStopped else { break }
+                AppDelegate.shared.wallpaperViewModel.isStopped = false
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
                 guard !shouldWallpaperStayPaused else { break }
                 AppDelegate.shared.resume()
@@ -919,6 +948,7 @@ class GlobalSettingsViewModel: ObservableObject {
             case .pause:
                 AppDelegate.shared.pause()
             case .stop:
+                AppDelegate.shared.wallpaperViewModel.isStopped = true
                 AppDelegate.shared.pause()
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderOut(nil) }
             case .keepRunning:
@@ -935,6 +965,8 @@ class GlobalSettingsViewModel: ObservableObject {
             guard !shouldWallpaperStayPaused else { break }
             AppDelegate.shared.resume()
         case .stop:
+            guard !shouldWallpaperStayStopped else { break }
+            AppDelegate.shared.wallpaperViewModel.isStopped = false
             for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
             guard !shouldWallpaperStayPaused else { break }
             AppDelegate.shared.resume()

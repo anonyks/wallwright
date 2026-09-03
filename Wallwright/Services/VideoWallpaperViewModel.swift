@@ -548,6 +548,44 @@ class VideoWallpaperViewModel: ObservableObject {
                 self?.playVolume = volume
             }
             .store(in: &cancellables)
+        // See `WallpaperViewModel.isStopped`'s own doc comment — this is what actually releases
+        // (and later rebuilds) this screen's real `VTDecoderXPCService` hardware-decoder session
+        // in response to a "Stop (free memory)" policy, rather than just hiding the window.
+        wvm.$isStopped
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] stopped in
+                if stopped { self?.teardownForStop() } else { self?.rebuildAfterStop() }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Releases both players' `AVPlayerItem`s entirely — `replaceCurrentItem(with: nil)` is what
+    /// actually invalidates the underlying `VTDecompressionSession` and lets `VTDecoderXPCService`
+    /// drop its buffer pool, confirmed live via `footprint` on the real decoder process (114MB for
+    /// the video item, freed on teardown). Idempotent: a no-op if already torn down (multiple
+    /// `.stop` policies can each set `isStopped = true` independently).
+    private func teardownForStop() {
+        guard player.currentItem != nil || audioPlayer.currentItem != nil else { return }
+        if let oldItem = player.currentItem {
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
+        }
+        itemStatusCancellable = nil
+        pendingFrameSeekCancellable = nil
+        pendingTrimSeekCancellable = nil
+        player.replaceCurrentItem(with: nil)
+        audioPlayer.replaceCurrentItem(with: nil)
+    }
+
+    /// The inverse of `teardownForStop()` — rebuilds fresh items from `currentWallpaper` via the
+    /// same `swapInFreshItems()` every normal wallpaper switch already uses, so this gets the exact
+    /// same observer wiring/trim/battery-cap handling a switch does, not a second, parallel path to
+    /// keep in sync. Idempotent: a no-op if playback was never actually torn down.
+    private func rebuildAfterStop() {
+        guard player.currentItem == nil else { return }
+        swapInFreshItems()
+        Self.apply(rate: playRate, to: player, audioPlayer)
+        self.audioPlayer.volume = self.playVolume
+        applyBatteryMode()
     }
 
     deinit {
