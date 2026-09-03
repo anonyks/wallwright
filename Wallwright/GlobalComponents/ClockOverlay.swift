@@ -163,15 +163,32 @@ final class ClockOverlayView: NSView {
         clockShowSecondsCancellable?.cancel()
     }
 
-    /// Seconds need a 1s refresh; otherwise 30s is plenty and cheaper.
+    /// Seconds need a 1s refresh; otherwise the displayed string only actually changes once a
+    /// minute, so the timer is aligned to the next real minute boundary rather than firing every
+    /// 60s from whatever arbitrary moment `restartTimer()` happened to run — an unaligned 60s (or
+    /// the previous plain 30s) interval redraws the exact same text roughly half the time for
+    /// nothing.
     private func restartTimer() {
         timer?.invalidate()
         let settings = AppDelegate.shared.globalSettingsViewModel.settings
-        let interval: TimeInterval = settings.clockShowSeconds ? 1.0 : 30.0
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.needsDisplay = true
+        if settings.clockShowSeconds {
+            let interval: TimeInterval = 1.0
+            let newTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+                self?.needsDisplay = true
+            }
+            newTimer.tolerance = interval * 0.2
+            timer = newTimer
+        } else {
+            let now = Date()
+            let secondsIntoMinute = Calendar.current.component(.second, from: now)
+            let nextMinuteBoundary = now.addingTimeInterval(TimeInterval(60 - secondsIntoMinute))
+            let newTimer = Timer(fire: nextMinuteBoundary, interval: 60, repeats: true) { [weak self] _ in
+                self?.needsDisplay = true
+            }
+            newTimer.tolerance = 1
+            RunLoop.main.add(newTimer, forMode: .common)
+            timer = newTimer
         }
-        timer?.tolerance = interval * 0.2
     }
 
     private var textShadow: NSShadow {
