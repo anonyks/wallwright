@@ -35,6 +35,16 @@ extension AppDelegate {
     }
 
     @objc func resume() {
+        // A "Stop (free memory)" policy tears down the decoder and hides the window (see
+        // `WallpaperViewModel.isStopped`) — neither of those undoes on its own just because
+        // `playRate` changes. Without this, a manual Resume (menu, hotkey, WallpaperPreview's
+        // play button, the `resume` CLI command — all of them funnel through here) while stopped
+        // left the user stuck: `playRate` flips to 1, but there's no item to play and no visible
+        // window, with no way out short of waiting for the original stop trigger to clear itself.
+        if self.wallpaperViewModel.isStopped {
+            self.wallpaperViewModel.isStopped = false
+            for window in self.wallpaperWindows.values { window.orderFront(nil) }
+        }
         let target = self.wallpaperViewModel.lastPlayRate == 0 ? 1 : self.wallpaperViewModel.lastPlayRate
         guard self.wallpaperViewModel.playRate != target else { return }
         self.wallpaperViewModel.playRate = target

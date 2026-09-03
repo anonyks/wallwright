@@ -632,21 +632,25 @@ class GlobalSettingsViewModel: ObservableObject {
     var activePauseReasonText: String? {
         if let frontmost = NSWorkspace.shared.frontmostApplication,
            frontmost.bundleIdentifier != Bundle.main.bundleIdentifier,
-           frontmost.bundleIdentifier != "com.apple.finder",
-           settings.otherApplicationFocused == .pause {
-            return String(localized: "Paused — another app is focused")
+           frontmost.bundleIdentifier != "com.apple.finder" {
+            if settings.otherApplicationFocused == .pause { return String(localized: "Paused — another app is focused") }
+            if settings.otherApplicationFocused == .stop { return String(localized: "Stopped — another app is focused") }
         }
-        if BatteryMonitor.shared.isOnBattery && settings.laptopOnBattery == .pause {
-            return String(localized: "Paused — on battery")
+        if BatteryMonitor.shared.isOnBattery {
+            if settings.laptopOnBattery == .pause { return String(localized: "Paused — on battery") }
+            if settings.laptopOnBattery == .stop { return String(localized: "Stopped — on battery") }
         }
-        if PowerConditionMonitor.shared.shouldPause && settings.lowPowerConditions == .pause {
-            return String(localized: "Paused — power-saving")
+        if PowerConditionMonitor.shared.shouldPause {
+            if settings.lowPowerConditions == .pause { return String(localized: "Paused — power-saving") }
+            if settings.lowPowerConditions == .stop { return String(localized: "Stopped — power-saving") }
         }
-        if FullscreenAppMonitor.shared.isOtherAppFullscreen && settings.otherApplicationFullscreen == .pause {
-            return String(localized: "Paused — another app is covering the screen")
+        if FullscreenAppMonitor.shared.isOtherAppFullscreen {
+            if settings.otherApplicationFullscreen == .pause { return String(localized: "Paused — another app is covering the screen") }
+            if settings.otherApplicationFullscreen == .stop { return String(localized: "Stopped — another app is covering the screen") }
         }
-        if isDisplayAsleep && settings.displayAsleep == .pause {
-            return String(localized: "Paused — display asleep")
+        if isDisplayAsleep {
+            if settings.displayAsleep == .pause { return String(localized: "Paused — display asleep") }
+            if settings.displayAsleep == .stop { return String(localized: "Stopped — display asleep") }
         }
         return nil
     }
