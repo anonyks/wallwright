@@ -17,4 +17,32 @@ extension FileManager {
         }
         return dir
     }
+
+    /// A safe, unique destination directory under `wallpapersDirectory` for `title` — every
+    /// importer used to build this as a plain `wallpapersDirectory.appending(path: title)` and
+    /// unconditionally `removeItem` whatever was already there before writing. `title` can be
+    /// arbitrary text from a remote source (a YouTube/Steam Workshop item name, a user-edited
+    /// field) with no filesystem safety applied to it at all: a "/" in it silently nested into a
+    /// subdirectory (or failed the write outright) instead of just being a character in a folder
+    /// name, and two entirely unrelated imports that happen to share a title (a real, reachable
+    /// case — "Sunset" is not a rare video title) silently deleted whichever one already existed.
+    /// Sanitizes filesystem-illegal characters and, if the resulting name is already taken by
+    /// something else, appends a numeric suffix instead — never deletes an existing directory to
+    /// make room, so nothing already in the library can be silently destroyed by an unrelated
+    /// import sharing its name.
+    func uniqueWallpaperDestination(forTitle title: String) -> URL {
+        let sanitized = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = sanitized.isEmpty ? "Untitled" : sanitized
+
+        var candidate = wallpapersDirectory.appending(path: base)
+        var suffix = 2
+        while fileExists(atPath: candidate.path) {
+            candidate = wallpapersDirectory.appending(path: "\(base) \(suffix)")
+            suffix += 1
+        }
+        return candidate
+    }
 }

@@ -84,12 +84,9 @@ enum PackageImporter {
         let fm = FileManager.default
         let trimmedTitle = pending.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalTitle = trimmedTitle.isEmpty ? pending.sourceDirectory.lastPathComponent : trimmedTitle
-        let destination = fm.wallpapersDirectory.appending(path: finalTitle)
+        let destination = fm.uniqueWallpaperDestination(forTitle: finalTitle)
 
         do {
-            // Clears any stale directory from a prior failed/retried import of the same title —
-            // same fix VideoImporter.commitImport needed, `copyItem` throws otherwise.
-            try? fm.removeItem(at: destination)
             try fm.copyItem(at: pending.sourceDirectory, to: destination)
 
             let projectURL = destination.appending(path: "project.json")

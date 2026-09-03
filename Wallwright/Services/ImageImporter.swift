@@ -126,11 +126,8 @@ enum ImageImporter {
         wallpaperDirectoryWrapper.addRegularFile(withContents: previewData, preferredFilename: "preview.jpg")
         wallpaperDirectoryWrapper.addRegularFile(withContents: (try? JSONEncoder().encode(projectData)) ?? Data(), preferredFilename: "project.json")
 
-        let destination = FileManager.default.wallpapersDirectory.appending(path: title)
+        let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
         do {
-            // Same stale-directory-clear as VideoImporter.commitImport — FileWrapper.write throws
-            // if something's already there, which would otherwise make every retry/re-import fail.
-            try? FileManager.default.removeItem(at: destination)
             try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
             VideoImporter.notifyLibraryChanged()
             return true

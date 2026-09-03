@@ -54,7 +54,6 @@ extension AppDelegate {
             // can make this take real, visible time.
             DispatchQueue.global(qos: .userInitiated).async {
                 let fm = FileManager.default
-                let docsDir = fm.wallpapersDirectory
 
                 var wallpaperURLs: [URL] = []
                 var zipURLs: [URL] = []
@@ -106,11 +105,16 @@ extension AppDelegate {
                           project.isSupportedType
                     else { continue }
 
-                    let dest = docsDir.appending(path: url.lastPathComponent)
-                    if !fm.fileExists(atPath: dest.path) {
-                        try? fm.copyItem(at: url, to: dest)
-                        copiedAny = true
-                    }
+                    // Was `wallpapersDirectory.appending(path: url.lastPathComponent)` + `if
+                    // !fileExists`, a silent no-op skip whenever the SOURCE folder's own name
+                    // (often a generic "wallpaper"/"content", or a Steam Workshop numeric ID — not
+                    // the wallpaper's real title) collided with anything already in the library.
+                    // Named by the wallpaper's actual title instead, with a numeric suffix on
+                    // collision rather than silently dropping the whole import.
+                    let title = project.title.isEmpty ? url.lastPathComponent : project.title
+                    let dest = fm.uniqueWallpaperDestination(forTitle: title)
+                    try? fm.copyItem(at: url, to: dest)
+                    copiedAny = true
                 }
                 if copiedAny {
                     // Safe to post off-main — `ContentViewModel`'s subscriber already hops to

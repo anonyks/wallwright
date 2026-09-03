@@ -28,7 +28,6 @@ enum ZipImporter {
 
         // Find wallpaper folders inside extracted content
         let wallpaperURLs = findWallpaperFolders(in: tempDir)
-        let dest = fm.wallpapersDirectory
         var imported = 0
 
         for url in wallpaperURLs {
@@ -42,14 +41,18 @@ enum ZipImporter {
                 continue
             }
 
-            let target = dest.appending(path: url.lastPathComponent)
-            if !fm.fileExists(atPath: target.path) {
-                do {
-                    try fm.copyItem(at: url, to: target)
-                    imported += 1
-                } catch {
-                    print("ZipImporter: copy failed for \(url.lastPathComponent): \(error)")
-                }
+            // Was `wallpapersDirectory.appending(path: url.lastPathComponent)` + `if
+            // !fileExists`, a silent no-op skip whenever the zip's internal folder name (often
+            // generic, not the wallpaper's real title) collided with anything already in the
+            // library. Named by the wallpaper's actual title instead, with a numeric suffix on
+            // collision rather than silently dropping the whole import.
+            let title = project.title.isEmpty ? url.lastPathComponent : project.title
+            let target = fm.uniqueWallpaperDestination(forTitle: title)
+            do {
+                try fm.copyItem(at: url, to: target)
+                imported += 1
+            } catch {
+                print("ZipImporter: copy failed for \(url.lastPathComponent): \(error)")
             }
         }
 
