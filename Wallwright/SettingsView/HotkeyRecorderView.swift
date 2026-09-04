@@ -49,11 +49,15 @@ final class HotkeyCaptureView: NSView {
             super.keyDown(with: event)
             return
         }
-        if event.keyCode == 53 { // Escape
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        // Bare Escape cancels recording — but Escape held WITH a modifier (⌥Esc, ⌘Esc, ...) is a
+        // combo like any other and should be captured, not treated as a cancel. Checking this
+        // before `modifiers.isEmpty` used to reject every Escape-based combo unconditionally,
+        // making them impossible to ever record.
+        if event.keyCode == 53, modifiers.isEmpty { // Escape
             isRecording = false
             return
         }
-        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         guard !modifiers.isEmpty else {
             NSSound.beep()
             return

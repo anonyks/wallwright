@@ -85,11 +85,27 @@ final class LockScreenSync {
             self, selector: #selector(screensaverDidDeactivate),
             name: NSNotification.Name("com.apple.screensaver.didStop"), object: nil
         )
+
+        // `screenLocked()` only checks power source once, at the moment the screen locks — if the
+        // user unplugs while still locked (e.g. dropping the Mac in a bag), the assertion already
+        // created keeps preventing display sleep on battery for up to the full `assertionTimeout`,
+        // silently violating the "AC power only" contract this file's header documents. Reacting to
+        // the change directly closes that gap instead of just waiting it out.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(powerSourceDidChange),
+            name: BatteryMonitor.powerSourceDidChange, object: nil
+        )
     }
 
     @objc private func screensaverDidDeactivate() {
         wallpaperDebugLog.notice("GROUND TRUTH: com.apple.screensaver.didStop received")
         AerialsInjector.shared.prewarmForNextActivation()
+    }
+
+    @objc private func powerSourceDidChange() {
+        guard assertionID != 0, BatteryMonitor.checkOnBattery() else { return }
+        wallpaperDebugLog.notice("power source changed to battery while locked — releasing display-sleep assertion")
+        releaseAssertion()
     }
 
     private func screenLocked() {

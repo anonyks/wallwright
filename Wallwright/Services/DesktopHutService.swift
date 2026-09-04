@@ -189,7 +189,7 @@ final class DesktopHutService {
             else { continue }
 
             seenSlugs.insert(id)
-            let title = decodeHTMLEntities(String(block[titleRange]))
+            let title = String(block[titleRange]).decodingHTMLEntities()
             let previewVideoURL = previewRegex.firstMatch(in: block, range: blockRange)
                 .flatMap { Range($0.range(at: 1), in: block) }
                 .flatMap { URL(string: String(block[$0])) }
@@ -197,18 +197,6 @@ final class DesktopHutService {
         }
 
         return items
-    }
-
-    /// Decodes HTML entities (`&quot;`, `&amp;`, ...) in scraped text via the HTML-document reader
-    /// rather than manual character replacement, since titles can contain arbitrary entities.
-    private static func decodeHTMLEntities(_ string: String) -> String {
-        guard let data = string.data(using: .utf8) else { return string }
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue,
-        ]
-        guard let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else { return string }
-        return attributed.string
     }
 
     /// Parses an item's own descriptive tags off its detail page (the `#tag pill` list under the

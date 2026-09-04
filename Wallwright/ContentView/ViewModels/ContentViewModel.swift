@@ -274,7 +274,15 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// their Cancel buttons need to reach this directly too — same leak, just one step earlier.
     func cleanupScratchSource(_ url: URL) {
         guard url.path.hasPrefix(FileManager.default.temporaryDirectory.path) else { return }
-        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+        let scratchDir = url.deletingLastPathComponent()
+        // Every current producer of these URLs (VideoTranscoder/DirectURLImporter/YtDlpService)
+        // places its output one level inside its own per-operation UUID directory, never directly
+        // in bare `/tmp` — but this is a general-purpose utility other callers reach into directly
+        // (see doc comment above), and getting this wrong doesn't just leak, it deletes every other
+        // app's temp files system-wide. Refusing to ever target the temp directory root itself
+        // costs nothing for any legitimate caller and removes that failure mode entirely.
+        guard scratchDir.standardizedFileURL.path != FileManager.default.temporaryDirectory.standardizedFileURL.path else { return }
+        try? FileManager.default.removeItem(at: scratchDir)
     }
 
     func commitCurrentImport(title: String, tags: [String]) {
@@ -298,7 +306,7 @@ class ContentViewModel: ObservableObject, DropDelegate {
 
     func enqueuePackageImport(directory: URL, project: WEProject, sourceId: String?) {
         do {
-            let pending = try PackageImporter.preparePending(project: project, directory: directory, sourceId: sourceId)
+            let pending = try PackageImporter.preparePending(project: project, directory: directory, sourceId: sourceId, sourceProvider: "steamworkshop")
             pendingPackageImports.append(pending)
         } catch {
             alertImportModal(which: WPImportError(
@@ -310,12 +318,33 @@ class ContentViewModel: ObservableObject, DropDelegate {
         }
     }
 
-    func commitCurrentPackageImport(title: String, tags: [String]) {
+    /// Package folders dropped straight onto the library window (e.g. an already-unpacked
+    /// Wallpaper Engine/Steam Workshop folder from Finder) — routes through the same
+    /// `PackageImporter` pipeline as Steam Workshop downloads instead of a raw filesystem copy, so
+    /// dropped packages get the same codec-compatibility transcode, metadata probing, and title
+    /// sanitization every other package import already gets. `sourceProvider: nil` — unlike a Steam
+    /// Workshop download, this didn't come from any tracked source, so it's not attributed to one.
+    func enqueuePackageImport(directory: URL) {
+        do {
+            let pending = try PackageImporter.preparePending(at: directory)
+            pendingPackageImports.append(pending)
+        } catch {
+            alertImportModal(which: WPImportError(
+                errorDescription: "Couldn't Import \(directory.lastPathComponent)",
+                failureReason: error.localizedDescription,
+                helpAnchor: "",
+                recoverySuggestion: ""
+            ))
+        }
+    }
+
+    @MainActor
+    func commitCurrentPackageImport(title: String, tags: [String]) async {
         guard !pendingPackageImports.isEmpty else { return }
         var pending = pendingPackageImports.removeFirst()
         pending.title = title
         pending.tags = tags
-        if !PackageImporter.commitImport(pending, sourceProvider: "steamworkshop") {
+        if await !PackageImporter.commitImport(pending) {
             alertImportModal(which: .unkown)
         }
     }
@@ -410,7 +439,12 @@ class ContentViewModel: ObservableObject, DropDelegate {
             }
             
             if let tags = project.tags {
-                guard !tags.allSatisfy({ $0.lowercased().contains(searchText) })
+                // `contains(where:)`, not `allSatisfy` — this must match if ANY tag contains the
+                // search text. `allSatisfy` required EVERY tag to match (failing a search like
+                // "cyberpunk" against `["cyberpunk", "city", "rain"]`, since "city"/"rain" don't
+                // contain it), and is vacuously `true` for an empty tag array, which made every
+                // untagged wallpaper match every search query regardless of relevance.
+                guard !tags.contains(where: { $0.lowercased().contains(searchText) })
                 else { return true }
             }
             
@@ -491,10 +525,17 @@ class ContentViewModel: ObservableObject, DropDelegate {
                 return sortingSequence == .increase ? lhs < rhs : lhs > rhs
             }
         case .recentlyAdded:
+            // Same decorate/sort/undecorate reasoning as `.fileSize`/`.estimatedImpact` above —
+            // `WEWallpaper.dateAdded` allocates a fresh `ISO8601DateFormatter` per access (itself a
+            // real cost — `ISO8601DateFormatter` construction carries genuine ICU locale/calendar
+            // setup) and falls back to a synchronous `resourceValues` filesystem call for wallpapers
+            // imported before the field existed. Comparing it directly inside the comparator re-paid
+            // both costs on every one of a sort's O(n log n) comparisons instead of once per item.
+            let dates = Dictionary(items.map { ($0.wallpaperDirectory, $0.dateAdded ?? .distantPast) }, uniquingKeysWith: { first, _ in first })
             return items.sorted {
-                let lhsDate = $0.dateAdded ?? .distantPast
-                let rhsDate = $1.dateAdded ?? .distantPast
-                return sortingSequence == .increase ? lhsDate < rhsDate : lhsDate > rhsDate
+                let lhs = dates[$0.wallpaperDirectory] ?? .distantPast
+                let rhs = dates[$1.wallpaperDirectory] ?? .distantPast
+                return sortingSequence == .increase ? lhs < rhs : lhs > rhs
             }
         }
     }
@@ -591,7 +632,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
 
         var videoURLs: [URL] = []
         var imageURLs: [URL] = []
-        var didImportPackage = false
 
         for url in urls {
             guard let wallpaper = try? FileWrapper(url: url) else {
@@ -604,15 +644,17 @@ class ContentViewModel: ObservableObject, DropDelegate {
                     alertImportModal(which: .doesNotContainWallpaper)
                     continue
                 }
-                // Was a raw `wallpapersDirectory.appending(path: url.lastPathComponent)` +
-                // `try?` — silently failed the whole import whenever the SOURCE folder's own name
-                // (not the wallpaper's title) collided with anything already in the library, with
-                // zero feedback. `uniqueWallpaperDestination` sanitizes and de-collides instead.
-                try? FileManager.default.copyItem(
-                    at: url,
-                    to: FileManager.default.uniqueWallpaperDestination(forTitle: url.lastPathComponent)
-                )
-                didImportPackage = true
+                // Was a raw `FileManager.copyItem` straight to `uniqueWallpaperDestination` — unlike
+                // every other package import (Steam Workshop, MoeWalls/MotionBgs/Wallper packages),
+                // that bypassed `PackageImporter` entirely: no `VideoTranscoder.ensureCompatible`
+                // check (a dropped folder with a VP9/AV1/MKV video — fine on Windows, none of it
+                // decodable by AVFoundation — imported "successfully" into an unplayable black
+                // wallpaper), no metadata probing, and it named the directory from the source
+                // folder's own name (often a generic numeric Workshop ID) instead of reading and
+                // sanitizing `project.json`'s actual title. Routing through the same
+                // `enqueuePackageImport` pending-review queue Steam Workshop downloads already use
+                // fixes all three at once.
+                enqueuePackageImport(directory: url)
             } else if wallpaper.isRegularFile, url.pathExtension.lowercased() == "zip" {
                 // Off-main — `ZipImporter.importZip` shells out to `ditto` and blocks on
                 // `waitUntilExit()`, which can take a long time for a large archive. Running that
@@ -629,9 +671,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
             }
         }
 
-        if didImportPackage {
-            refresh()
-        }
         if !videoURLs.isEmpty {
             await enqueueImports(videoURLs)
         }

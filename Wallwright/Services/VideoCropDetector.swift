@@ -32,6 +32,7 @@ enum VideoCropDetector {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ffmpeg)
         process.arguments = [
+            "-hwaccel", "videotoolbox",
             "-i", url.path,
             "-vf", "cropdetect=24:16:0",
             "-frames:v", "200",
@@ -104,8 +105,14 @@ enum VideoCropDetector {
 
     /// Crops `source` to `crop` via a fresh H.264 encode — same VideoToolbox settings
     /// `VideoTranscoder.convert` already uses for its own re-encodes, for consistent output
-    /// quality/behavior — written to `destination`. Audio is stream-copied, untouched.
-    static func crop(_ source: URL, to crop: VideoCropRect, destination: URL) async throws {
+    /// quality/behavior — written to `destination`. Audio is re-encoded to AAC, same as
+    /// `VideoTranscoder.convert` — not stream-copied: `VideoTranscoder.ensureCompatible`'s
+    /// "already compatible" fast path only checks the VIDEO codec/container, never audio, so a
+    /// native-container, compatible-video file with non-AAC audio (AC3, Opus, Vorbis — anything
+    /// not valid in an MP4 container) can reach this already in the library, untouched. `-c:a copy`
+    /// into this function's always-.mp4 `destination` would fail outright on exactly that audio.
+    @discardableResult
+    static func crop(_ source: URL, to crop: VideoCropRect, destination: URL) async throws -> (width: Int, height: Int) {
         guard let ffmpeg = VideoTranscoder.ffmpegPath else { throw VideoTranscoderError.ffmpegMissing }
         // `h264_videotoolbox` requires even width/height for 4:2:0 chroma subsampling (error
         // -12908 otherwise) — `VideoTranscoder.convert`'s own scale filter already guards against
@@ -115,13 +122,20 @@ enum VideoCropDetector {
         // integers) reached ffmpeg here unguarded and failed the whole crop.
         let evenWidth = (crop.width / 2) * 2
         let evenHeight = (crop.height / 2) * 2
+        // `x`/`y` need the same even-rounding as width/height above — ffmpeg's `yuv420p` chroma
+        // subsampling requires the crop rectangle's offset, not just its size, to land on an even
+        // pixel boundary. Rounding down (never up) is what keeps this safe: it can only shrink `x`/
+        // `y`, so the `x + width <= in_w` bound `applyCrop`'s clamping already establishes still
+        // holds — rounding up could push the rectangle back out of bounds.
+        let evenX = (crop.x / 2) * 2
+        let evenY = (crop.y / 2) * 2
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ffmpeg)
         process.arguments = [
             "-y", "-i", source.path,
-            "-vf", "crop=\(evenWidth):\(evenHeight):\(crop.x):\(crop.y)",
+            "-vf", "crop=\(evenWidth):\(evenHeight):\(evenX):\(evenY)",
             "-c:v", "h264_videotoolbox", "-q:v", "65",
-            "-c:a", "copy",
+            "-c:a", "aac", "-b:a", "192k",
             destination.path,
         ]
         process.standardOutput = Pipe()
@@ -159,5 +173,6 @@ enum VideoCropDetector {
             let message = syncQueue.sync { String(data: stderrData, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines)
             throw VideoTranscoderError.transcodeFailed(message?.isEmpty == false ? message! : "ffmpeg exited with status \(process.terminationStatus)")
         }
+        return (evenWidth, evenHeight)
     }
 }

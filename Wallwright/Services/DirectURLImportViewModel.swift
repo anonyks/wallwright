@@ -29,6 +29,10 @@ final class DirectURLImportViewModel: ObservableObject {
     }
 
     func startDownload() async {
+        // Same fix as `YouTubeImportViewModel.startDownload`'s identical guard — a fast double-
+        // trigger can queue two `Task`s before either one's own `isDownloading = true` below has
+        // run, both believing no download is in progress.
+        guard !isDownloading else { return }
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             errorMessage = DirectURLImportError.invalidURL.errorDescription

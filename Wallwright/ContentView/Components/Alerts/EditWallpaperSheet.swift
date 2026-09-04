@@ -31,10 +31,13 @@ struct EditWallpaperSheet: SubviewOfContentView {
     @State private var cropResultMessage: String?
 
     @State private var isManualCropping = false
-    /// Normalized (0...1) crop rectangle within the video's own frame — independent of the fixed
-    /// 340x191.25 box it's drawn in, since `ThumbnailImage`'s `.aspectRatio(16/9, contentMode: .fit)`
-    /// always stretches the preview to exactly fill that box regardless of the video's real aspect
-    /// ratio, so box-normalized and native-pixel-normalized coordinates are the same fraction.
+    /// Normalized (0...1) crop rectangle within the video's own native pixel frame — NOT within the
+    /// fixed 340x191.25 box it's drawn in. `ThumbnailImage`'s `.aspectRatio(16/9, contentMode: .fit)`
+    /// is backed by `NSImageView.imageScaling = .scaleProportionallyUpOrDown`, which letterboxes/
+    /// pillarboxes a non-16:9 video instead of stretching it — box-normalized and native-pixel-
+    /// normalized coordinates are only the same fraction for an exactly-16:9 video. `CropOverlay`
+    /// itself accounts for the difference (see its own `contentRect`), so this value is always
+    /// genuinely native-pixel-normalized regardless of the video's aspect ratio.
     @State private var manualCropRect = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
     @State private var isApplyingManualCrop = false
 
@@ -268,8 +271,18 @@ struct EditWallpaperSheet: SubviewOfContentView {
     private func propagateUpdatedProject(_ updated: WEProject) {
         let updatedWallpaper = WEWallpaper(using: updated, where: wallpaper.wallpaperDirectory)
         viewModel.hoveredWallpaper = updatedWallpaper
-        if wallpaperViewModel.currentWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) {
-            wallpaperViewModel.currentWallpaper = updatedWallpaper
+        // Every screen currently showing this wallpaper needs the update, not just whichever one
+        // happens to be selected in the Settings UI — `wallpaperViewModel.wallpapers` is a per-screen
+        // dictionary (a real, reachable multi-monitor case: the same wallpaper assigned to two
+        // displays, or just a different screen selected in Display Settings than the one being
+        // edited here). This matters especially for a crop: `VideoCropDetector.crop`/
+        // `VideoImporter.applyCrop` always re-encodes to `.mp4`, and when the source was a
+        // different container (`.mov`), the original file is deleted outright (see `applyCrop`'s own
+        // doc comment) — a screen left pointing at the stale `WEProject` would still reference a
+        // filename that no longer exists on disk at all, not just outdated dimensions.
+        for (screenId, screenWallpaper) in wallpaperViewModel.wallpapers
+        where screenWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) {
+            wallpaperViewModel.wallpapers[screenId] = updatedWallpaper
         }
         // `updateWallpaperInPlace`, not `refresh()` — see its own doc comment: a full library
         // rescan here could race the background `project.json` write just below and read back
@@ -400,6 +413,11 @@ struct EditWallpaperSheet: SubviewOfContentView {
 
     private func cancelFrameChooser() {
         scrubPlayer?.pause()
+        // `replaceCurrentItem(with: nil)`, not just dropping the reference — same fix as
+        // `VideoWallpaperViewModel.deinit`, with the same confirmed-live reasoning (114MB decoder
+        // buffer pool freed on teardown): merely letting the `AVPlayer` deallocate wasn't reliably
+        // releasing its `VTDecompressionSession`.
+        scrubPlayer?.replaceCurrentItem(with: nil)
         scrubPlayer = nil
         isChoosingFrame = false
     }
@@ -546,6 +564,36 @@ private struct CropOverlay: View {
         Self.normalizedAspect(nativeWidth: nativeWidth, nativeHeight: nativeHeight, targetAspect: targetAspect)
     }
 
+    /// The sub-rect (normalized 0...1 within `boxSize`) the video's own pixels actually occupy.
+    /// `rect`'s box-fills-exactly-with-no-letterboxing assumption doesn't hold: `ThumbnailImage`
+    /// with `.aspectRatio(16/9, contentMode: .fit)` is backed by `NSImageView.imageScaling =
+    /// .scaleProportionallyUpOrDown`, which preserves the video's own native aspect ratio and
+    /// CENTERS it in the box — not a stretch-to-fill. For any video that isn't exactly 16:9 (the
+    /// box's own fixed aspect — 340/191.25 = 16/9 exactly), that leaves letterbox or pillarbox bars
+    /// this overlay used to treat as if they were draggable crop area, silently skewing every crop
+    /// coordinate against the real video content. Every other computation in this view (`rect`,
+    /// `denormalize`, drag deltas) is now expressed relative to THIS rect instead of the full box,
+    /// so `applyManualCrop`'s direct `rect * native dimensions` multiply is correct again.
+    static func contentRect(nativeWidth: Int, nativeHeight: Int, boxAspect: CGFloat) -> CGRect {
+        guard nativeWidth > 0, nativeHeight > 0, boxAspect > 0 else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+        let nativeAspect = CGFloat(nativeWidth) / CGFloat(nativeHeight)
+        if nativeAspect > boxAspect {
+            // Video is relatively WIDER than the box (e.g. 21:9 in a 16:9 box) — full box width,
+            // letterboxed top/bottom.
+            let heightFraction = boxAspect / nativeAspect
+            return CGRect(x: 0, y: (1 - heightFraction) / 2, width: 1, height: heightFraction)
+        } else {
+            // Video is relatively TALLER/narrower than the box (e.g. 4:3 or vertical 9:16 in a
+            // 16:9 box) — full box height, pillarboxed left/right.
+            let widthFraction = nativeAspect / boxAspect
+            return CGRect(x: (1 - widthFraction) / 2, y: 0, width: widthFraction, height: 1)
+        }
+    }
+
+    private var contentRect: CGRect {
+        Self.contentRect(nativeWidth: nativeWidth, nativeHeight: nativeHeight, boxAspect: boxSize.width / boxSize.height)
+    }
+
     private enum Corner: CaseIterable {
         case topLeft, topRight, bottomLeft, bottomRight
         var isLeft: Bool { self == .topLeft || self == .bottomLeft }
@@ -630,15 +678,31 @@ private struct CropOverlay: View {
             .onChanged { value in
                 let start = gestureStartRect ?? rect
                 if gestureStartRect == nil { gestureStartRect = start }
-                let dx = value.translation.width / boxSize.width
-                let dy = value.translation.height / boxSize.height
+                // `rect` lives in content-normalized space (0...1 of the actual video area, see
+                // `contentRect`'s doc comment) — a raw point delta needs dividing by the CONTENT's
+                // own pixel size, not the outer box's, or a drag would move the crop rect faster or
+                // slower than the mouse whenever the two differ (any non-16:9 video).
+                let dx = value.translation.width / (boxSize.width * contentRect.width)
+                let dy = value.translation.height / (boxSize.height * contentRect.height)
                 rect = update(start, dx, dy)
             }
             .onEnded { _ in gestureStartRect = nil }
     }
 
+    /// Maps `r` from content-normalized space (0...1 of the actual video area — see `contentRect`'s
+    /// doc comment) to real box-pixel coordinates for drawing.
     private func denormalize(_ r: CGRect) -> CGRect {
-        CGRect(x: r.minX * boxSize.width, y: r.minY * boxSize.height, width: r.width * boxSize.width, height: r.height * boxSize.height)
+        let content = contentRect
+        let contentPixelRect = CGRect(
+            x: content.minX * boxSize.width, y: content.minY * boxSize.height,
+            width: content.width * boxSize.width, height: content.height * boxSize.height
+        )
+        return CGRect(
+            x: contentPixelRect.minX + r.minX * contentPixelRect.width,
+            y: contentPixelRect.minY + r.minY * contentPixelRect.height,
+            width: r.width * contentPixelRect.width,
+            height: r.height * contentPixelRect.height
+        )
     }
 }
 

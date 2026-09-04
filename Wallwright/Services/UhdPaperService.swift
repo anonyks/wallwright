@@ -224,8 +224,14 @@ final class UhdPaperService {
         let shard = codeParts[1]
 
         // Best available quality for this specific post — `_8k` only exists in the page's script
-        // for posts actually tagged 8K; `_4k`/`_2k`/`_hd` are present otherwise.
-        let bestTag = ["_8k", "_4k", "_2k", "_hd"].first { html.contains($0) } ?? "_hd"
+        // for posts actually tagged 8K; `_4k`/`_2k`/`_hd` are present otherwise. Matched against
+        // the specific `getElementById("_8k")` pattern from the download-link script (see this
+        // file's header comment), not a bare `html.contains("_8k")` — the raw page HTML also
+        // includes sidebar/related-post widgets and SEO meta tags that can incidentally mention
+        // other quality tiers for posts unrelated to this one's actual availability; the wider bare
+        // substring search risked selecting a quality this specific post doesn't actually offer,
+        // producing a 404 when the CDN request goes out.
+        let bestTag = ["_8k", "_4k", "_2k", "_hd"].first { html.contains("getElementById(\"\($0)\")") } ?? "_hd"
         let quality = String(bestTag.dropFirst())
 
         guard let downloadURL = URL(string: "https://image-\(shard).uhdpaper.com/wallpaper/\(slug)-\(quality)-wallpaper-uhdpaper.com-\(code).jpg")

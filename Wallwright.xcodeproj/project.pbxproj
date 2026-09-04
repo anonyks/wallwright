@@ -129,6 +129,7 @@
 		EE000000000000000000008B /* BrowseSourceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008C /* BrowseSourceSession.swift */; };
 		EE000000000000000000008D /* LoadMoreTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000008E /* LoadMoreTrigger.swift */; };
 		EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000090 /* PowerConditionMonitor.swift */; };
+		EE0000000000000000000091 /* HTMLEntityDecoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000092 /* HTMLEntityDecoding.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -277,6 +278,7 @@
 		EE000000000000000000008C /* BrowseSourceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseSourceSession.swift; sourceTree = "<group>"; };
 		EE000000000000000000008E /* LoadMoreTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadMoreTrigger.swift; sourceTree = "<group>"; };
 		EE0000000000000000000090 /* PowerConditionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerConditionMonitor.swift; sourceTree = "<group>"; };
+		EE0000000000000000000092 /* HTMLEntityDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLEntityDecoding.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -402,6 +404,7 @@
 				EE0000000000000000000006 /* CommandListener.swift */,
 				EE0000000000000000000008 /* BatteryMonitor.swift */,
 				EE0000000000000000000090 /* PowerConditionMonitor.swift */,
+				EE0000000000000000000092 /* HTMLEntityDecoding.swift */,
 				EE0000000000000000000012 /* OtherAudioMonitor.swift */,
 				EE000000000000000000007E /* ThumbnailDownsampler.swift */,
 				EE0000000000000000000080 /* InboxLinksStore.swift */,
@@ -752,6 +755,7 @@
 				EE0000000000000000000005 /* CommandListener.swift in Sources */,
 				EE0000000000000000000007 /* BatteryMonitor.swift in Sources */,
 				EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */,
+				EE0000000000000000000091 /* HTMLEntityDecoding.swift in Sources */,
 				EE0000000000000000000011 /* OtherAudioMonitor.swift in Sources */,
 				EE000000000000000000007D /* ThumbnailDownsampler.swift in Sources */,
 				EE0000000000000000000009 /* ClockOverlay.swift in Sources */,

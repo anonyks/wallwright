@@ -118,10 +118,10 @@ enum SteamWorkshopService {
         // doesn't pre-decode its own meta tags. This is only the preview's title (shown before the
         // user commits to downloading); the item actually downloads with its own `project.json`
         // title straight from Wallpaper Engine's package metadata, which never passes through this
-        // scraped HTML at all. Same decoding approach as `AlphaCodersService`/`DesktopHutService`.
-        let title = decodeHTMLEntities(extractMetaContent(property: "og:title", html: html)?
+        // scraped HTML at all.
+        let title = (extractMetaContent(property: "og:title", html: html)?
             .replacingOccurrences(of: "Steam Workshop::", with: "")
-            ?? "Workshop Item \(itemId)")
+            ?? "Workshop Item \(itemId)").decodingHTMLEntities()
         let imageURLString = extractMetaContent(property: "og:image", html: html)?
             .replacingOccurrences(of: "&amp;", with: "&")
         let fileSizeText = extractLabeledStat(label: "File Size", html: html)
@@ -138,19 +138,6 @@ enum SteamWorkshopService {
         let afterProp = html[propRange.upperBound...]
         guard let endQuote = afterProp.range(of: "\"") else { return nil }
         return String(afterProp[..<endQuote.lowerBound])
-    }
-
-    /// Decodes HTML entities (`&quot;`, `&amp;`, ...) in scraped text via the HTML-document reader
-    /// rather than manual character replacement, since titles can contain arbitrary entities — same
-    /// approach as `AlphaCodersService`/`DesktopHutService`.
-    private static func decodeHTMLEntities(_ string: String) -> String {
-        guard let data = string.data(using: .utf8) else { return string }
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue,
-        ]
-        guard let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else { return string }
-        return attributed.string
     }
 
     /// Steam renders each stat as two parallel lists — `detailsStatLeft` labels ("File Size",
@@ -259,6 +246,18 @@ enum SteamWorkshopService {
         }
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
+        // `terminationHandler` firing doesn't guarantee `readabilityHandler` has already delivered
+        // every byte steamcmd wrote before exiting — process-exit detection and pipe-buffer
+        // delivery are two independent mechanisms with no ordering guarantee between them, and
+        // steamcmd prints its "Downloaded item ... to ..." marker on the very last line right
+        // before exiting. Nilling the handler above only stops FUTURE callbacks; it doesn't discard
+        // whatever's still sitting unread in the kernel pipe buffer — draining it explicitly here
+        // (blocking, but the process has already exited so this returns immediately) guarantees the
+        // marker line is captured even if it arrived in that last, easy-to-miss window.
+        syncQueue.sync {
+            stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+            stderrData.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
+        }
 
         if let timeoutTail { throw SteamWorkshopError.timedOut(timeoutTail) }
 

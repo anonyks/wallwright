@@ -128,7 +128,7 @@ private struct PackageImportReviewContent: View {
                     // Same fix as ImportReviewSheet — flush an unsubmitted "Add a tag" field
                     // before committing, rather than silently dropping it.
                     addTag()
-                    viewModel.commitCurrentPackageImport(title: trimmedTitle, tags: tags)
+                    Task { await viewModel.commitCurrentPackageImport(title: trimmedTitle, tags: tags) }
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(trimmedTitle.isEmpty)

@@ -109,8 +109,16 @@ final class PlaylistViewModel: ObservableObject {
     /// `.main` on every loop-end would make playlist advancement silently jump between screens
     /// depending on which window the user last clicked, since `WallpaperWindow` itself can never
     /// become key/main. `.screens.first` only changes on an actual display connect/disconnect.
+    ///
+    /// Filtered to enabled screens: `AppDelegate.setWallpaperWindows()` never creates a
+    /// `VideoWallpaperViewModel` for a disabled screen at all, so if the raw first screen happened
+    /// to be disabled, nothing would ever call `playerDidFinishPlaying` for it — `mainScreenLoopEnded()`
+    /// would never fire, permanently deadlocking `.perWallpaper` playlist advancement for any video
+    /// wallpaper (`.timed` mode has its own independent tick-based fallback in `tick()`, unaffected).
     var drivingScreenId: String {
-        guard let first = NSScreen.screens.first else { return WallpaperViewModel.mainScreenId() }
+        let enabledScreens = AppDelegate.shared.wallpaperViewModel.enabledScreens
+        guard let first = NSScreen.screens.first(where: { enabledScreens.contains(WallpaperViewModel.screenId(for: $0)) })
+        else { return WallpaperViewModel.mainScreenId() }
         return WallpaperViewModel.screenId(for: first)
     }
 
@@ -121,7 +129,7 @@ final class PlaylistViewModel: ObservableObject {
         // would run its own `didSet` and start the timer redundantly here on top of the explicit
         // call below) — Swift property observers don't fire for a value set during `init` anyway,
         // but this stays explicit rather than relying on that.
-        self.isActive = loaded.isActive
+        self.isActive = playlist.itemDirectories.isEmpty ? false : loaded.isActive
         self.isPinned = loaded.isPinned
         if isActive { startTicking() }
 
@@ -189,6 +197,9 @@ final class PlaylistViewModel: ObservableObject {
 
     func removeItems(at offsets: IndexSet) {
         playlist.itemDirectories.remove(atOffsets: offsets)
+        if playlist.itemDirectories.isEmpty {
+            deactivate()
+        }
     }
 
     func moveItems(from source: IndexSet, to destination: Int) {
@@ -199,6 +210,9 @@ final class PlaylistViewModel: ObservableObject {
     /// wallpaper can't leave a dangling, 404-on-advance entry in the playlist.
     func removeWallpaperFromPlaylist(directory: URL) {
         playlist.itemDirectories.removeAll { $0.isSameWallpaperDirectory(as: directory) }
+        if playlist.itemDirectories.isEmpty {
+            deactivate()
+        }
     }
 
     // MARK: - Activation
@@ -276,25 +290,43 @@ final class PlaylistViewModel: ObservableObject {
         guard !playlist.itemDirectories.isEmpty else { return }
         guard let nextIndex = pickNextIndex(from: cur, direction: direction) else { return }
 
-        recordPlayed(index: nextIndex, itemCount: playlist.itemDirectories.count)
-        elapsedSeconds = 0
-
         let directory = playlist.itemDirectories[nextIndex]
         guard let wallpaper = resolveWallpaper(at: directory) else {
-            // This directory no longer resolves to a real wallpaper — deleted externally
-            // (Finder/Terminal) or living on an unmounted external drive. Just returning here
-            // used to deadlock the playlist permanently: `currentIndex` above is computed from
-            // whatever wallpaper is actually on screen, which never changed, so the very next
-            // advance() call (the next timer tick, or the next manual skip) recomputed this exact
-            // same dead index and failed the same way — forever. Pruning it and retrying moves
-            // rotation on to the next real candidate instead; each retry strictly shrinks
-            // `itemDirectories`, so this can't recurse further than the playlist's own length even
-            // if several consecutive entries are dead.
-            playlist.itemDirectories.remove(at: nextIndex)
-            guard !playlist.itemDirectories.isEmpty else { return }
-            advance(direction: direction)
+            // `resolveWallpaper` only looks in `ContentViewModel.wallpapers` (an in-memory cache
+            // populated by an async `refresh()` scan) — not on disk directly. If advance() runs
+            // before that scan finishes (e.g. a previously-active, timed playlist starts ticking
+            // immediately in `init()`, or the user hits the skip hotkey right after launch, well
+            // before a large library's `refresh()` completes), EVERY directory resolves to `nil`
+            // here even though nothing was actually deleted — pruning in that case recursed through
+            // the whole list and wiped the playlist to empty, then persisted that. Checking the
+            // directory's own `project.json` directly (independent of whether ContentViewModel has
+            // caught up yet) distinguishes "genuinely gone" from "not loaded yet": only prune when
+            // the file is actually gone; otherwise just skip this tick without touching the list —
+            // the next real advance (once refresh() has caught up) resolves normally.
+            guard FileManager.default.fileExists(atPath: directory.appending(path: "project.json").path) else {
+                playlist.itemDirectories.remove(at: nextIndex)
+                // Same invariant as `removeItems`/`removeWallpaperFromPlaylist`: an active playlist
+                // must never have zero items (`activate()` itself already refuses to start one) —
+                // pruning the last surviving dead entry here left `isActive` stuck `true` with an
+                // empty list otherwise, so `tickTimer` kept firing indefinitely and `Playlist.json`
+                // persisted an active-but-empty playlist.
+                guard !playlist.itemDirectories.isEmpty else {
+                    deactivate()
+                    return
+                }
+                advance(direction: direction)
+                return
+            }
             return
         }
+        // Only recorded/reset once a wallpaper has actually been resolved and is about to switch —
+        // these used to run unconditionally before this guard, so a transient resolution failure
+        // (the common "refresh() hasn't caught up yet" case just above) still reset the timed-mode
+        // clock (delaying the next real advance by a full interval, e.g. 5-15 minutes for nothing
+        // actually shown) and recorded the never-actually-displayed index as "played" in shuffle
+        // history, silently skipping it in rotation despite it never having appeared.
+        recordPlayed(index: nextIndex, itemCount: playlist.itemDirectories.count)
+        elapsedSeconds = 0
         AppDelegate.shared.wallpaperViewModel.setWallpaperForEnabledScreens(wallpaper)
     }
 

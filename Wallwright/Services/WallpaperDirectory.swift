@@ -35,7 +35,16 @@ extension FileManager {
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = sanitized.isEmpty ? "Untitled" : sanitized
+        // `"."`/`".."` alone (no `/` to trip the replacement above) are POSIX path-traversal
+        // components, not just characters — `wallpapersDirectory.appending(path: "..")` genuinely
+        // resolves to the parent directory once used in a real filesystem call (confirmed
+        // directly: a file written through it landed one level up), and every importer's failure
+        // path does `removeItem(at: destination)`. The `while fileExists` loop below happens to
+        // already dodge this in practice (the parent always exists by the time this runs, so it
+        // advances past the literal ".."), but that's incidental to loop logic having nothing to
+        // do with safety — an explicit reject costs nothing and doesn't depend on that surviving a
+        // future refactor.
+        let base = (sanitized.isEmpty || sanitized == "." || sanitized == "..") ? "Untitled" : sanitized
 
         var candidate = wallpapersDirectory.appending(path: base)
         var suffix = 2

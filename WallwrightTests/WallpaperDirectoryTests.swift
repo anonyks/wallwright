@@ -66,4 +66,54 @@ final class WallpaperDirectoryTests: XCTestCase {
         XCTAssertFalse(destination.lastPathComponent.isEmpty)
         XCTAssertNotEqual(destination.lastPathComponent, " ")
     }
+
+    func testDotDotTitleFallsBackToUntitledRatherThanTraversingToTheParentDirectory() {
+        // A title of exactly ".." (no "/" for the sanitizer to catch) must never be allowed to
+        // reach `.appending(path:)` unsanitized — that resolves to `wallpapersDirectory`'s parent
+        // directory in real filesystem calls, and callers `removeItem` their destination on import
+        // failure. Covers both "." and ".." since both are POSIX path-traversal components.
+        for title in [".", ".."] {
+            let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
+            createdDirectories.append(destination)
+            XCTAssertEqual(
+                destination.standardizedFileURL.deletingLastPathComponent().path,
+                FileManager.default.wallpapersDirectory.standardizedFileURL.path,
+                "title \"\(title)\" must not escape wallpapersDirectory"
+            )
+            XCTAssertNotEqual(destination.lastPathComponent, title)
+        }
+    }
+
+    func testThumbnailDownsamplerProducesNonZeroSize() {
+        let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 20,
+            pixelsHigh: 10,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 20 * 4,
+            bitsPerPixel: 32
+        )!
+        let pngData = bitmap.representation(using: .png, properties: [:])!
+        let image = ThumbnailDownsampler.downsampledImage(from: pngData, maxDimension: 50)
+        XCTAssertNotNil(image)
+        XCTAssertGreaterThan(image?.size.width ?? 0, 0)
+        XCTAssertGreaterThan(image?.size.height ?? 0, 0)
+        XCTAssertEqual(image?.size.width, 20)
+        XCTAssertEqual(image?.size.height, 10)
+    }
+
+    func testPlaylistDeactivatesWhenEmpty() {
+        let vm = PlaylistViewModel()
+        let dummyURL = URL(fileURLWithPath: "/tmp/dummyWallpaper")
+        vm.playlist.itemDirectories = [dummyURL]
+        vm.isActive = true
+        XCTAssertTrue(vm.isActive)
+
+        vm.removeWallpaperFromPlaylist(directory: dummyURL)
+        XCTAssertFalse(vm.isActive, "Playlist should automatically deactivate when emptied")
+    }
 }

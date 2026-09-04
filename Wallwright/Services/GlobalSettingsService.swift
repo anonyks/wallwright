@@ -477,15 +477,21 @@ class GlobalSettingsViewModel: ObservableObject {
         self.didChangeShowClockOverlayCancellable =
         self.$settings
             .removeDuplicates {
+                // Only fields that change the window's own hierarchy/geometry belong here —
+                // `ClockOverlayView.init` already subscribes to `$settings` directly and sets
+                // `needsDisplay = true` on *any* change (see its own comment), so a purely visual
+                // field (color, opacity, gradient, alignment, seconds, 24h) already redraws live in
+                // place. Including those here too used to make every one of them ALSO close and
+                // recreate the whole `NSWindow` hierarchy across every display — confirmed
+                // reachable from something as ordinary as dragging the opacity slider or picking a
+                // custom gradient color, both visibly flickering. `clockShowSeconds` specifically
+                // already has its own dedicated `clockShowSecondsCancellable` in `ClockOverlayView`
+                // to restart just its timer, so it needs neither a redraw trigger nor a rebuild.
                 $0.showClockOverlay == $1.showClockOverlay
                 && $0.clockDayFont == $1.clockDayFont
-                && $0.clockColor == $1.clockColor
-                && $0.clockTextAlignment == $1.clockTextAlignment
                 && $0.clockDayFontSize == $1.clockDayFontSize
                 && $0.clockDateFontSize == $1.clockDateFontSize
                 && $0.clockTimeFontSize == $1.clockTimeFontSize
-                && $0.clockShowSeconds == $1.clockShowSeconds
-                && $0.clockUse24HourTime == $1.clockUse24HourTime
                 && $0.clockSummitLineLength == $1.clockSummitLineLength
                 && $0.clockDraggable == $1.clockDraggable
                 // clockCustomOrigins deliberately excluded — it's written continuously while
@@ -602,6 +608,16 @@ class GlobalSettingsViewModel: ObservableObject {
         if PowerConditionMonitor.shared.shouldPause && settings.lowPowerConditions == .pause { return true }
         if FullscreenAppMonitor.shared.isOtherAppFullscreen && settings.otherApplicationFullscreen == .pause { return true }
         if isDisplayAsleep && settings.displayAsleep == .pause { return true }
+        // Both real, reachable pause triggers (`activateApplicationDidChange`/
+        // `otherAudioPlayingDidChange`) were missing here — `shouldWallpaperStayStopped` below
+        // already checks its own `.stop` equivalent of the first one; this was the same
+        // confirmed-live coordination gap this whole property exists to close (see its own doc
+        // comment), just for two policy combinations that slipped through.
+        if let frontmost = NSWorkspace.shared.frontmostApplication,
+           frontmost.bundleIdentifier != Bundle.main.bundleIdentifier,
+           frontmost.bundleIdentifier != "com.apple.finder",
+           settings.otherApplicationFocused == .pause { return true }
+        if OtherAudioMonitor.shared.isOtherAppPlaying && settings.otherApplicationPlayingAudio == .pause { return true }
         return false
     }
 
@@ -670,6 +686,7 @@ class GlobalSettingsViewModel: ObservableObject {
         } else {
             switch settings.otherApplicationPlayingAudio {
             case .mute:
+                guard !AppDelegate.shared.wallpaperViewModel.isMutedByUser else { break }
                 AppDelegate.shared.unmute()
             case .pause:
                 guard !shouldWallpaperStayPaused else { break }
@@ -962,6 +979,7 @@ class GlobalSettingsViewModel: ObservableObject {
     func globalSettingsWhenApplicationDidBecomeActive() {
         switch self.settings.otherApplicationFocused {
         case .mute:
+            guard !AppDelegate.shared.wallpaperViewModel.isMutedByUser else { break }
             AppDelegate.shared.unmute()
         case .pause:
             guard !shouldWallpaperStayPaused else { break }

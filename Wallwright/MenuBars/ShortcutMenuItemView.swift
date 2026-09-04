@@ -20,8 +20,11 @@ final class ShortcutMenuItemView: NSView {
     private var trackingArea: NSTrackingArea?
 
     private weak var target: NSObject?
-    private let action: Selector
-    private let systemImage: String
+    /// Not private — the stable, locale-independent way callers outside this file identify which
+    /// row a given menu item is (see `updateTitle(_:systemImage:)`'s doc comment for why matching
+    /// on `title` doesn't work here).
+    let action: Selector
+    private var systemImage: String
     weak var menuItem: NSMenuItem?
 
     init(title: String, systemImage: String, shortcut: String, target: NSObject?, action: Selector) {
@@ -90,6 +93,18 @@ final class ShortcutMenuItemView: NSView {
 
     func setShortcut(_ text: String) {
         shortcutLabel.stringValue = text
+    }
+
+    /// Updates the row's displayed title/icon in place (e.g. "Mute" → "Unmute" as `playVolume`
+    /// changes). This view's `NSMenuItem` sets its own `.title` too, but since `.view` is set,
+    /// AppKit never actually renders that — this custom view's own `titleLabel` is the only thing
+    /// the user sees, and this is the only way to change it after construction. A caller that
+    /// instead replaced the whole `NSMenuItem` (as this used to) would silently destroy this view —
+    /// including its shortcut-hint label — the first time the title needed to change.
+    func updateTitle(_ title: String, systemImage: String) {
+        titleLabel.stringValue = title
+        self.systemImage = systemImage
+        iconView.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)
     }
 
     /// `NSMenuItem.copy()` (used for the Dock menu — see `AppDelegate.applicationDockMenu`) shares

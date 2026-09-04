@@ -277,6 +277,17 @@ final class InboxLinksStore: ObservableObject {
         save()
     }
 
+    /// Called from `ContentView`'s `pendingDirectURLDownload` handoff when the Direct URL sheet
+    /// closes WITHOUT a completed download (the user cancelled, or dismissed it) — without this,
+    /// `pendingSheetImportLinkId` stays set to this link's id indefinitely, since
+    /// `markSheetImportCompletedIfPending()` above only ever runs on the success path. The next
+    /// time the user opens Direct URL Import for anything else entirely and that one actually
+    /// succeeds, `markSheetImportCompletedIfPending()` would find this stale id still set and
+    /// wrongly mark THIS link `.completed`, even though it was never imported.
+    func cancelPendingSheetImport() {
+        pendingSheetImportLinkId = nil
+    }
+
     /// Fetches title/thumbnail via yt-dlp without downloading any video data — same call
     /// `YouTubeImportViewModel` already makes, just not restricted to youtube.com. Sets `.resolved`
     /// on success (ready for `downloadIndirectLink` on the next tap) or `.failed` with yt-dlp's own
@@ -316,7 +327,13 @@ final class InboxLinksStore: ObservableObject {
     }
 
     private func commitIndirectImport(fileURL: URL, link: InboxLink) async {
-        guard let index = links.firstIndex(where: { $0.id == link.id }) else { return }
+        // Same cleanup-on-early-return as `commitDirectImport` below — if the link was deleted
+        // from the Inbox while this download was still in flight, this guard used to return
+        // without ever touching `fileURL`'s scratch directory, permanently orphaning it.
+        guard let index = links.firstIndex(where: { $0.id == link.id }) else {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            return
+        }
         isConverting.remove(link.id)
         links[index].status = .importing
         let title = links[index].resolvedTitle
@@ -344,16 +361,69 @@ final class InboxLinksStore: ObservableObject {
         save()
     }
 
+    // MARK: - Direct links batch import
+
+    func downloadAndImportDirectLink(_ link: InboxLink) {
+        guard let index = links.firstIndex(where: { $0.id == link.id }) else { return }
+        links[index].status = .downloading
+        downloadProgress[link.id] = 0
+        save()
+        Task {
+            do {
+                let fileURL = try await DirectURLImporter.download(from: link.url) { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        self?.downloadProgress[link.id] = progress
+                    }
+                }
+                await commitDirectImport(fileURL: fileURL, link: link)
+            } catch {
+                setFailed(link.id, reason: error.localizedDescription)
+            }
+        }
+    }
+
+    private func commitDirectImport(fileURL: URL, link: InboxLink) async {
+        guard let index = links.firstIndex(where: { $0.id == link.id }) else {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            return
+        }
+        links[index].status = .importing
+        let title = links[index].resolvedTitle ?? fileURL.deletingPathExtension().lastPathComponent
+        let ext = fileURL.pathExtension.lowercased()
+        let isImage = ImageImporter.importableExtensions.contains(ext)
+        let success: Bool
+        if isImage {
+            success = ImageImporter.importImageFile(
+                at: fileURL, title: title, tags: nil,
+                sourceProvider: "inbox", sourceId: link.id.uuidString
+            )
+        } else {
+            success = await withCheckedContinuation { continuation in
+                VideoImporter.importVideoFile(
+                    at: fileURL, title: title, tags: nil,
+                    sourceProvider: "inbox", sourceId: link.id.uuidString
+                ) { success in continuation.resume(returning: success) }
+            }
+        }
+        try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        guard let index = links.firstIndex(where: { $0.id == link.id }) else { return }
+        if success {
+            links[index].status = .completed
+        } else {
+            links[index].status = .failed(reason: "Import failed")
+        }
+        save()
+    }
+
     // MARK: - Batch actions
 
-    /// Toolbar's "Import All Direct" — only ever targets already-classified `.direct` links sitting
-    /// idle; anything already in flight (downloading/importing) or already `.completed`/`.failed`
-    /// is left alone.
+    /// Toolbar's "Import All Direct" — batch-downloads and imports every already-classified
+    /// `.direct` link sitting idle in the background without stomping sheet state.
     func importAllDirect() {
         for link in links where link.kind == .direct {
             switch link.status {
             case .pending, .resolved:
-                importDirectLink(link)
+                downloadAndImportDirectLink(link)
             case .resolving, .downloading, .importing, .completed, .failed:
                 continue
             }

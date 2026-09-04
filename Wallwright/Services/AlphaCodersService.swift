@@ -124,10 +124,20 @@ final class AlphaCodersService {
             guard var components = URLComponents(url: resolvedSearchURL, resolvingAgainstBaseURL: false) else {
                 throw AlphaCodersError.invalidURL
             }
-            components.queryItems = [
+            // A search only redirects to a canonical tag/category slug (no query needed) when the
+            // term happens to match an existing one — confirmed live: `q=cat` 301s to
+            // `/cat-wallpapers`, but an uncommon or multi-word query (`q=purple+dragon+sunset`, or
+            // anything that doesn't match a real tag) gets a bare 200 and stays on
+            // `/search/view?q=...&type=wallpaper`. Overwriting `queryItems` wholesale dropped `q`/
+            // `type` in that case, sending page 2+ back to an unfiltered/empty listing instead of
+            // more of the same search. Keep whatever's already there, only replacing `page`/
+            // `quickload`.
+            var queryItems = (components.queryItems ?? []).filter { $0.name != "page" && $0.name != "quickload" }
+            queryItems.append(contentsOf: [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "quickload", value: "1"),
-            ]
+            ])
+            components.queryItems = queryItems
             guard let pagedURL = components.url else { throw AlphaCodersError.invalidURL }
             url = pagedURL
             headers["X-Requested-With"] = "XMLHttpRequest"
@@ -175,9 +185,9 @@ final class AlphaCodersService {
             let rawKeywords = firstMatch(#"itemprop="keywords" content="([^"]+)""#, in: block) ?? ""
 
             let id = fullImageURL.deletingPathExtension().lastPathComponent
-            let title = decodeHTMLEntities(rawName ?? id)
+            let title = (rawName ?? id).decodingHTMLEntities()
             let tags = rawKeywords.components(separatedBy: ", ")
-                .map(decodeHTMLEntities)
+                .map { $0.decodingHTMLEntities() }
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
 
@@ -193,16 +203,6 @@ final class AlphaCodersService {
               let matchRange = Range(match.range(at: 1), in: text)
         else { return nil }
         return String(text[matchRange])
-    }
-
-    /// Listing pages HTML-escape their microdata `content="..."` attributes (e.g. `&amp;` in a
-    /// title with "&" in it) — unescape the handful of entities that actually show up here.
-    private static func decodeHTMLEntities(_ s: String) -> String {
-        s.replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&#039;", with: "'")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
     }
 
     /// Downloads the wallpaper image for the given item — `fullImageURL` is already the genuine

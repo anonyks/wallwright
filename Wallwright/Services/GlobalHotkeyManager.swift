@@ -79,7 +79,7 @@ final class GlobalHotkeyManager {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, eventRef, _ -> OSStatus in
             var hotKeyID = EventHotKeyID()
-            GetEventParameter(
+            let status = GetEventParameter(
                 eventRef,
                 EventParamName(kEventParamDirectObject),
                 EventParamType(typeEventHotKeyID),
@@ -88,6 +88,14 @@ final class GlobalHotkeyManager {
                 nil,
                 &hotKeyID
             )
+            // Both checks matter: `signature` namespaces our 5 numeric IDs against any other
+            // Carbon hotkey handler that might exist in this same process (the signature field
+            // exists specifically to prevent that kind of collision), and returning `noErr`
+            // unconditionally marks the event as handled — swallowing it from any other handler
+            // further down this event target's chain even when it was never actually ours.
+            guard status == noErr, hotKeyID.signature == GlobalHotkeyManager.signature else {
+                return OSStatus(eventNotHandledErr)
+            }
             DispatchQueue.main.async {
                 GlobalHotkeyManager.shared.handle(id: hotKeyID.id)
             }

@@ -28,4 +28,12 @@ struct VideoFrameScrubberView: NSViewRepresentable {
     func updateNSView(_ nsView: AVPlayerView, context: Context) {
         if nsView.player !== player { nsView.player = player }
     }
+
+    // Belt-and-suspenders alongside `EditWallpaperSheet.cancelFrameChooser()`'s own
+    // `replaceCurrentItem(with: nil)` (which already tears down the actual decoder session) —
+    // this drops the view's own strong reference to `player` the moment SwiftUI removes it from
+    // the hierarchy, rather than waiting on `AVPlayerView`'s own deallocation.
+    static func dismantleNSView(_ nsView: AVPlayerView, coordinator: ()) {
+        nsView.player = nil
+    }
 }

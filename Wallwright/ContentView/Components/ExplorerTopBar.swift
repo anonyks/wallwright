@@ -79,7 +79,7 @@ struct ExplorerTopBar: SubviewOfContentView {
                     Button {
                         viewModel.sortingSequence = viewModel.sortingSequence == .decrease ? .increase : .decrease
                     } label: {
-                        Image(systemName: viewModel.sortingSequence == .increase ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
+                        Image(systemName: viewModel.sortingSequence == .increase ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
                             .font(.caption2)
                             .frame(width: 14, height: 14)
                     }

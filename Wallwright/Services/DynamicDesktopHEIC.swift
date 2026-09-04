@@ -63,7 +63,7 @@ enum DynamicDesktopHEIC {
     /// pixels than it has, so decoding a Dynamic Desktop frame larger than the screen's own native
     /// resolution just burns memory on undisplayable detail.
     static func frame(at index: Int, in url: URL, maxPixelSize: CGFloat? = nil) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), index < CGImageSourceGetCount(source) else {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), index >= 0, index < CGImageSourceGetCount(source) else {
             return nil
         }
         guard let maxPixelSize else {

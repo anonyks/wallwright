@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 
 enum DirectURLImportError: LocalizedError {
     case invalidURL
@@ -67,6 +68,12 @@ enum DirectURLImporter {
         }
 
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+            // `URLSession` holds a strong reference to its delegate (this object) until explicitly
+            // invalidated — same leak class already fixed in `NtfyInboxTransport`. This task is the
+            // session's only task and has already finished by the time this method runs, so
+            // `finishTasksAndInvalidate()` (not `invalidateAndCancel()`, which would cancel it)
+            // releases the session/delegate pair the moment this method returns, on every exit path.
+            defer { session.finishTasksAndInvalidate() }
             // The file at `location` is deleted the instant this method returns, so it has to be
             // moved out synchronously here rather than handed off for later.
             guard let response = downloadTask.response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
@@ -94,7 +101,34 @@ enum DirectURLImporter {
             do {
                 let scratchDir = FileManager.default.temporaryDirectory.appending(path: "wallwright-directurl-\(UUID().uuidString)")
                 try FileManager.default.createDirectory(at: scratchDir, withIntermediateDirectories: true)
-                let filename = response.suggestedFilename ?? location.lastPathComponent
+                var filename = response.suggestedFilename ?? location.lastPathComponent
+                // A query-parameter-based or extensionless direct link (no `Content-Disposition`,
+                // a URL path with no extension of its own) leaves `filename` without one — this
+                // file's own header says routing the result is entirely up to the caller reading
+                // the extension back off this URL (see `ContentView`'s handoff), so a missing
+                // extension here silently misroutes an image download into the video import
+                // pipeline, which then fails trying to transcode it. `mimeType` is already read
+                // above for the text/JSON check; reusing it to infer the real extension when
+                // needed costs nothing extra and doesn't change anything for the common case where
+                // the filename already has one.
+                //
+                // A *present but non-media* extension needs the same treatment, not just a missing
+                // one — a PHP/ASPX download gateway (confirmed live: MoeWalls' own
+                // `go.moewalls.com/download.php?video=...`, already integrated in this app) has no
+                // `Content-Disposition` either, so `suggestedFilename` falls back to the URL's own
+                // path component, "download.php" — a non-empty extension that skipped this check
+                // entirely before, leaving the file on disk (and everything downstream reading its
+                // extension) thinking it was a PHP script rather than a video.
+                let currentExtension = URL(fileURLWithPath: filename).pathExtension.lowercased()
+                let isKnownMediaExtension = VideoImporter.importableExtensions.contains(currentExtension)
+                    || ImageImporter.importableExtensions.contains(currentExtension)
+                if (currentExtension.isEmpty || !isKnownMediaExtension),
+                   let mimeType = response.mimeType,
+                   let ext = UTType(mimeType: mimeType)?.preferredFilenameExtension {
+                    filename = currentExtension.isEmpty
+                        ? filename + "." + ext
+                        : URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent + "." + ext
+                }
                 let destination = scratchDir.appending(path: filename)
                 try FileManager.default.moveItem(at: location, to: destination)
                 continuation?.resume(returning: destination)
@@ -105,7 +139,12 @@ enum DirectURLImporter {
         }
 
         func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-            guard let error else { return } // success is already resumed from didFinishDownloadingTo
+            // Success invalidates from `didFinishDownloadingTo` instead — this fires again
+            // afterward either way (with `error == nil` on success), so invalidating
+            // unconditionally here too would just be a harmless no-op repeat, but returning early
+            // keeps this method's own responsibility limited to the failure path it actually owns.
+            guard let error else { return }
+            session.finishTasksAndInvalidate()
             continuation?.resume(throwing: DirectURLImportError.downloadFailed(error.localizedDescription))
             continuation = nil
         }

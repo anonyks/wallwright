@@ -469,10 +469,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.lastScreenConfigurationSignature = signature
 
             let connectedIds = Set(NSScreen.screens.map { WallpaperViewModel.screenId(for: $0) })
-            for id in connectedIds where !self.wallpaperViewModel.enabledScreens.contains(id) {
+            // Gated on `knownScreens`, not `enabledScreens` — a display the user explicitly
+            // disabled stays disabled across a resolution change/sleep-wake/dock-undock, since
+            // those all re-fire this for the SAME already-known screen ID. Only a genuinely new
+            // (never-before-seen) display gets auto-enabled. See `knownScreens`' own doc comment.
+            for id in connectedIds where !self.wallpaperViewModel.knownScreens.contains(id) {
                 self.wallpaperViewModel.enabledScreens.insert(id)
+                self.wallpaperViewModel.knownScreens.insert(id)
             }
             self.wallpaperViewModel.pruneOrphanedLegacyScreenIDs()
+            // `selectedScreenId` drives which screen picking a wallpaper in the Library actually
+            // targets (`WallpaperViewModel.nextCurrentWallpaper`'s `willSet`) — if the display it
+            // was pointed at just disconnected, leaving it pointed at that now-gone ID meant every
+            // subsequent Library click silently wrote to a phantom screen entry instead of the
+            // display the user can actually see, with no visible sign anything was wrong.
+            if !connectedIds.contains(self.wallpaperViewModel.selectedScreenId) {
+                self.wallpaperViewModel.selectedScreenId = WallpaperViewModel.mainScreenId()
+            }
             wallpaperDebugLog.notice("screensChanged() — signature CHANGED, rebuilding wallpaper windows")
             self.rebuildWallpaperWindows()
             self.rebuildClockWindows()
@@ -539,15 +552,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     /// Guards the image branch below against redundant `setDesktopImageURL` calls — see its own
-    /// comment for why that call is expensive. Not persisted: a fresh launch should always run it
-    /// at least once, since nothing guarantees the OS's own desktop picture still matches what we
-    /// last set (a macOS update, a reset, another app changing it).
-    private var lastPlaceholderImageURL: URL?
+    /// comment for why that call is expensive. Keyed per-screen (by `WallpaperViewModel.screenId`)
+    /// since each screen can carry its own independent image assignment. Not persisted: a fresh
+    /// launch should always run it at least once per screen, since nothing guarantees the OS's own
+    /// desktop picture still matches what we last set (a macOS update, a reset, another app changing
+    /// it).
+    private var lastPlaceholderImageURLs: [String: URL] = [:]
 
     func setPlacehoderWallpaper(with wallpaper: WEWallpaper) {
         switch wallpaper.project.type {
         case "video":
-            let asset = AVURLAsset(url: wallpaper.wallpaperDirectory.appending(component: wallpaper.project.file))
+            // `.appending(path:)`, not `.appending(component:)` — matches every other place this
+            // exact directory+file join happens in this file (and the rest of the app).
+            // `.appending(component:)` treats the whole string as one literal path component,
+            // percent-escaping any `/` in it — a package whose `project.file` points into a
+            // subfolder (real for some Wallpaper Engine packages, which don't all keep their media
+            // flat) would produce a URL for a single file literally named e.g. "video%2Fscene.mp4",
+            // which doesn't exist, silently failing to generate the desktop placeholder.
+            let asset = AVURLAsset(url: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file))
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
             
@@ -571,8 +593,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             // on every single app launch instead of overwriting one.
                             let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "staticWP_current.tiff")
                             try data.write(to: url, options: .atomic)
-                            for screen in NSScreen.screens {
-                                try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
+                            // `generateCGImagesAsynchronously`'s completion handler runs on an
+                            // arbitrary AVFoundation-internal queue, not necessarily main —
+                            // `NSScreen.screens` and `setDesktopImageURL` are AppKit/Dock-IPC calls
+                            // with no such guarantee. Unlike the "image" branch's deliberately
+                            // synchronous `setDesktopImageURL` (see its own comment — that one stays
+                            // put specifically to avoid racing a *different* call site's own async
+                            // dispatch), this isn't about ordering against another caller; it's
+                            // purely about not touching main-thread-affinity APIs from whatever
+                            // background thread AVFoundation happens to call back on.
+                            DispatchQueue.main.async {
+                                for screen in NSScreen.screens {
+                                    do {
+                                        try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
+                                    } catch {
+                                        print(error)
+                                    }
+                                }
                             }
                         } catch {
                             print(error)
@@ -593,21 +630,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // site, since two independent `.async` calls to the same concurrent queue have no
             // ordering guarantee relative to each other.
             //
-            // Gated on the URL actually changing: `didCurrentWallpaperChange`'s caller subscribes
-            // to the whole `$wallpapers` dictionary (every screen), not just this one, so with a
-            // multi-display setup, changing screen 2's wallpaper redundantly re-fired this for
-            // screen 1 too — confirmed live (2026-08-07) that meant this "slow, 1-2s" call was
-            // running again for no reason on every unrelated screen's wallpaper change.
-            let url = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
-            if url != lastPlaceholderImageURL {
-                for screen in NSScreen.screens {
-                    do {
-                        try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
-                    } catch {
-                        print(error)
-                    }
+            // Every connected screen can carry its OWN wallpaper assignment (`wallpaperViewModel
+            // .wallpapers`, keyed by stable screen ID — see its own doc comment), but `wallpaper`
+            // here is a single `WEWallpaper` (whichever screen's change actually triggered this
+            // call). `setDesktopImageURL` is the only place in the app that ever sets the OS-level
+            // desktop picture — Wallwright's own rendering windows are what the user actually sees
+            // day to day, but this backdrop is still what shows through in Mission Control, Stage
+            // Manager, screen sharing, or anywhere else macOS reads the real Desktop choice
+            // directly — so looping every screen and unconditionally pushing this one `wallpaper`'s
+            // image onto all of them used to silently stomp whatever image any OTHER screen had
+            // been individually assigned. Looking each screen's own current assignment up instead
+            // (falling back to `wallpaper` only when that screen has no assignment of its own, e.g.
+            // it was only just connected) keeps this in sync with the per-display config instead of
+            // flattening it to whichever screen happened to change most recently. A screen whose own
+            // assignment is a video is deliberately left untouched here rather than forced to a
+            // static image — that type is `AerialsInjector`'s territory (see this function's
+            // "video" branch above), and this app never registers more than one aerial at a time.
+            for screen in NSScreen.screens {
+                let screenId = WallpaperViewModel.screenId(for: screen)
+                let screenWallpaper = AppDelegate.shared.wallpaperViewModel.wallpapers[screenId] ?? wallpaper
+                guard screenWallpaper.project.type == "image" else { continue }
+                let url = screenWallpaper.wallpaperDirectory.appending(path: screenWallpaper.project.file)
+                guard url != lastPlaceholderImageURLs[screenId] else { continue }
+                do {
+                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
+                    lastPlaceholderImageURLs[screenId] = url
+                } catch {
+                    print(error)
                 }
-                lastPlaceholderImageURL = url
             }
             // Reverted: registering this image as the system's "Idle" (screensaver) choice too,
             // via a `killall WallpaperAgent` restart on every real wallpaper switch. Confirmed live

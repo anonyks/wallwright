@@ -92,6 +92,11 @@ struct ThumbnailImage: NSViewRepresentable {
     final class Coordinator {
         var lastLoadedKey: String?
         var loadTask: Task<Void, Never>?
+        /// The plain `url` last checked, regardless of whether it was already loaded — lets
+        /// `updateModifiers` skip `currentKey()`'s filesystem stat entirely when `url` itself is
+        /// unchanged from last time, without weakening the mtime check for when it actually matters.
+        /// See `updateModifiers`'s own comment for why this is safe.
+        var lastCheckedURL: URL?
     }
 
     private func currentKey() -> String {
@@ -116,44 +121,59 @@ struct ThumbnailImage: NSViewRepresentable {
     }
 
     private func updateModifiers(_ nsView: NSImageView, coordinator: Coordinator) {
-        let key = currentKey()
-        if key != coordinator.lastLoadedKey {
-            coordinator.lastLoadedKey = key
-            coordinator.loadTask?.cancel()
+        // `currentKey()` does a real filesystem stat to catch a same-path regeneration (see its own
+        // doc comment) — necessary the first time a given `url` is seen, but every call site that
+        // actually needs that (the scrolling grid, the edit sheet, the sidebar preview) already
+        // forces a fresh view/Coordinator via `.id(project.thumbnailTimestamp)` whenever content is
+        // regenerated, so within a single already-loaded Coordinator instance, `url` not having
+        // changed at all since the last check already rules out a same-path regeneration having
+        // mattered here. Skipping straight past it in that case avoids re-statting on every one of
+        // the `updateNSView` calls this view gets for reasons that have nothing to do with its own
+        // content (hover elsewhere in the grid, a sibling re-render, ...) — confirmed by this
+        // function's own doc comment above that those fire far more often than `url` itself changes.
+        // Only guards the stat/reload check below, not the `imageScaling` sync at the bottom of this
+        // function, which SwiftUI can legitimately need re-applied even when `url` hasn't changed.
+        if coordinator.lastCheckedURL != url {
+            coordinator.lastCheckedURL = url
+            let key = currentKey()
+            if key != coordinator.lastLoadedKey {
+                coordinator.lastLoadedKey = key
+                coordinator.loadTask?.cancel()
 
-            if let cached = thumbnailImageCache.object(forKey: key as NSString) {
-                // Already decoded this session (e.g. the last time this tab was visible) — assign
-                // synchronously, no blank frame while an async Task spins up for nothing.
-                nsView.image = cached
-            } else {
-                // Downsampled at decode time via `ThumbnailDownsampler`, not `NSImage(contentsOf:)`
-                // — confirmed live (2026-08-09) via `vmmap` that plain full decodes of this app's
-                // own "preview" files (some pre-dating the fix at the generation side, some from
-                // third-party packages this app doesn't control the size of) were producing
-                // 100MB+ IOSurfaces each for a grid cell rendered at a few hundred points wide. This
-                // protects every caller regardless of what's actually sitting on disk, not just
-                // newly-generated previews.
-                //
-                // Still decoded off the main thread — switching tabs tears down and rebuilds the
-                // entire grid subtree, so every visible thumbnail used to decode synchronously on
-                // the main thread, back to back, in one pass. Confirmed live (2026-08-07) that was a
-                // real, visible freeze on switching back to the Library tab.
-                let url = self.url
-                coordinator.loadTask = Task { [weak nsView, weak coordinator] in
-                    let image = await Task.detached(priority: .userInitiated) {
-                        ThumbnailDownsampler.downsampledThumbnail(at: url)?.image
-                    }.value
+                if let cached = thumbnailImageCache.object(forKey: key as NSString) {
+                    // Already decoded this session (e.g. the last time this tab was visible) —
+                    // assign synchronously, no blank frame while an async Task spins up for nothing.
+                    nsView.image = cached
+                } else {
+                    // Downsampled at decode time via `ThumbnailDownsampler`, not
+                    // `NSImage(contentsOf:)` — confirmed live (2026-08-09) via `vmmap` that plain
+                    // full decodes of this app's own "preview" files (some pre-dating the fix at the
+                    // generation side, some from third-party packages this app doesn't control the
+                    // size of) were producing 100MB+ IOSurfaces each for a grid cell rendered at a
+                    // few hundred points wide. This protects every caller regardless of what's
+                    // actually sitting on disk, not just newly-generated previews.
+                    //
+                    // Still decoded off the main thread — switching tabs tears down and rebuilds the
+                    // entire grid subtree, so every visible thumbnail used to decode synchronously
+                    // on the main thread, back to back, in one pass. Confirmed live (2026-08-07)
+                    // that was a real, visible freeze on switching back to the Library tab.
+                    let url = self.url
+                    coordinator.loadTask = Task { [weak nsView, weak coordinator] in
+                        let image = await Task.detached(priority: .userInitiated) {
+                            ThumbnailDownsampler.downsampledThumbnail(at: url)?.image
+                        }.value
 
-                    guard !Task.isCancelled, let image, let nsView, let coordinator,
-                          coordinator.lastLoadedKey == key
-                    else { return }
+                        guard !Task.isCancelled, let image, let nsView, let coordinator,
+                              coordinator.lastLoadedKey == key
+                        else { return }
 
-                    // 4 bytes/pixel (RGBA) — an approximation (a JPEG's actual decoded
-                    // representation can vary), but a real, size-aware cost beats the previous
-                    // implicit 0, which made `totalCostLimit` meaningless regardless of its value.
-                    let approximateCost = Int(image.size.width * image.size.height * 4)
-                    thumbnailImageCache.setObject(image, forKey: key as NSString, cost: approximateCost)
-                    nsView.image = image
+                        // 4 bytes/pixel (RGBA) — an approximation (a JPEG's actual decoded
+                        // representation can vary), but a real, size-aware cost beats the previous
+                        // implicit 0, which made `totalCostLimit` meaningless regardless of its value.
+                        let approximateCost = Int(image.size.width * image.size.height * 4)
+                        thumbnailImageCache.setObject(image, forKey: key as NSString, cost: approximateCost)
+                        nsView.image = image
+                    }
                 }
             }
         }

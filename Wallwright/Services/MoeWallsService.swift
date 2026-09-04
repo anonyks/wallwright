@@ -139,14 +139,18 @@ final class MoeWallsService {
                   let detailRange = Range(match.range(at: 3), in: html),
                   let thumbRange = Range(match.range(at: 4), in: html),
                   let id = Int(html[idRange]),
-                  let detailURL = URL(string: String(html[detailRange])),
-                  let thumbnailURL = URL(string: String(html[thumbRange]))
+                  // The markup is server-rendered HTML, so attribute/URL values arrive with their
+                  // own entities escaped (an apostrophe in a title shows up as `&#8217;`, and a `&`
+                  // anywhere as `&amp;`) — decoded via the same helper AlphaCoders/DesktopHut/Steam
+                  // already use (see `HTMLEntityDecoding.swift`), which this source never called.
+                  let detailURL = URL(string: String(html[detailRange]).decodingHTMLEntities()),
+                  let thumbnailURL = URL(string: String(html[thumbRange]).decodingHTMLEntities())
             else { continue }
 
             guard !seenIds.contains(id) else { continue }
             seenIds.insert(id)
 
-            items.append(MoeWallsItem(id: id, title: String(html[titleRange]), detailURL: detailURL, thumbnailURL: thumbnailURL))
+            items.append(MoeWallsItem(id: id, title: String(html[titleRange]).decodingHTMLEntities(), detailURL: detailURL, thumbnailURL: thumbnailURL))
         }
 
         return items
@@ -161,7 +165,7 @@ final class MoeWallsService {
         let nsRange = NSRange(html.startIndex..<html.endIndex, in: html)
         return regex.matches(in: html, range: nsRange).compactMap { match in
             guard let range = Range(match.range(at: 1), in: html) else { return nil }
-            return String(html[range])
+            return String(html[range]).decodingHTMLEntities()
         }
     }
 

@@ -39,7 +39,12 @@ final class BatteryMonitor {
         // Registered on the main run loop, so the callback above always lands on the main thread —
         // the standard, documented way to use this API — matching every other observer of
         // `powerSourceDidChange` (GlobalSettingsViewModel etc.), which expect a main-thread post.
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        // `.commonModes`, not just `.defaultMode` — a plug/unplug is genuinely event-driven and can
+        // happen while the main run loop is in `.eventTrackingRunLoopMode` (a menu open, a slider
+        // being dragged) or `.modalPanelRunLoopMode` (a sheet/modal up), neither of which pumps
+        // `.defaultMode` sources — without this, the notification would just sit unfired until the
+        // user released the mouse/dismissed the modal, on top of the debounce below.
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         runLoopSource = source
         // The callback only fires on a subsequent *change* — refresh the value now in case the
         // power source changed between `init()` and this call. Immediate, not debounced — nothing
@@ -49,7 +54,11 @@ final class BatteryMonitor {
 
     deinit {
         if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .defaultMode)
+            // `.commonModes`, matching `startIfNeeded()`'s own add call above — removing with a
+            // different mode than it was added with only detaches it from that one mode, leaving it
+            // still registered (and still firing into `Unmanaged.passUnretained(self)`, a dangling
+            // reference once this object is gone) in whichever other modes `.commonModes` covers.
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
     }
 

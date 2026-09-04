@@ -126,6 +126,19 @@ final class ClockOverlayView: NSView {
     // instance is safe; only .dateFormat needs to change per call, not the whole formatter.
     private static let timeFormatter: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); return f }()
 
+    /// Reassigning `DateFormatter.dateFormat` isn't a cheap property set — it makes Foundation
+    /// reparse and rebuild ICU's internal pattern tables. Both `draw()` and `drawSummitFormat()`
+    /// recompute this same pattern on every redraw (every 1s with seconds enabled), but the pattern
+    /// itself only actually changes when the user flips the 24h/seconds settings — comparing against
+    /// the formatter's own current pattern first skips the rebuild on every redraw where it hasn't.
+    private static func applyTimeFormat(use24Hour: Bool, showSeconds: Bool) {
+        let pattern = use24Hour
+            ? (showSeconds ? "HH:mm:ss" : "HH:mm")
+            : (showSeconds ? "h:mm:ss a" : "h:mm a")
+        guard timeFormatter.dateFormat != pattern else { return }
+        timeFormatter.dateFormat = pattern
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
@@ -172,11 +185,19 @@ final class ClockOverlayView: NSView {
         timer?.invalidate()
         let settings = AppDelegate.shared.globalSettingsViewModel.settings
         if settings.clockShowSeconds {
+            // `Timer(timeInterval:repeats:)` + explicit `RunLoop.main.add(_, forMode: .common)`,
+            // not the `Timer.scheduledTimer` convenience initializer — that schedules on the
+            // current run loop in `.defaultMode` only, same gap the minute-timer branch below
+            // already avoids. `.defaultMode` doesn't get pumped while the run loop is in
+            // `.eventTrackingRunLoopMode` (a menu open, a window/slider being dragged) or
+            // `.modalPanelRunLoopMode` (a sheet up) — the 1-second clock would visibly freeze for
+            // the duration of any such interaction, then jump forward on release.
             let interval: TimeInterval = 1.0
-            let newTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            let newTimer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
                 self?.needsDisplay = true
             }
             newTimer.tolerance = interval * 0.2
+            RunLoop.main.add(newTimer, forMode: .common)
             timer = newTimer
         } else {
             let now = Date()
@@ -234,9 +255,7 @@ final class ClockOverlayView: NSView {
 
         // Without a fixed locale, DateFormatter silently overrides a literal "HH" pattern back to
         // the system's 12/24-hour preference — this is what actually makes the toggle take effect.
-        Self.timeFormatter.dateFormat = settings.clockUse24HourTime
-            ? (settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")
-            : (settings.clockShowSeconds ? "h:mm:ss a" : "h:mm a")
+        Self.applyTimeFormat(use24Hour: settings.clockUse24HourTime, showSeconds: settings.clockShowSeconds)
         let timeString = NSAttributedString(string: "- " + Self.timeFormatter.string(from: now).uppercased() + " -", attributes: timeAttrs)
 
         let dateSize = dateString.size()
@@ -327,9 +346,7 @@ final class ClockOverlayView: NSView {
         let dayString = NSAttributedString(string: Self.summitDayFormatter.string(from: now).uppercased(), attributes: dayAttrs)
         let dateString = NSAttributedString(string: Self.summitDateFormatter.string(from: now).uppercased(), attributes: bodyAttrs)
 
-        Self.timeFormatter.dateFormat = settings.clockUse24HourTime
-            ? (settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")
-            : (settings.clockShowSeconds ? "h:mm:ss a" : "h:mm a")
+        Self.applyTimeFormat(use24Hour: settings.clockUse24HourTime, showSeconds: settings.clockShowSeconds)
         let timeAttrs: [NSAttributedString.Key: Any] = [
             .font: clockFont(.summit, size: timeFontSize, fallbackWeight: .semibold), .foregroundColor: textColor,
             .kern: (timeFontSize * 0.2) as NSNumber, .shadow: textShadow,
@@ -430,7 +447,20 @@ final class ClockOverlayWindow: NSWindow {
         // Default to this screen's center until the user drags the overlay somewhere else —
         // there's no longer a preset "position" to fall back to.
         let defaultOrigin = NSPoint(x: frame.midX - width / 2, y: frame.midY - height / 2)
-        let finalOrigin = settings.clockCustomOrigins?[screenId] ?? defaultOrigin
+        // A saved origin is only trustworthy if it still lands somewhere on this display today —
+        // it was recorded against whatever arrangement/resolution was active *when the user last
+        // dragged the overlay*, and `constrainFrameRect` below is intentionally a no-op (see its
+        // own comment), so nothing else stops a stale origin from a since-reconfigured/detached/
+        // resized monitor from placing the window fully off-screen with no way to click-drag it
+        // back. `constrainFrameRect` isn't reused here since it only clamps a rect already being
+        // moved to a *specific* screen, not a coordinate restored from disk against `screen`.
+        let savedOrigin = settings.clockCustomOrigins?[screenId]
+        let finalOrigin: NSPoint
+        if let savedOrigin, frame.intersects(NSRect(origin: savedOrigin, size: NSSize(width: width, height: height))) {
+            finalOrigin = savedOrigin
+        } else {
+            finalOrigin = defaultOrigin
+        }
 
         self.screenId = screenId
         super.init(

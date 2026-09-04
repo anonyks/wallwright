@@ -97,6 +97,16 @@ enum VideoImporter {
         } catch let error as VideoTranscoderError {
             throw VideoImportPreparationError.transcodeFailed(error.errorDescription ?? "Conversion failed")
         }
+        // `ensureCompatible` returns the ORIGINAL `url` untouched (never writing into
+        // `outputDirectory` at all) when the source is already natively playable — `scratchDir`
+        // was created above just in case, but stays permanently empty in that case, and nothing
+        // downstream ever gets a reference to it to clean up later (the returned `sourceURL` is the
+        // user's own original file, which `cleanupScratchSource` correctly never touches). Removing
+        // it here, the one place that still knows its path, is the only chance to avoid leaking one
+        // empty UUID-named directory in `/tmp` per compatible import.
+        if !playableURL.path.hasPrefix(scratchDir.path) {
+            try? FileManager.default.removeItem(at: scratchDir)
+        }
 
         let asset = AVURLAsset(url: playableURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
@@ -134,10 +144,11 @@ enum VideoImporter {
         sourceProvider: String? = nil,
         sourceId: String? = nil
     ) -> Bool {
-        guard let wrapper = try? FileWrapper(url: pending.sourceURL), wrapper.isRegularFile else { return false }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: pending.sourceURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return false }
         guard let previewData = pending.thumbnail.jpegData else { return false }
 
-        let filename = wrapper.filename ?? pending.sourceURL.lastPathComponent
+        let filename = pending.sourceURL.lastPathComponent
         let title = pending.title.isEmpty ? pending.sourceURL.deletingPathExtension().lastPathComponent : pending.title
 
         var projectData = WEProject(file: filename, preview: "preview.jpg", title: title, type: "video")
@@ -155,22 +166,27 @@ enum VideoImporter {
         let videoBytes = (videoAttributes?[.size] as? Int64) ?? 0
         projectData.packageSizeBytes = videoBytes + Int64(previewData.count)
 
-        let wallpaperDirectoryWrapper = FileWrapper(directoryWithFileWrappers: [filename: wrapper])
-        wallpaperDirectoryWrapper.addRegularFile(withContents: previewData, preferredFilename: "preview.jpg")
-        wallpaperDirectoryWrapper.addRegularFile(withContents: (try? JSONEncoder().encode(projectData)) ?? Data(), preferredFilename: "project.json")
-
+        // `FileManager.copyItem` + direct `Data.write`, not `FileWrapper` — see
+        // `VideoImporter.importVideoFile`'s identical fix and doc comment for why (measured RSS
+        // spike matching the source file's full size, and no APFS `clonefile` fast path). This is
+        // the review-and-commit path (File > Open, drag-and-drop, YouTube, Direct URL all funnel
+        // through `prepareImport` then here) — missed when `importVideoFile`'s one-shot sibling
+        // was fixed, since the two look similar but are separate functions.
         let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
         do {
-            try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: pending.sourceURL, to: destination.appending(path: filename))
+            try previewData.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
+            try JSONEncoder().encode(projectData).write(to: destination.appending(path: "project.json"), options: .atomic)
             notifyLibraryChanged()
             return true
         } catch {
-            // `FileWrapper.write` isn't atomic for a directory wrapper — a failure partway
-            // through (realistically: running out of disk space while writing the video file)
-            // can leave some of its contents already written. Clean those up rather than leaving
-            // a broken, permanently-invisible directory behind (`ContentViewModel.refresh()` just
-            // silently skips anything without a valid project.json — it never deletes it), same
-            // as `PackageImporter.commitImport` already does on its own failure path.
+            // A failure partway through (realistically: running out of disk space while copying
+            // the video file) can leave some of the destination's contents already written. Clean
+            // those up rather than leaving a broken, permanently-invisible directory behind
+            // (`ContentViewModel.refresh()` just silently skips anything without a valid
+            // project.json — it never deletes it), same as `PackageImporter.commitImport`'s own
+            // failure path.
             print("VideoImporter: write failed: \(error)")
             try? FileManager.default.removeItem(at: destination)
             return false
@@ -196,14 +212,33 @@ enum VideoImporter {
         sourceId: String? = nil,
         completion: @escaping (Bool) -> Void
     ) {
-        guard let wallpaper = try? FileWrapper(url: url), wallpaper.isRegularFile else {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
             DispatchQueue.main.async { completion(false) }
             return
         }
-        let filename = wallpaper.filename ?? url.lastPathComponent
+        let filename = url.lastPathComponent
         let title = title ?? url.deletingPathExtension().lastPathComponent
 
-        let wallpaperDirectoryWrapper = FileWrapper(directoryWithFileWrappers: [filename: wallpaper])
+        // `FileManager.copyItem`, not `FileWrapper` — confirmed live: building a `FileWrapper`
+        // around the source file and writing the whole directory wrapper out reads the entire
+        // video into resident memory (measured a 200MB source file inflating RSS by ~200MB during
+        // the write) and bypasses APFS's `clonefile` fast path entirely (measured ~1500x slower
+        // than `copyItem` for the same file — clonefile is a near-instant pointer copy, this was a
+        // genuine byte-for-byte write). For a real multi-GB 4K source, that's real memory pressure
+        // and many extra seconds on every video import for no benefit — `FileWrapper` exists for
+        // building an in-memory document package, not for relocating an already-on-disk file.
+        let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
+        do {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: url, to: destination.appending(path: filename))
+        } catch {
+            print("VideoImporter: copy failed: \(error)")
+            try? FileManager.default.removeItem(at: destination)
+            DispatchQueue.main.async { completion(false) }
+            return
+        }
+
         var projectData = WEProject(file: filename, preview: "preview.jpg", title: title, type: "video")
         projectData.tags = (tags?.isEmpty == false) ? tags : nil
         projectData.sourceProvider = sourceProvider
@@ -220,6 +255,7 @@ enum VideoImporter {
                   let data = NSBitmapImageRep(cgImage: cgImage)
                     .representation(using: .jpeg, properties: [.compressionFactor: 0.85])
             else {
+                try? FileManager.default.removeItem(at: destination)
                 DispatchQueue.main.async { completion(false) }
                 return
             }
@@ -233,17 +269,15 @@ enum VideoImporter {
                 let videoBytes = (videoAttributes?[.size] as? Int64) ?? 0
                 projectData.packageSizeBytes = videoBytes + Int64(data.count)
 
-                wallpaperDirectoryWrapper.addRegularFile(withContents: data, preferredFilename: "preview.jpg")
-                wallpaperDirectoryWrapper.addRegularFile(withContents: (try? JSONEncoder().encode(projectData)) ?? Data(), preferredFilename: "project.json")
-
                 await MainActor.run {
                     do {
-                        let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
-                        try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
+                        try data.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
+                        try JSONEncoder().encode(projectData).write(to: destination.appending(path: "project.json"), options: .atomic)
                         notifyLibraryChanged()
                         completion(true)
                     } catch {
                         print("VideoImporter: write failed: \(error)")
+                        try? FileManager.default.removeItem(at: destination)
                         completion(false)
                     }
                 }
@@ -277,7 +311,20 @@ enum VideoImporter {
 
         guard let data = try? JSONEncoder().encode(project) else { return nil }
         try? data.write(to: wallpaper.wallpaperDirectory.appending(path: "project.json"), options: .atomic)
-        notifyLibraryChanged()
+        // `updateWallpaperInPlace`, not `notifyLibraryChanged()` — this already knows exactly which
+        // one wallpaper changed and what its new value is, so there's no reason to fall back to the
+        // heavy, debounced path meant for "something changed somewhere, go find out what": that
+        // notification's own subscriber (`ContentViewModel.init`) responds to it with a full
+        // `refresh()` — a complete rescan of the wallpapers directory re-decoding every project.json
+        // on disk. Called from `ExplorerItem`'s `.task(id:)` for every visible grid card missing
+        // metadata, a scroll through an unmigrated library could trigger that full rescan repeatedly.
+        // Dispatched onto the main actor explicitly — this function isn't itself actor-isolated (the
+        // `await probeVideoMetadata` above can resume off-main), but `ContentViewModel.wallpapers` is
+        // an `@Published` property SwiftUI expects mutated only from the main thread.
+        let updatedWallpaper = WEWallpaper(using: project, where: wallpaper.wallpaperDirectory)
+        await MainActor.run {
+            AppDelegate.shared.contentViewModel.updateWallpaperInPlace(updatedWallpaper)
+        }
         return project
     }
 
@@ -347,8 +394,8 @@ enum VideoImporter {
     }
 
     /// Shared tail end of both crop entry points above: re-encodes the file in place (same
-    /// filename, so nothing else referencing `project.file` needs to change), regenerates
-    /// `preview.jpg` from the now-cropped frame, and updates the persisted width/height.
+    /// filename unless the container needed to change to `.mp4` — see `targetURL` below),
+    /// regenerates `preview.jpg` from the now-cropped frame, and updates the persisted width/height.
     private static func applyCrop(_ crop: VideoCropRect, for wallpaper: WEWallpaper) async -> WEProject? {
         let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
         let croppedURL = wallpaper.wallpaperDirectory.appending(path: "cropped-\(UUID().uuidString).mp4")
@@ -372,23 +419,45 @@ enum VideoImporter {
         } else {
             safeCrop = crop
         }
+        let encodedSize: (width: Int, height: Int)
+        // `VideoCropDetector.crop` always writes an `.mp4` (`h264_videotoolbox` into an MP4
+        // container) — if the source was a different native container (`.mov` is also accepted
+        // unconverted at import time, see `VideoTranscoder`), replacing at `videoURL`'s original
+        // path via `replaceItemAt` would leave a file whose extension no longer matches what's
+        // actually inside it. Renaming to `.mp4` when they differ keeps `project.file` honest about
+        // the real container instead of relying on AVFoundation's tolerance for the mismatch.
+        let targetURL = videoURL.deletingPathExtension().appendingPathExtension("mp4")
         do {
-            try await VideoCropDetector.crop(videoURL, to: safeCrop, destination: croppedURL)
-            // Preserves `videoURL`'s exact name/location — `project.file` never needs to change.
-            _ = try FileManager.default.replaceItemAt(videoURL, withItemAt: croppedURL)
+            encodedSize = try await VideoCropDetector.crop(videoURL, to: safeCrop, destination: croppedURL)
+            _ = try FileManager.default.replaceItemAt(targetURL, withItemAt: croppedURL)
+            if targetURL != videoURL {
+                try? FileManager.default.removeItem(at: videoURL)
+            }
         } catch {
             try? FileManager.default.removeItem(at: croppedURL)
             return nil
         }
 
         var project = wallpaper.project
-        project.videoWidth = crop.width
-        project.videoHeight = crop.height
+        if targetURL != videoURL {
+            project.file = targetURL.lastPathComponent
+        }
+        // The actual encoded dimensions (`VideoCropDetector.crop`'s own even-rounded width/height,
+        // and after `safeCrop`'s clamping), not the raw, possibly-odd or possibly-out-of-bounds
+        // `crop.width`/`crop.height` the UI requested — those two values already might not match
+        // the file's real dimensions before this fix (see `VideoCropDetector.crop`'s own doc
+        // comment for why an odd request is a real, reachable case), and `EditWallpaperSheet`'s own
+        // "Invalid position or size" clamping edge case would make it worse (persisting a size that
+        // was never actually encoded at all).
+        project.videoWidth = encodedSize.width
+        project.videoHeight = encodedSize.height
 
         // Regenerates the thumbnail from the now-cropped file so the grid/preview stop showing the
         // old bars too — same frame-grab-and-downsample `regenerateThumbnail` above uses, at
         // whatever timestamp was already chosen (or 1s, `prepareImport`'s own default) if none was.
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: videoURL))
+        // `targetURL`, not `videoURL` — when the extension changed, `videoURL`'s file no longer
+        // exists on disk (removed above).
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: targetURL))
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
         let time = CMTimeMake(value: Int64(wallpaper.project.thumbnailTimestamp ?? 1), timescale: 1)
@@ -406,8 +475,10 @@ enum VideoImporter {
 
     /// Real pixel dimensions (orientation-corrected) and audio-track presence, probed directly
     /// off the asset — the same technique `WallpaperPreview.loadResolution()` uses for display,
-    /// but done once at import time and persisted so nothing has to re-probe the file later.
-    private static func probeVideoMetadata(asset: AVAsset) async -> (width: Int?, height: Int?, hasAudio: Bool, duration: Double?) {
+    /// but done once at import time and persisted so nothing has to re-probe the file later. Not
+    /// private — `PackageImporter.commitImport` reuses this for the exact same reason after its own
+    /// transcode step.
+    static func probeVideoMetadata(asset: AVAsset) async -> (width: Int?, height: Int?, hasAudio: Bool, duration: Double?) {
         let hasAudio = ((try? await asset.loadTracks(withMediaType: .audio)) ?? []).isEmpty == false
         let duration: Double?
         if let cmDuration = try? await asset.load(.duration), cmDuration.isNumeric {

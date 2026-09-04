@@ -98,15 +98,20 @@ final class WallperService {
 
         var items: [WallperItem] = []
         for block in blocks {
+            // The sitemap is XML, so its own entities (an "&" in a title, or in a query-string
+            // parameter inside a URL) are escaped on the wire — `&amp;` and friends need decoding
+            // before the URL/query-param values are usable, or before the title is anything but a
+            // literal "&amp;" on screen and on disk (see `HTMLEntityDecoding.swift`'s doc comment;
+            // this source just wasn't wired up to it yet).
             guard block.contains("<video:video>"),
                   let pageURLString = firstMatch(#"<loc>([^<]+)</loc>"#, in: block),
-                  let pageURL = URL(string: pageURLString),
+                  let pageURL = URL(string: pageURLString.decodingHTMLEntities()),
                   let id = extractID(from: pageURL),
                   let rawTitle = firstMatch(#"<video:title>([^<]+)</video:title>"#, in: block),
                   let thumbString = firstMatch(#"<video:thumbnail_loc>([^<]+)</video:thumbnail_loc>"#, in: block),
-                  let thumbnailURL = URL(string: thumbString),
+                  let thumbnailURL = URL(string: thumbString.decodingHTMLEntities()),
                   let videoString = firstMatch(#"<video:content_loc>([^<]+)</video:content_loc>"#, in: block),
-                  let videoURL = URL(string: videoString)
+                  let videoURL = URL(string: videoString.decodingHTMLEntities())
             else { continue }
 
             // Page path looks like /wallpaper/{category}/{slug}-{id} — category is the segment
@@ -119,7 +124,8 @@ final class WallperService {
 
             // Titles are published as "{Name} — Live Wallpaper for Mac" — strip the boilerplate
             // suffix since the grid already shows this is a wallpaper.
-            let title = rawTitle.replacingOccurrences(of: #" — Live Wallpaper for Mac$"#, with: "", options: .regularExpression)
+            let title = rawTitle.decodingHTMLEntities()
+                .replacingOccurrences(of: #" — Live Wallpaper for Mac$"#, with: "", options: .regularExpression)
 
             items.append(WallperItem(id: id, title: title, category: category, thumbnailURL: thumbnailURL, videoURL: videoURL, pageURL: pageURL))
         }

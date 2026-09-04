@@ -45,6 +45,10 @@ final class SteamWorkshopImportViewModel: ObservableObject {
     }
 
     func startDownload(username: String) async {
+        // Same fix as `YouTubeImportViewModel.startDownload`'s identical guard — a fast double-
+        // trigger can queue two `Task`s before either one's own `isDownloading = true` below has
+        // run, both believing no download is in progress.
+        guard !isDownloading else { return }
         guard let itemId = SteamWorkshopService.extractItemId(from: urlString) else { return }
         errorMessage = nil
         downloadStatusLine = ""

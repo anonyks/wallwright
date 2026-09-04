@@ -59,6 +59,15 @@ final class OtherAudioMonitor {
     private var pendingStartWorkItem: DispatchWorkItem?
     private let ownPID = ProcessInfo.processInfo.processIdentifier
 
+    /// `isKnownAppActuallyPlaying()` runs `NSAppleScript.executeAndReturnError` against Spotify/
+    /// Music — a synchronous Apple Event call with no way to configure a short timeout, and Apple
+    /// Events can legitimately take a long time (up to their default ~120s timeout) if the target
+    /// app is hung, busy, or showing a blocking dialog. Without this guard, every 2s timer tick
+    /// dispatched another `poll()` regardless of whether the previous one had returned, so a single
+    /// slow/hung app could pile up many concurrent blocked utility-queue tasks over even a short
+    /// stretch of ticks.
+    private var isPolling = false
+
     /// How many consecutive polls in a row the coarse CoreAudio signal (see
     /// `isAnyOtherProcessOutputtingAudio`) has read "something's outputting audio." Only that
     /// signal needs this — `isKnownAppActuallyPlaying`'s Apple Event answer is already a direct,
@@ -131,11 +140,17 @@ final class OtherAudioMonitor {
     }
 
     private func poll() {
+        guard !isPolling else {
+            wallpaperDebugLog.notice("OtherAudioMonitor: poll() skipped — previous poll still in flight")
+            return
+        }
+        isPolling = true
         let ownPID = self.ownPID
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             if let knownPlaying = Self.isKnownAppActuallyPlaying() {
                 DispatchQueue.main.async {
+                    self.isPolling = false
                     self.consecutiveCoreAudioTrueCount = 0
                     self.isOtherAppPlaying = knownPlaying
                 }
@@ -144,6 +159,7 @@ final class OtherAudioMonitor {
 
             let coreAudioPlaying = Self.isAnyOtherProcessOutputtingAudio(excluding: ownPID)
             DispatchQueue.main.async {
+                self.isPolling = false
                 guard coreAudioPlaying else {
                     if self.consecutiveCoreAudioTrueCount > 0 {
                         wallpaperDebugLog.notice("OtherAudioMonitor: coreAudioPlaying=false, resetting count from \(self.consecutiveCoreAudioTrueCount)")

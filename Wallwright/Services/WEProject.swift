@@ -129,7 +129,14 @@ struct WEProject: Codable, Equatable, Hashable {
 
 struct WEWallpaper: Codable, RawRepresentable, Identifiable {
     
-    var id: Int { self.project.hashValue }
+    // Not `project.hashValue`: `project` is a mutable struct, so editing a wallpaper's title/tags/
+    // any other field changed its `id` — SwiftUI's `ForEach` then treated the edited item as
+    // deleted-and-reinserted instead of updated, dropping hover state and breaking transitions.
+    // Two wallpapers with identical `project` content (e.g. a manually duplicated folder) would
+    // also collide on the same hash, producing duplicate `ForEach` IDs. `wallpaperDirectory` is
+    // this wallpaper's actual persistent identity — unique by construction (`uniqueWallpaperDestination`)
+    // and never changes just because metadata was edited.
+    var id: String { wallpaperDirectory.standardizedFileURL.path }
     var rawValue: String {
         do {
             let rawValueData = try JSONEncoder().encode(self)
@@ -146,13 +153,29 @@ struct WEWallpaper: Codable, RawRepresentable, Identifiable {
     /// Prefers `project.packageSizeBytes` (computed once at import time) over a live directory
     /// walk — this is read for every wallpaper on every sort/filter, so recomputing it from disk
     /// each time is real, avoidable I/O. Only wallpapers imported before that field existed fall
-    /// back to the live walk.
+    /// back to the live walk — memoized process-lifetime below, since this is also read directly
+    /// from `ExplorerItem`'s view body (`WallpaperImpactEstimator.estimate`, for the corner-dot
+    /// overlay every grid card shows) on every SwiftUI re-render, not just once per sort: without
+    /// memoizing, repeatedly hovering the same unmigrated wallpaper re-walked its entire directory
+    /// tree synchronously on the main thread on every hover-triggered redraw.
     var wallpaperSize: Int {
         if let cached = project.packageSizeBytes { return Int(cached) }
+        let key = wallpaperDirectory.standardizedFileURL.path as NSString
+        if let memoized = Self.wallpaperSizeMemo.object(forKey: key) {
+            return memoized.intValue
+        }
         guard let sizeBytes = try? self.wallpaperDirectory.directoryTotalAllocatedSize(includingSubfolders: true)
         else { return 0 }
+        Self.wallpaperSizeMemo.setObject(NSNumber(value: sizeBytes), forKey: key)
         return sizeBytes
     }
+
+    /// Backing store for `wallpaperSize`'s live-walk fallback above — unbounded on purpose: this
+    /// only ever holds one small `NSNumber` per wallpaper still missing `packageSizeBytes`, a
+    /// count that only shrinks over a library's lifetime as `PackageImporter`/`VideoImporter`/
+    /// `ImageImporter` persist the field going forward, never one that grows without bound the way
+    /// `ThumbnailImage`'s decoded-bitmap cache does.
+    private static let wallpaperSizeMemo = NSCache<NSString, NSNumber>()
 
     /// When this wallpaper was added to the library, used for the "Recently Added" sort. Prefers
     /// `project.dateAdded` (set by every importer at commit time) — falls back to the package

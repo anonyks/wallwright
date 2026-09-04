@@ -20,6 +20,20 @@ enum SystemUsageMonitor {
         }
     }
 
+    /// Guards against concurrent samples piling up separate blocking GCD worker threads — every
+    /// caller already dispatches `sample()` onto `DispatchQueue.global`, a shared, bounded thread
+    /// pool, and `sample()` itself blocks its calling thread for the full 3s window below (see
+    /// `currentCPUPercent`'s own doc comment for why that's deliberate). Opening/closing the menu
+    /// bar item repeatedly, or clicking the Performance page's refresh button a few times in a row,
+    /// used to spawn a fresh 3-second-blocking thread for each click with nothing coalescing them —
+    /// harmless once, but real thread-pool pressure under rapid repeated use, since GCD's global
+    /// concurrent queues are shared with every other background task in the app (thumbnail decode,
+    /// transcoding progress, etc.). A sample already in flight now serves its own in-progress result
+    /// to any caller that shows up while it's running, instead of starting a second blocking sample.
+    private static let stateLock = NSLock()
+    private static var isSampling = false
+    private static var lastSnapshot: Snapshot?
+
     /// Samples this process's *current* CPU% and real physical memory footprint.
     ///
     /// Previously shelled out to `ps -o %cpu=,rss=`, with a doc comment claiming that matched
@@ -37,9 +51,27 @@ enum SystemUsageMonitor {
     /// a short live window (two `getrusage` samples ~150ms apart) rather than an average since
     /// launch — still only runs when something actually asks, not on a background timer.
     static func sample() -> Snapshot? {
-        guard let memoryMB = physicalFootprintMB() else { return nil }
+        stateLock.lock()
+        if isSampling {
+            let cached = lastSnapshot
+            stateLock.unlock()
+            return cached
+        }
+        isSampling = true
+        stateLock.unlock()
+        defer {
+            stateLock.lock()
+            isSampling = false
+            stateLock.unlock()
+        }
+
+        guard let memoryMB = physicalFootprintMB() else { return lastSnapshot }
         let cpuPercent = currentCPUPercent() ?? 0
-        return Snapshot(cpuPercent: cpuPercent, memoryMB: memoryMB)
+        let snapshot = Snapshot(cpuPercent: cpuPercent, memoryMB: memoryMB)
+        stateLock.lock()
+        lastSnapshot = snapshot
+        stateLock.unlock()
+        return snapshot
     }
 
     private static func physicalFootprintMB() -> Double? {

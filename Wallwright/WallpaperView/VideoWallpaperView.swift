@@ -56,7 +56,18 @@ struct VideoWallpaperView: NSViewRepresentable {
         let selectedWallpaper = wallpaperViewModel.wallpaper(for: screenId)
         let currentWallpaper = viewModel.currentWallpaper
 
-        if selectedWallpaper.wallpaperDirectory.appending(path: selectedWallpaper.project.file) != currentWallpaper.wallpaperDirectory.appending(path: currentWallpaper.project.file) {
+        // Was file-path-only (`wallpaperDirectory.appending(path: project.file)`), which missed
+        // edits to the SAME file's metadata — trimming (or retitling, retagging, re-picking the
+        // thumbnail frame of) the wallpaper currently showing on this screen changes `project` but
+        // not the video file itself, so that check saw "same path" and never reassigned
+        // `viewModel.currentWallpaper`. `applyTrimEnd`/`seedTrimStartIfNeeded` only ever read
+        // `viewModel.currentWallpaper.project`, not this file's own `selectedWallpaper` — so a live
+        // trim edit silently had zero effect on playback until switching to a different wallpaper
+        // and back forced a real path change. Comparing the full `project` too (`Equatable`) closes
+        // that gap while still skipping a rebuild on every unrelated re-render (playRate/playVolume
+        // changes below don't touch `project` at all).
+        if !selectedWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: currentWallpaper.wallpaperDirectory)
+            || selectedWallpaper.project != currentWallpaper.project {
             viewModel.currentWallpaper = selectedWallpaper
         }
 

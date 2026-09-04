@@ -79,8 +79,15 @@ class VideoWallpaperViewModel: ObservableObject {
                 NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: oldItem)
             }
             let url = currentWallpaper.wallpaperDirectory.appending(path: currentWallpaper.project.file)
-            let newItem = Self.videoOnlyItem(url: url)
-            let newAudioItem = Self.audioOnlyItem(url: url)
+            // One shared `AVURLAsset`, not one built independently inside each of `videoOnlyItem`/
+            // `audioOnlyItem` — each construction opens the file and parses its container/track
+            // metadata (MP4 atoms, track descriptors) from scratch, so building two for the exact
+            // same URL back-to-back on every wallpaper switch was doing that parse work twice for
+            // nothing. Both builders read tracks off whichever asset they're handed either way.
+            let asset = AVURLAsset(url: url)
+            let newItem = Self.videoOnlyItem(asset: asset)
+            let newAudioItem = Self.audioOnlyItem(asset: asset)
+            Self.capForwardBuffering(newItem, newAudioItem)
             Self.applyTrimEnd(project: currentWallpaper.project, to: newItem, newAudioItem)
             self.player.replaceCurrentItem(with: newItem)
             seedInitialFrameIfStartingPaused(project: currentWallpaper.project, item: newItem)
@@ -201,8 +208,8 @@ class VideoWallpaperViewModel: ObservableObject {
     /// track for this item in the first place, so no second session gets created at all. Falls back
     /// to the plain file URL if the asset has no audio track or composition setup fails, so a
     /// wallpaper's own file stays the ultimate source of truth.
-    private static func audioOnlyItem(url: URL) -> AVPlayerItem {
-        let asset = AVURLAsset(url: url)
+    private static func audioOnlyItem(asset: AVURLAsset) -> AVPlayerItem {
+        let url = asset.url
         guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
             // A silent wallpaper has nothing for this player to contribute at all — falling back
             // to the full file here (as an earlier version of this fix did) would mean
@@ -238,8 +245,8 @@ class VideoWallpaperViewModel: ObservableObject {
     /// doesn't inherit the source track's rotation/orientation metadata on its own, and losing it
     /// would show some videos sideways or upside down. Falls back to the plain file URL if the
     /// asset has no audio track (nothing to strip) or composition setup fails.
-    private static func videoOnlyItem(url: URL) -> AVPlayerItem {
-        let asset = AVURLAsset(url: url)
+    private static func videoOnlyItem(asset: AVURLAsset) -> AVPlayerItem {
+        let url = asset.url
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             return AVPlayerItem(url: url)
         }
@@ -291,6 +298,21 @@ class VideoWallpaperViewModel: ObservableObject {
     private static func fourCCString(_ code: FourCharCode) -> String {
         let bytes: [UInt8] = [24, 16, 8, 0].map { UInt8((code >> $0) & 0xFF) }
         return String(bytes: bytes, encoding: .ascii) ?? "????"
+    }
+
+    /// Caps how far ahead AVFoundation is willing to buffer decoded frames — left unset (the
+    /// default), AVFoundation picks its own buffering depth heuristically, which for a high-
+    /// resolution local file can hold several seconds' worth of decoded frames in `IOSurface`-backed
+    /// buffers at once. That heuristic exists mainly for network streaming, where buffering ahead
+    /// hedges against variable download throughput; it buys nothing for these players, which always
+    /// read a local file on this Mac's own disk and loop a typically-short clip repeatedly. A small,
+    /// explicit cap keeps decoded-frame memory bounded without affecting playback smoothness — local
+    /// disk I/O is far faster than real-time playback needs, so there's no stall risk in trading a
+    /// large speculative buffer for a small one.
+    private static func capForwardBuffering(_ items: AVPlayerItem...) {
+        for item in items {
+            item.preferredForwardBufferDuration = 2.0
+        }
     }
 
     private static func apply(rate: Float, to players: AVPlayer...) {
@@ -481,9 +503,14 @@ class VideoWallpaperViewModel: ObservableObject {
         // shown on this screen at launch) reintroduced the exact double-audio-decode bug already
         // fixed in `applyCurrentWallpaperChange` for every subsequent wallpaper switch — confirmed
         // live (2026-08-31) this was a second, separate construction path for the same player.
-        self.player = AVPlayer(playerItem: Self.videoOnlyItem(url: url))
+        // One shared `AVURLAsset` for both builders — see `swapInFreshItems`'s identical comment.
+        let initialAsset = AVURLAsset(url: url)
+        let initialItem = Self.videoOnlyItem(asset: initialAsset)
+        let initialAudioItem = Self.audioOnlyItem(asset: initialAsset)
+        Self.capForwardBuffering(initialItem, initialAudioItem)
+        self.player = AVPlayer(playerItem: initialItem)
         self.player.isMuted = true
-        self.audioPlayer = AVPlayer(playerItem: Self.audioOnlyItem(url: url))
+        self.audioPlayer = AVPlayer(playerItem: initialAudioItem)
         if let item = self.player.currentItem {
             if let audioItem = self.audioPlayer.currentItem {
                 Self.applyTrimEnd(project: currentWallpaper.project, to: item, audioItem)
@@ -592,6 +619,13 @@ class VideoWallpaperViewModel: ObservableObject {
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         readinessTimer?.invalidate()
+        // `replaceCurrentItem(with: nil)` is what actually invalidates the underlying
+        // `VTDecompressionSession` — see `teardownForStop()`'s own doc comment (confirmed live via
+        // `footprint`: 114MB freed for the video item). Deallocating this instance without it (e.g.
+        // `AppDelegate.rebuildWallpaperWindows()` tearing down old windows on a display change)
+        // wasn't releasing the decoder session as reliably.
+        player.replaceCurrentItem(with: nil)
+        audioPlayer.replaceCurrentItem(with: nil)
     }
 
     @objc private func playerDidFinishPlaying(_ notification: Notification) {
@@ -616,9 +650,26 @@ class VideoWallpaperViewModel: ObservableObject {
         // free to snap to the nearest keyframe instead of the exact requested time, which on a
         // video with a multi-second keyframe interval means every loop restart visibly jumps
         // forward a beat instead of landing exactly back at the start.
-        self.player.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        self.audioPlayer.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        //
+        // `player`/`audioPlayer` are two independently-seeking `AVPlayer`s (the audio track is
+        // played out-of-band from a second item on the same file — see this class's own header
+        // comment for why), and `seek(to:toleranceBefore:toleranceAfter:)` without a completion
+        // handler is asynchronous: it returns immediately, before the seek has actually landed.
+        // Calling `apply(rate:)` right after used to resume both players before either seek was
+        // guaranteed to have finished, and since video/audio decoders don't necessarily finish
+        // seeking in the same amount of time, that could resume one track a beat ahead of the
+        // other on every single loop restart. Waiting for both completion handlers before applying
+        // the rate guarantees playback only resumes once both tracks have actually landed on
+        // `restartTime` together.
+        let seekGroup = DispatchGroup()
+        seekGroup.enter()
+        self.player.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in seekGroup.leave() }
+        seekGroup.enter()
+        self.audioPlayer.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in seekGroup.leave() }
+        seekGroup.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            Self.apply(rate: self.playRate, to: self.player, self.audioPlayer)
+        }
     }
 
     @objc private func playerDidStopPlaying(_ notification: Notification) {
@@ -646,7 +697,14 @@ class VideoWallpaperViewModel: ObservableObject {
 
     @objc func systemDidWake(_ notification: Notification) {
         wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] systemDidWake (screensDidWake) fired — playRate=\(self.playRate), player.rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        // Global source of truth, not `self.playRate` — same staleness `seedInitialFrameIfStartingPaused`'s
+        // own doc comment already covers: this fires from a direct `NSWorkspace` notification, with
+        // no guaranteed ordering against `VideoWallpaperView.updateNSView`'s next render (which is
+        // what actually syncs `self.playRate`). A policy that only decides to pause once awake
+        // (e.g. battery status, which needs its own notification to fire after wake) hasn't
+        // necessarily updated the global value's SwiftUI-synced local mirror yet either, but reading
+        // the global directly removes the render-cycle half of that lag.
+        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
         // Full system sleep/wake (lid close, or a long enough display sleep) is exactly the kind of
         // suspension that wedges AVPlayerView's render pipeline the same way lock/unlock does — see
         // `reattachPlayerLayer`.
@@ -700,7 +758,9 @@ class VideoWallpaperViewModel: ObservableObject {
         wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer RUNNING — before: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
         view.player = nil
         view.player = player
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        // See `systemDidWake`'s identical fix and comment — same staleness risk, since this is
+        // called from `systemDidWake` (among other places) with no guaranteed sync beforehand.
+        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
         wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer DONE — after: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
     }
 }

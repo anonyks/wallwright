@@ -172,7 +172,17 @@ struct ContentView: View {
                             .padding()
                             .frame(width: 520, height: 600)
                     } else if viewModel.isEditWallpaperReveal, let hoveredWallpaper = viewModel.hoveredWallpaper {
+                        // `.id()` forces SwiftUI to tear down and recreate this view (re-running its
+                        // `init`, re-seeding `@State private var title`) whenever the wallpaper being
+                        // edited changes — the background scrim already disables all hit-testing on
+                        // the grid while this sheet is open (see its own comment a few lines up), so
+                        // `hoveredWallpaper` can't actually change to a DIFFERENT wallpaper while this
+                        // branch stays selected in practice today. Explicit all the same: relying on
+                        // that scrim to be what keeps `@State` correctly reset is exactly the kind of
+                        // incidental protection a future refactor could break without anyone noticing
+                        // the safety implications, and this costs nothing.
                         EditWallpaperSheet(viewModel: viewModel, wallpaperViewModel: wallpaperViewModel, wallpaper: hoveredWallpaper)
+                            .id(hoveredWallpaper.wallpaperDirectory)
                             .frame(width: 420, height: 560)
                     } else if viewModel.isYouTubeImportReveal {
                         YouTubeImportSheet(viewModel: viewModel, model: viewModel.youTubeImportViewModel)
@@ -258,7 +268,16 @@ struct ContentView: View {
             }
         }
         .onChange(of: viewModel.isDirectURLImportReveal) { _, isPresented in
-            guard !isPresented, let url = viewModel.pendingDirectURLDownload else { return }
+            guard !isPresented else { return }
+            guard let url = viewModel.pendingDirectURLDownload else {
+                // Sheet closed without a completed download (cancelled, or dismissed) — clear any
+                // Inbox link association now rather than leaving it stuck, or a later, unrelated
+                // Direct URL import would wrongly mark THIS cancelled link `.completed` (see
+                // `cancelPendingSheetImport`'s own doc comment). A no-op if the sheet wasn't opened
+                // from an Inbox link's Import button.
+                AppDelegate.shared.inboxLinksStore.cancelPendingSheetImport()
+                return
+            }
             viewModel.pendingDirectURLDownload = nil
             // If this sheet was opened from an Inbox link's Import button, mark that row completed
             // — the only reliable "did this actually finish" signal, since the sheet can always be

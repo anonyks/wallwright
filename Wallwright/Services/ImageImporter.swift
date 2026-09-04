@@ -104,10 +104,21 @@ enum ImageImporter {
         sourceProvider: String? = nil,
         sourceId: String? = nil
     ) -> Bool {
-        guard let wrapper = try? FileWrapper(url: pending.sourceURL), wrapper.isRegularFile else { return false }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: pending.sourceURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return false }
         guard let previewData = pending.thumbnail.jpegData else { return false }
 
-        let filename = wrapper.filename ?? pending.sourceURL.lastPathComponent
+        // "preview.jpg" is an extremely common filename for a downloaded preview/thumbnail image
+        // in the wild — if the source file is literally named that (case-insensitively, matching
+        // APFS's default case-insensitive behavior), it would land at the exact same path this
+        // function writes the downsampled thumbnail to below, and the thumbnail write would
+        // silently overwrite — permanently destroying — the user's actual full-resolution import
+        // with a 420px JPEG. Renaming only in that specific collision case avoids the loss without
+        // changing every other import's filename.
+        let sourceFilename = pending.sourceURL.lastPathComponent
+        let filename = sourceFilename.lowercased() == "preview.jpg"
+            ? "image." + pending.sourceURL.pathExtension
+            : sourceFilename
         let title = pending.title.isEmpty ? pending.sourceURL.deletingPathExtension().lastPathComponent : pending.title
 
         var projectData = WEProject(file: filename, preview: "preview.jpg", title: title, type: "image")
@@ -122,13 +133,15 @@ enum ImageImporter {
         let imageAttributes = try? FileManager.default.attributesOfItem(atPath: pending.sourceURL.path)
         projectData.packageSizeBytes = ((imageAttributes?[.size] as? Int64) ?? 0) + Int64(previewData.count)
 
-        let wallpaperDirectoryWrapper = FileWrapper(directoryWithFileWrappers: [filename: wrapper])
-        wallpaperDirectoryWrapper.addRegularFile(withContents: previewData, preferredFilename: "preview.jpg")
-        wallpaperDirectoryWrapper.addRegularFile(withContents: (try? JSONEncoder().encode(projectData)) ?? Data(), preferredFilename: "project.json")
-
+        // `FileManager.copyItem` + direct `Data.write`, not `FileWrapper` — see
+        // `VideoImporter.importVideoFile`'s identical fix and doc comment for why (measured RSS
+        // spike matching the source file's full size, and no APFS `clonefile` fast path).
         let destination = FileManager.default.uniqueWallpaperDestination(forTitle: title)
         do {
-            try wallpaperDirectoryWrapper.write(to: destination, originalContentsURL: nil)
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: pending.sourceURL, to: destination.appending(path: filename))
+            try previewData.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
+            try JSONEncoder().encode(projectData).write(to: destination.appending(path: "project.json"), options: .atomic)
             VideoImporter.notifyLibraryChanged()
             return true
         } catch {

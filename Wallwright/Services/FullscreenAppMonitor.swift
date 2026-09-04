@@ -149,10 +149,25 @@ final class FullscreenAppMonitor {
         // (e.g. user clicked into another app without closing it) and still be the thing visually
         // covering the wallpaper — requiring key-ness would misread that as "other app fullscreen"
         // again, the same failure mode this check exists to prevent.
+        // `isVisible`/`isOnActiveSpace` alone say Wallwright's own window is somewhere non-hidden on
+        // the current Space — not that it's actually the thing sitting on top and covering the
+        // wallpaper. A borderless-fullscreen game (common — many games default to this rather than
+        // real macOS-native fullscreen, which would instead move to its own dedicated Space and
+        // fail `isOnActiveSpace`) stays on the SAME Space as everything else and can end up stacked
+        // above BOTH the wallpaper AND Wallwright's own main/Settings window at once: `isVisible`
+        // stays `true` for our window the whole time (it reflects window-server ordering, not
+        // actual unobstructed visibility), so without this check `ownWindowIsCovering` stayed `true`
+        // and permanently suppressed fullscreen detection for as long as the user merely left
+        // Wallwright's window open anywhere, even while looking at a genuinely fullscreen game.
+        // `occlusionState.contains(.visible)` is the same real-occlusion signal already used for the
+        // wallpaper windows themselves just above (`allOccluded`) — applying it to our own window
+        // too directly answers "is OUR window still what's actually on top," not just "open."
         let ownWindowIsCovering = (AppDelegate.shared.mainWindowController.window.isVisible
-            && AppDelegate.shared.mainWindowController.window.isOnActiveSpace)
+            && AppDelegate.shared.mainWindowController.window.isOnActiveSpace
+            && AppDelegate.shared.mainWindowController.window.occlusionState.contains(.visible))
             || (AppDelegate.shared.settingsWindow.isVisible
-                && AppDelegate.shared.settingsWindow.isOnActiveSpace)
+                && AppDelegate.shared.settingsWindow.isOnActiveSpace
+                && AppDelegate.shared.settingsWindow.occlusionState.contains(.visible))
         let effectiveOtherAppFullscreen = allOccluded && !ownWindowIsCovering
         wallpaperDebugLog.notice("FullscreenAppMonitor.recompute() — allOccluded=\(allOccluded), ownWindowIsCovering=\(ownWindowIsCovering), was isOtherAppFullscreen=\(self.isOtherAppFullscreen)")
 

@@ -59,6 +59,14 @@ final class YouTubeImportViewModel: ObservableObject {
     }
 
     func startDownload() async {
+        // A `Task { await startDownload() }` fired from a button/onSubmit action schedules
+        // asynchronously rather than running synchronously inline — a fast enough double-trigger
+        // (double-click, Return held down) can queue a second Task before the first one's own
+        // `isDownloading = true` below has actually run, so both reach this point believing no
+        // download is in progress. Guarding here, before anything else, closes that window: whichever
+        // one runs first wins, and the second exits immediately instead of starting a duplicate
+        // multi-hundred-MB download into its own separate scratch directory.
+        guard !isDownloading else { return }
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         errorMessage = nil

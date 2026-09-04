@@ -29,6 +29,18 @@ class WallpaperViewModel: ObservableObject {
         }
     }
 
+    /// Every screen ID this app has ever seen connected — distinct from `enabledScreens` so a
+    /// display the user explicitly disabled doesn't get silently re-enabled just because it's
+    /// still connected. `screenId(for:)` is a stable per-display UUID unaffected by resolution, so
+    /// `AppDelegate.screensChanged()` re-fires for the SAME already-known display on a resolution
+    /// change, sleep/wake, or dock/undock — under the old "not in enabledScreens" check, that was
+    /// indistinguishable from a genuinely new display and silently overrode the user's choice.
+    @Published var knownScreens: Set<String> = [] {
+        didSet {
+            UserDefaults.standard.set(Array(knownScreens), forKey: "KnownScreens")
+        }
+    }
+
     /// The screen currently selected in the UI for configuration.
     @Published var selectedScreenId: String = ""
 
@@ -170,6 +182,11 @@ class WallpaperViewModel: ObservableObject {
             enabledScreens.insert(screenId)
         }
         AppDelegate.shared.rebuildWallpaperWindows()
+        // `setClockWindows()` gates window creation on `isScreenEnabled(screenId)` — without this,
+        // disabling a screen left its clock overlay floating above the native desktop picture
+        // indefinitely (only the wallpaper window was torn down), and re-enabling one didn't create
+        // a new clock window until something else happened to trigger a rebuild.
+        AppDelegate.shared.rebuildClockWindows()
     }
 
     /// Cleans up every reference to a wallpaper after it's been deleted: clears it from any
@@ -202,6 +219,13 @@ class WallpaperViewModel: ObservableObject {
     /// Auto-resume checks this and backs off; auto-pause is unaffected either way.
     @Published var isPausedByUser = false
 
+    /// Same reasoning as `isPausedByUser` above, for volume instead of playback — without this, a
+    /// user muting the wallpaper on purpose gets silently un-muted the moment an unrelated trigger
+    /// re-fires an auto-unmute (other-app audio stopping, or switching back to Wallwright/Finder
+    /// with "Other Application Focused" set to Mute), since `unmute()` had no way to know the mute
+    /// was intentional rather than another policy's own doing.
+    @Published var isMutedByUser = false
+
     /// True while a "Stop (free memory)" policy is currently in effect — every screen's
     /// `VideoWallpaperViewModel` observes this (same reactive pattern as `playRate`/`playVolume`
     /// below) and actually tears down/rebuilds its `AVPlayerItem`s in response, releasing the real
@@ -214,20 +238,21 @@ class WallpaperViewModel: ObservableObject {
 
     @Published public var playRate: Float = 1.0 {
         willSet {
-            if newValue == 0.0 {
-                for (index, item) in AppDelegate.shared.statusItem.menu!.items.enumerated() {
-                    if item.title == "Pause" {
-                        AppDelegate.shared.statusItem.menu!.items[index] =
-                            .init(title: "Resume", systemImage: "play.fill", action: #selector(AppDelegate.shared.togglePause), keyEquivalent: "")
-                    }
-                }
-            } else {
-                for (index, item) in AppDelegate.shared.statusItem.menu!.items.enumerated() {
-                    if item.title == "Resume" {
-                        AppDelegate.shared.statusItem.menu!.items[index] =
-                            .init(title: "Pause", systemImage: "pause.fill", action: #selector(AppDelegate.shared.togglePause), keyEquivalent: "")
-                    }
-                }
+            // Matched by the row's own `action`, not `item.title` — `title` is locale-dependent
+            // (these rows are built via `String(localized:)`) so an English-literal comparison
+            // never matches on a non-English system, and replacing the whole `NSMenuItem` (as this
+            // used to) destroys its `ShortcutMenuItemView` on every toggle regardless of locale.
+            // `action` is stable in both states and unique to this row. `statusItem` and `.menu`
+            // are both implicitly-unwrapped and unset this early during launch — optional-chained
+            // rather than force-unwrapped so a `playRate` change before menu setup is a no-op
+            // instead of a crash.
+            if let item = AppDelegate.shared.statusItem?.menu?.items.first(where: {
+                ($0.view as? ShortcutMenuItemView)?.action == #selector(AppDelegate.togglePause)
+            }), let view = item.view as? ShortcutMenuItemView {
+                view.updateTitle(
+                    newValue == 0.0 ? String(localized: "Resume") : String(localized: "Pause"),
+                    systemImage: newValue == 0.0 ? "play.fill" : "pause.fill"
+                )
             }
         }
         didSet {
@@ -238,20 +263,14 @@ class WallpaperViewModel: ObservableObject {
     var lastPlayVolume: Float = 1.0
     @Published public var playVolume: Float = 1.0 {
         willSet {
-            if newValue == 0.0 {
-                for (index, item) in AppDelegate.shared.statusItem.menu!.items.enumerated() {
-                    if item.title == "Mute" {
-                        AppDelegate.shared.statusItem.menu!.items[index] =
-                            .init(title: String(localized: "Unmute"), systemImage: "speaker.fill", action: #selector(AppDelegate.shared.toggleMute), keyEquivalent: "")
-                    }
-                }
-            } else {
-                for (index, item) in AppDelegate.shared.statusItem.menu!.items.enumerated() {
-                    if item.title == "Unmute" {
-                        AppDelegate.shared.statusItem.menu!.items[index] =
-                            .init(title: String(localized: "Mute"), systemImage: "speaker.slash.fill", action: #selector(AppDelegate.shared.toggleMute), keyEquivalent: "")
-                    }
-                }
+            // See `playRate`'s willSet above for why this matches on `action`, not `title`.
+            if let item = AppDelegate.shared.statusItem?.menu?.items.first(where: {
+                ($0.view as? ShortcutMenuItemView)?.action == #selector(AppDelegate.toggleMute)
+            }), let view = item.view as? ShortcutMenuItemView {
+                view.updateTitle(
+                    newValue == 0.0 ? String(localized: "Unmute") : String(localized: "Mute"),
+                    systemImage: newValue == 0.0 ? "speaker.fill" : "speaker.slash.fill"
+                )
             }
         }
         didSet {
@@ -296,6 +315,18 @@ class WallpaperViewModel: ObservableObject {
             self.enabledScreens = migrated
         } else {
             self.enabledScreens = Set(NSScreen.screens.map { Self.screenId(for: $0) })
+        }
+
+        // No prior history of which screens were ever seen before this property existed — the best
+        // available reconstruction is anything currently enabled or ever assigned a wallpaper
+        // (`wallpapers`' keys persist across a disable, see `toggleScreen`). A screen disabled
+        // before ever getting a wallpaper assignment won't be caught by this one-time migration and
+        // could still get silently re-enabled once more, but every screen seen from here on is
+        // tracked correctly.
+        if let saved = UserDefaults.standard.array(forKey: "KnownScreens") as? [String] {
+            self.knownScreens = Set(saved)
+        } else {
+            self.knownScreens = self.enabledScreens.union(self.wallpapers.keys)
         }
 
         // Default selected screen to main

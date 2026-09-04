@@ -61,7 +61,13 @@ extension AppDelegate {
     }
 
     @objc func toggleMute() {
-        if wallpaperViewModel.playVolume == 0 { unmute() } else { mute() }
+        if wallpaperViewModel.playVolume == 0 {
+            wallpaperViewModel.isMutedByUser = false
+            unmute()
+        } else {
+            wallpaperViewModel.isMutedByUser = true
+            mute()
+        }
     }
 
     @objc func toggleClockOverlay() {
@@ -306,9 +312,12 @@ extension AppDelegate: NSMenuDelegate {
         let settings = globalSettingsViewModel.settings
         for item in menu.items {
             guard let view = item.view as? ShortcutMenuItemView else { continue }
-            switch item.title {
-            case "Mute", "Unmute": view.setShortcut(settings.muteHotkey?.displayString ?? "")
-            case "Pause", "Resume": view.setShortcut(settings.pauseHotkey?.displayString ?? "")
+            // Matched by `action`, not `item.title` — title is locale-dependent (these rows are
+            // built via `String(localized:)`) and also flips between two strings ("Mute"/"Unmute",
+            // "Pause"/"Resume") as playback state changes, neither of which `action` does.
+            switch view.action {
+            case #selector(AppDelegate.toggleMute): view.setShortcut(settings.muteHotkey?.displayString ?? "")
+            case #selector(AppDelegate.togglePause): view.setShortcut(settings.pauseHotkey?.displayString ?? "")
             default: break
             }
         }

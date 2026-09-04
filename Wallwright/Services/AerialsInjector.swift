@@ -140,7 +140,17 @@ final class AerialsInjector {
     /// needs to actually show the aerial.
     func prewarmForNextActivation() {
         guard let videoURL = lastVideoURL, let name = lastVideoName else { return }
-        inject(videoURL: videoURL, name: name)
+        // `inject()` does real blocking work (a synchronous `AVAssetExportSession` wait, a
+        // multi-hundred-MB file copy, and always a `killall WallpaperAgent` via
+        // `Process.waitUntilExit()`) — every other caller of `inject()` already dispatches to a
+        // background queue first (`AppDelegate.applicationDidFinishLaunching`,
+        // `GlobalSettingsService`'s wallpaper-change sink). This one didn't, and its own callers
+        // (`StatusBar.refreshVideoWallpaper()`, `LockScreenSync.screenUnlocked()`/
+        // `screensaverDidDeactivate()`) all run on the main thread — meaning every unlock and every
+        // screensaver exit froze the main thread until the restart finished.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.inject(videoURL: videoURL, name: name)
+        }
     }
 
     /// True if the currently-injected aerial's files and manifest entry are all still present and
@@ -224,7 +234,14 @@ final class AerialsInjector {
         let thumbPath = (thumbsDir as NSString).appendingPathComponent("\(uuid).png")
         if videoChanged || !fm.fileExists(atPath: thumbPath) {
             try? fm.createDirectory(atPath: thumbsDir, withIntermediateDirectories: true)
-            generateThumbnail(from: videoURL, to: thumbPath)
+            // From `destPath` (the file just copied into the aerials store, or already sitting
+            // there from a previous call), not the original `videoURL` — `generateThumbnail`
+            // requests a frame at 1.0s, but `videoURL` can be shorter than that (confirmed live
+            // with a 0.64s source, see `minimumAerialDuration`'s doc comment), while `destPath` is
+            // always either that same short source (if it already cleared the 10s floor) or
+            // `preparedVideoURL`'s looped-out version — never shorter than what was actually copied
+            // in, so the 1.0s request is always valid against it.
+            generateThumbnail(from: URL(fileURLWithPath: destPath), to: thumbPath)
         }
 
         guard updateEntriesJSON(assetID: uuid, videoName: name) else {
@@ -439,8 +456,19 @@ final class AerialsInjector {
     /// screensaver phase plays our injected video instead of whatever module was selected before.
     private func configureScreensaverForAerials() {
         let aerialsPath = "/System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex"
-        let current = UserDefaults(suiteName: "com.apple.screensaver")
-        let currentModuleDict = current?.dictionary(forKey: "moduleDict") as? [String: String]
+        // `UserDefaults(suiteName:)` reads the plain per-user domain
+        // (`~/Library/Preferences/com.apple.screensaver.plist`), but macOS actually keeps the
+        // active screensaver module selection in the ByHost domain — the exact one the write below
+        // already targets via `-currentHost write`. Reading through `UserDefaults` here was
+        // domain-mismatched with that write and always came back nil, so the "save what was
+        // selected before we override it" step below saved an empty dictionary instead of the
+        // user's real prior choice — confirmed by the mismatch between this read and the write just
+        // a few lines down. `CFPreferencesCopyValue` with `kCFPreferencesCurrentHost` reads the same
+        // ByHost domain the `defaults -currentHost` CLI does.
+        let currentModuleDict = CFPreferencesCopyValue(
+            "moduleDict" as CFString, "com.apple.screensaver" as CFString,
+            kCFPreferencesCurrentUser, kCFPreferencesCurrentHost
+        ) as? [String: String]
         let currentModule = currentModuleDict?["path"] ?? ""
         guard currentModule != aerialsPath else { return }
 
@@ -603,28 +631,37 @@ final class AerialsInjector {
 
     // MARK: - Thumbnail
 
+    /// Blocks the calling thread until the thumbnail is actually written — every caller of
+    /// `inject()` already dispatches to a background queue first (see its own callers), so this is
+    /// safe to block synchronously, the same `DispatchSemaphore` bridge `preparedVideoURL` above
+    /// already uses for its own export. Without this, `generateCGImageAsynchronously`'s completion
+    /// handler was truly fire-and-forget: `inject()` proceeded straight to writing `entries.json`
+    /// (which references this exact `outputPath`) and restarting WallpaperAgent while the PNG
+    /// encode/write was potentially still in flight, racing WallpaperAgent reading a thumbnail file
+    /// that might not exist on disk yet.
     private func generateThumbnail(from videoURL: URL, to outputPath: String) {
         let asset = AVURLAsset(url: videoURL)
         let gen = AVAssetImageGenerator(asset: asset)
         gen.appliesPreferredTrackTransform = true
         gen.maximumSize = CGSize(width: 480, height: 480)
         let time = CMTime(seconds: 1.0, preferredTimescale: 600)
+        let semaphore = DispatchSemaphore(value: 0)
         gen.generateCGImageAsynchronously(for: time) { cgImage, _, _ in
+            defer { semaphore.signal() }
             guard let cgImage else { return }
             let rep = NSBitmapImageRep(cgImage: cgImage)
             if let pngData = rep.representation(using: .png, properties: [:]) {
                 // .atomic, not a plain write: thumbPath is the same UUID-keyed file across every
-                // wallpaper we ever inject (the asset ID is reused, not per-wallpaper), and
-                // thumbnail generation is async and fire-and-forget. Two inject() calls close
-                // together — e.g. a quick wallpaper switch, or prewarmForNextActivation() firing
-                // on an unlock right after one — can end up with two of these completion
-                // handlers writing to the exact same path concurrently. A plain write can
-                // interleave and corrupt the file (this is what produced the garbled/static-like
-                // thumbnail seen in System Settings); .atomic writes to a temp file and renames,
-                // so even under a race only one fully-formed file ever lands at the real path.
+                // wallpaper we ever inject (the asset ID is reused, not per-wallpaper). Two
+                // inject() calls close together — e.g. a quick wallpaper switch, or
+                // prewarmForNextActivation() firing on an unlock right after one — could still
+                // both reach this write around the same time; .atomic writes to a temp file and
+                // renames, so even under that race only one fully-formed file ever lands at the
+                // real path.
                 try? pngData.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
             }
         }
+        semaphore.wait()
     }
 
     // MARK: - Store/Index.plist

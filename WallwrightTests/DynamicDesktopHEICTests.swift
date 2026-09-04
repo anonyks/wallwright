@@ -60,4 +60,9 @@ final class DynamicDesktopHEICTests: XCTestCase {
         XCTAssertTrue((0...1).contains(evening))
         XCTAssertEqual(morning, evening, "should track system appearance, not time of day")
     }
+
+    func testNegativeIndexReturnsNil() {
+        let fakeURL = URL(fileURLWithPath: "/dev/null")
+        XCTAssertNil(DynamicDesktopHEIC.frame(at: -1, in: fakeURL))
+    }
 }

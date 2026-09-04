@@ -105,12 +105,20 @@ extension NtfyInboxTransport: URLSessionDataDelegate {
         // reconnect, matching every other idempotent-restart service in this app.
         inboxDebugLog.notice("didCompleteWithError: \(error?.localizedDescription ?? "nil", privacy: .public)")
         self.task = nil
+        // Same reasoning as `start()`/`stop()`'s own `invalidateAndCancel()` calls — a bare
+        // `session = nil` here would drop our reference but leave `URLSession` holding its own
+        // strong reference to `self` as delegate alive indefinitely, since this was the one place
+        // that nilled `session` without invalidating it first.
+        self.session?.invalidateAndCancel()
         self.session = nil
     }
 
     private func handle(line: String) {
         guard line.hasPrefix("data:") else { return }
-        let jsonText = line.dropFirst("data:".count).trimmingCharacters(in: .whitespaces)
+        // `.whitespacesAndNewlines`, not `.whitespaces` — lines are split on bare `\n` above, so a
+        // CRLF-terminated line would leave a trailing `\r` that `.whitespaces` alone doesn't strip
+        // (`\r`/`\n` are in `CharacterSet.newlines`, not `.whitespaces`).
+        let jsonText = line.dropFirst("data:".count).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let jsonData = jsonText.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
               // ntfy also sends "open" (on connect) and "keepalive" (periodic) events over the same

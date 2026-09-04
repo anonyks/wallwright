@@ -70,7 +70,15 @@ enum ThumbnailDownsampler {
         ]
         guard let cgThumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
 
-        let image = NSImage(cgImage: cgThumbnail, size: .zero)
+        // A real size, not `.zero` — `NSImage(cgImage:size:)` stores whatever size it's given
+        // verbatim rather than deriving one from the backing `CGImage` (confirmed by the very real
+        // bug this already caused elsewhere: see `NSImage.jpegData`'s own doc comment on why it
+        // avoids `tiffRepresentation`, which draws into a context sized off this degenerate `.zero`).
+        // `ThumbnailImage`'s cache-cost accounting reads this exact `.size` to decide how much of
+        // `thumbnailImageCache`'s 64MB budget each entry counts against — with `.zero`, every single
+        // thumbnail was recorded at cost 0, silently defeating that budget entirely (`NSCache`'s
+        // `countLimit` was the only thing still bounding it in practice).
+        let image = NSImage(cgImage: cgThumbnail, size: NSSize(width: cgThumbnail.width, height: cgThumbnail.height))
         let pixelsWide = realSize?.width ?? cgThumbnail.width
         let pixelsHigh = realSize?.height ?? cgThumbnail.height
         return (image, pixelsWide, pixelsHigh)
@@ -100,7 +108,8 @@ enum ThumbnailDownsampler {
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         guard let cgThumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return NSImage(cgImage: cgThumbnail, size: .zero)
+        // Real size, not `.zero` — same fix and reasoning as `downsampledThumbnail(at:)` above.
+        return NSImage(cgImage: cgThumbnail, size: NSSize(width: cgThumbnail.width, height: cgThumbnail.height))
     }
 }
 
@@ -109,7 +118,16 @@ extension NSImage {
     /// uses — visually indistinguishable at thumbnail size, meaningfully smaller `preview.jpg`
     /// files on disk (less to read back on every future grid render, too).
     var jpegData: Data? {
-        guard let tiffData = tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiffData) else { return nil }
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
+        // Via the backing `CGImage` directly (`NSBitmapImageRep(cgImage:)`), not
+        // `tiffRepresentation` — confirmed live elsewhere in this app (see
+        // `AppDelegate.setPlacehoderWallpaper`'s own doc comment) that going through
+        // `tiffRepresentation` on an image constructed with `size: .zero` (which every caller of
+        // this property does — see `ThumbnailDownsampler`'s own `NSImage(cgImage:, size: .zero)`
+        // calls) produces a corrupted, grayscale, partially-mirrored render: `tiffRepresentation`
+        // draws into a context sized off the NSImage's own `size`, which is degenerate at `.zero`.
+        // `cgImage(forProposedRect:)` instead returns the already-decoded backing image directly,
+        // with no size-dependent redraw step to go wrong.
+        guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        return NSBitmapImageRep(cgImage: cgImage).representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 }
