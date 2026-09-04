@@ -140,8 +140,19 @@ final class FullscreenAppMonitor {
         // otherApplicationFullscreen "stop"/"pause" policy against Wallwright's own UI. Confirmed
         // live (2026-07-31): `allOccluded` stuck `true` continuously for 10+ minutes with no
         // lock/unlock or app-switch in that window, correlating with normal in-app use.
-        let ownWindowIsCovering = AppDelegate.shared.mainWindowController.window.isVisible
-            || AppDelegate.shared.settingsWindow.isVisible
+        //
+        // `isVisible` alone isn't enough: it reflects window-server order state, not the active
+        // Space, so a window left open on a Space the user has since switched away from still
+        // reports `isVisible == true` — wrongly suppressing a real other-app-fullscreen reading on
+        // the Space the user is actually on. `isOnActiveSpace` closes that gap. Deliberately NOT
+        // also requiring `isKeyWindow`: our window can be visible-but-unfocused on the active Space
+        // (e.g. user clicked into another app without closing it) and still be the thing visually
+        // covering the wallpaper — requiring key-ness would misread that as "other app fullscreen"
+        // again, the same failure mode this check exists to prevent.
+        let ownWindowIsCovering = (AppDelegate.shared.mainWindowController.window.isVisible
+            && AppDelegate.shared.mainWindowController.window.isOnActiveSpace)
+            || (AppDelegate.shared.settingsWindow.isVisible
+                && AppDelegate.shared.settingsWindow.isOnActiveSpace)
         let effectiveOtherAppFullscreen = allOccluded && !ownWindowIsCovering
         wallpaperDebugLog.notice("FullscreenAppMonitor.recompute() — allOccluded=\(allOccluded), ownWindowIsCovering=\(ownWindowIsCovering), was isOtherAppFullscreen=\(self.isOtherAppFullscreen)")
 

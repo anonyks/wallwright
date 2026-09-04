@@ -92,19 +92,11 @@ final class WallperViewModel: ObservableObject {
     }
 
     private func markAlreadyDownloaded() {
-        // Full library scan+decode moved off the main thread — see MotionBgsViewModel's identical
-        // fix and its doc comment for why (this ran synchronously on main after every page load,
-        // category switch, and search).
-        let currentItems = allItems
-        DispatchQueue.global(qos: .utility).async {
-            let index = WallperService.existingLibraryIndex()
-            let matchedIds = currentItems
-                .filter { index.sourceIds.contains($0.id) || index.titles.contains($0.title.lowercased()) }
-                .map(\.id)
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                for id in matchedIds { self.downloadState[id] = .completed }
-            }
+        // Reads the already-in-memory library instead of re-scanning disk — see
+        // `MotionBgsViewModel.markAlreadyDownloaded()`'s identical fix and doc comment.
+        let index = WallperService.existingLibraryIndex(wallpapers: AppDelegate.shared.contentViewModel.wallpapers)
+        for item in allItems where index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
+            downloadState[item.id] = .completed
         }
     }
 

@@ -55,11 +55,18 @@ final class BatteryMonitor {
 
     /// IOKit can fire this notification more than once for a single physical plug/unplug (and a
     /// flaky connector can bounce a few times in quick succession) — debounced the same way
-    /// FullscreenAppMonitor debounces its own occlusion notifications, so a burst of events settles
-    /// into exactly one state check instead of several.
+    /// FullscreenAppMonitor debounces its own occlusion notifications: only schedule when nothing
+    /// is already pending, rather than cancel-and-reschedule on every event. Cancel-and-reschedule
+    /// against a rolling window can be deferred indefinitely as long as events keep arriving inside
+    /// each window — confirmed live (2026-07-30) for FullscreenAppMonitor's occlusion notifications
+    /// during a lock/unlock cycle. Scheduling only when idle bounds this to firing 5s after the
+    /// *first* event in a burst, no matter how much further bouncing follows.
     private func scheduleTick() {
-        pendingTickWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in self?.tick() }
+        guard pendingTickWorkItem == nil else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingTickWorkItem = nil
+            self?.tick()
+        }
         pendingTickWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
     }

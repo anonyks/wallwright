@@ -63,7 +63,15 @@ struct SteamWorkshopImportSheet: View {
                 }
                 Spacer()
                 Button(model.downloadResult != nil ? "Cancel" : "Close") {
+                    // Same "declined, no reason to keep the download" reasoning as
+                    // `ContentViewModel.skipCurrentPackageImport()` — deliberately unconditional,
+                    // unlike `cleanupScratchSource`'s temp-directory guard, since this is Steam's
+                    // own Workshop download rather than a throwaway scratch copy.
+                    if let downloadResult = model.downloadResult {
+                        try? FileManager.default.removeItem(at: downloadResult.contentDirectory)
+                    }
                     viewModel.isSteamWorkshopImportReveal = false
+                    model.reset()
                 }
             }
         }

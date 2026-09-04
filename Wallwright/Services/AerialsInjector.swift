@@ -166,6 +166,7 @@ final class AerialsInjector {
             // already correct from the first call, nothing here needs updating.
             return
         }
+        let previousInjectedURL = lastInjectedURL
         lastVideoURL = videoURL
         lastVideoName = name
         lastInjectedURL = videoURL
@@ -180,10 +181,17 @@ final class AerialsInjector {
         // forever afterward, permanently skipping the copy and leaving the aerial pointing at a
         // file that no longer exists — the exact self-healing case `checkHealth()`'s timer exists
         // for, which this was silently defeating.
+        //
+        // Also force a re-copy whenever the URL itself differs from the last injection
+        // (`previousInjectedURL`, captured above *before* `lastInjectedURL` gets overwritten a few
+        // lines up — comparing against the already-reassigned property here would always read as
+        // unchanged). Two genuinely different source videos can happen to share an identical byte
+        // size (e.g. same fixed-bitrate encode), which would otherwise leave `videoChanged` false
+        // and the aerial silently stuck on the previous video's content.
         let previousUUID = aerialsAssetID
         let previousDestExists = previousUUID.map { fm.fileExists(atPath: (videosDir as NSString).appendingPathComponent("\($0).mov")) } ?? false
         let srcSize = (try? fm.attributesOfItem(atPath: videoURL.path)[.size] as? Int) ?? -1
-        let videoChanged = srcSize != lastInjectedSourceSize || !previousDestExists
+        let videoChanged = videoURL != previousInjectedURL || srcSize != lastInjectedSourceSize || !previousDestExists
 
         // Mint a FRESH asset UUID whenever the video content actually changes, rather than reusing
         // the previous one. Confirmed live (2026-07-31): reusing the same UUID across genuinely

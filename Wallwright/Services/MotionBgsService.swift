@@ -226,21 +226,17 @@ final class MotionBgsService {
         let titles: Set<String>
     }
 
-    /// Scans the wallpapers directory once and returns both matching signals, so the UI can show
-    /// "Added" instead of "Download" for duplicates instead of re-downloading and wasting
-    /// storage/bandwidth — including for wallpapers downloaded before this tracking existed.
-    static func existingLibraryIndex() -> ExistingLibraryIndex {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(at: fm.wallpapersDirectory, includingPropertiesForKeys: nil) else {
-            return ExistingLibraryIndex(sourceIds: [], titles: [])
-        }
+    /// Builds both matching signals from the already-in-memory library (`ContentViewModel.wallpapers`
+    /// — every wallpaper's `project.json` is decoded once at refresh time and held in RAM), so the UI
+    /// can show "Added" instead of "Download" for duplicates without re-downloading and wasting
+    /// storage/bandwidth — including for wallpapers downloaded before this tracking existed. Used to
+    /// re-scan `wallpapersDirectory` and re-decode every `project.json` from disk on every page load,
+    /// category switch, and search — this is that same data, already parsed, for free.
+    static func existingLibraryIndex(wallpapers: [WEWallpaper]) -> ExistingLibraryIndex {
         var sourceIds = Set<Int>()
         var titles = Set<String>()
-        for entry in entries {
-            guard let data = try? Data(contentsOf: entry.appending(path: "project.json")),
-                  let project = try? JSONDecoder().decode(WEProject.self, from: data)
-            else { continue }
-
+        for wallpaper in wallpapers {
+            let project = wallpaper.project
             titles.insert(project.title.lowercased())
 
             if project.sourceProvider == "motionbgs",

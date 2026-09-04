@@ -114,9 +114,14 @@ enum SteamWorkshopService {
             throw SteamWorkshopError.downloadFailed("Couldn't load that Workshop page")
         }
 
-        let title = extractMetaContent(property: "og:title", html: html)?
+        // `og:title` comes back with HTML entities intact (`&quot;`, `&#39;`, `&amp;`, ...) — Steam
+        // doesn't pre-decode its own meta tags. This is only the preview's title (shown before the
+        // user commits to downloading); the item actually downloads with its own `project.json`
+        // title straight from Wallpaper Engine's package metadata, which never passes through this
+        // scraped HTML at all. Same decoding approach as `AlphaCodersService`/`DesktopHutService`.
+        let title = decodeHTMLEntities(extractMetaContent(property: "og:title", html: html)?
             .replacingOccurrences(of: "Steam Workshop::", with: "")
-            ?? "Workshop Item \(itemId)"
+            ?? "Workshop Item \(itemId)")
         let imageURLString = extractMetaContent(property: "og:image", html: html)?
             .replacingOccurrences(of: "&amp;", with: "&")
         let fileSizeText = extractLabeledStat(label: "File Size", html: html)
@@ -133,6 +138,19 @@ enum SteamWorkshopService {
         let afterProp = html[propRange.upperBound...]
         guard let endQuote = afterProp.range(of: "\"") else { return nil }
         return String(afterProp[..<endQuote.lowerBound])
+    }
+
+    /// Decodes HTML entities (`&quot;`, `&amp;`, ...) in scraped text via the HTML-document reader
+    /// rather than manual character replacement, since titles can contain arbitrary entities — same
+    /// approach as `AlphaCodersService`/`DesktopHutService`.
+    private static func decodeHTMLEntities(_ string: String) -> String {
+        guard let data = string.data(using: .utf8) else { return string }
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue,
+        ]
+        guard let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else { return string }
+        return attributed.string
     }
 
     /// Steam renders each stat as two parallel lists — `detailsStatLeft` labels ("File Size",

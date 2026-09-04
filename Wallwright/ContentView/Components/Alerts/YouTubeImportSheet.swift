@@ -123,7 +123,11 @@ struct YouTubeImportSheet: View {
             HStack {
                 Spacer()
                 Button(model.downloadResult != nil ? "Cancel" : "Close") {
+                    if let downloadResult = model.downloadResult {
+                        viewModel.cleanupScratchSource(downloadResult.fileURL)
+                    }
                     viewModel.isYouTubeImportReveal = false
+                    model.reset()
                 }
             }
         }

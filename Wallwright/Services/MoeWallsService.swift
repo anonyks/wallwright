@@ -202,18 +202,14 @@ final class MoeWallsService {
         let titles: Set<String>
     }
 
-    static func existingLibraryIndex() -> ExistingLibraryIndex {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(at: fm.wallpapersDirectory, includingPropertiesForKeys: nil) else {
-            return ExistingLibraryIndex(sourceIds: [], titles: [])
-        }
+    /// Reads the already-in-memory library (`ContentViewModel.wallpapers`) instead of re-scanning
+    /// `wallpapersDirectory` and re-decoding every `project.json` from disk — see
+    /// `MotionBgsService.existingLibraryIndex(wallpapers:)`'s doc comment.
+    static func existingLibraryIndex(wallpapers: [WEWallpaper]) -> ExistingLibraryIndex {
         var sourceIds = Set<Int>()
         var titles = Set<String>()
-        for entry in entries {
-            guard let data = try? Data(contentsOf: entry.appending(path: "project.json")),
-                  let project = try? JSONDecoder().decode(WEProject.self, from: data)
-            else { continue }
-
+        for wallpaper in wallpapers {
+            let project = wallpaper.project
             titles.insert(project.title.lowercased())
 
             if project.sourceProvider == "moewalls", let sourceId = project.sourceId, let id = Int(sourceId) {

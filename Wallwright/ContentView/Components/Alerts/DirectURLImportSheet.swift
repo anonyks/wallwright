@@ -68,7 +68,11 @@ struct DirectURLImportSheet: View {
             HStack {
                 Spacer()
                 Button(model.downloadedFileURL != nil ? "Cancel" : "Close") {
+                    if let downloadedFileURL = model.downloadedFileURL {
+                        viewModel.cleanupScratchSource(downloadedFileURL)
+                    }
                     viewModel.isDirectURLImportReveal = false
+                    model.reset()
                 }
             }
         }

@@ -156,23 +156,15 @@ final class MotionBgsViewModel: ObservableObject {
     /// Matches by source ID when available, falling back to title for wallpapers downloaded
     /// before source-ID tracking existed.
     private func markAlreadyDownloaded() {
-        // `existingLibraryIndex()` does a full `contentsOfDirectory` scan plus a `project.json`
-        // read+decode for every wallpaper in the library — this used to run synchronously on the
-        // main thread, from here, after every single page load, category switch, and search
-        // (`load()`/`loadNextPage()` above both call this), scaling with library size on every one
-        // of those. Same anti-pattern as `ContentViewModel.refresh()` already fixed elsewhere this
-        // session — the scan itself moves to a background queue; only the resulting
-        // `downloadState` assignment (cheap) comes back to the main actor.
-        let currentItems = items
-        DispatchQueue.global(qos: .utility).async {
-            let index = MotionBgsService.existingLibraryIndex()
-            let matchedIds = currentItems
-                .filter { index.sourceIds.contains($0.id) || index.titles.contains($0.title.lowercased()) }
-                .map(\.id)
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                for id in matchedIds { self.downloadState[id] = .completed }
-            }
+        // `existingLibraryIndex()` used to re-scan `wallpapersDirectory` and re-decode every
+        // wallpaper's `project.json` from disk, synchronously on the main thread, after every
+        // single page load, category switch, and search (`load()`/`loadNextPage()` above both call
+        // this), scaling with library size on every one of those. It now reads the same data out of
+        // `ContentViewModel.wallpapers` — already decoded, already in RAM — so this is cheap enough
+        // to run inline on the main actor with no dispatch at all.
+        let index = MotionBgsService.existingLibraryIndex(wallpapers: AppDelegate.shared.contentViewModel.wallpapers)
+        for item in items where index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
+            downloadState[item.id] = .completed
         }
     }
 

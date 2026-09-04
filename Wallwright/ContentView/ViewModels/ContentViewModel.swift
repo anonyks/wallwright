@@ -268,7 +268,11 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// user's own original file, which this must NOT touch — hence the temp-directory prefix
     /// check, not an unconditional delete). Removes the whole per-import scratch folder, not just
     /// the one file, since each import gets its own uniquely-named directory.
-    private func cleanupScratchSource(_ url: URL) {
+    ///
+    /// Not private: the YouTube/Direct URL import sheets download into this same scratch-directory
+    /// pattern (see `DirectURLImporter`/`YtDlpService`) before a `PendingImport` even exists, so
+    /// their Cancel buttons need to reach this directly too — same leak, just one step earlier.
+    func cleanupScratchSource(_ url: URL) {
         guard url.path.hasPrefix(FileManager.default.temporaryDirectory.path) else { return }
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
     }
@@ -467,16 +471,20 @@ class ContentViewModel: ObservableObject, DropDelegate {
                 return sortingSequence == .increase ? order == .orderedAscending : order == .orderedDescending
             }
         case .fileSize:
-            let sizes = Dictionary(uniqueKeysWithValues: items.map { ($0.wallpaperDirectory, $0.wallpaperSize) })
+            // `uniquingKeysWith:`, not `uniqueKeysWithValues:` — `wallpaperDirectory` should be
+            // unique per `refresh()`'s single-pass directory scan, but a raw-URL key is cheap
+            // insurance against a hard crash if that assumption ever breaks; either value is fine
+            // to keep since a true duplicate means the same wallpaper anyway.
+            let sizes = Dictionary(items.map { ($0.wallpaperDirectory, $0.wallpaperSize) }, uniquingKeysWith: { first, _ in first })
             return items.sorted {
                 let lhs = sizes[$0.wallpaperDirectory] ?? 0
                 let rhs = sizes[$1.wallpaperDirectory] ?? 0
                 return sortingSequence == .increase ? lhs < rhs : lhs > rhs
             }
         case .estimatedImpact:
-            let impacts = Dictionary(uniqueKeysWithValues: items.map {
+            let impacts = Dictionary(items.map {
                 ($0.wallpaperDirectory, WallpaperImpactEstimator.estimate(for: $0).rawValue)
-            })
+            }, uniquingKeysWith: { first, _ in first })
             return items.sorted {
                 let lhs = impacts[$0.wallpaperDirectory] ?? 0
                 let rhs = impacts[$1.wallpaperDirectory] ?? 0

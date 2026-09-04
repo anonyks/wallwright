@@ -75,6 +75,9 @@ struct CommandPaletteView: SubviewOfContentView {
             },
             PaletteRow(id: "AlphaCoders", icon: "star.fill", title: "AlphaCoders", subtitle: "Image source", matchText: "alphacoders image") {
                 self.viewModel.topTabBarSelection = 6
+            },
+            PaletteRow(id: "Inbox", icon: "tray.and.arrow.down.fill", title: "Inbox", subtitle: "", matchText: "inbox links pending") {
+                self.viewModel.topTabBarSelection = 7
             }
         ]
     }
@@ -109,6 +112,18 @@ struct CommandPaletteView: SubviewOfContentView {
             },
             PaletteRow(id: "Settings", icon: "gearshape.fill", title: "Settings", subtitle: "⌘,", matchText: "settings preferences") {
                 AppDelegate.shared.openSettingsWindow()
+            },
+            PaletteRow(id: "Next Wallpaper", icon: "forward.end.fill", title: "Next Wallpaper", subtitle: "", matchText: "next wallpaper skip playlist") {
+                AppDelegate.shared.skipToNextPlaylistItem()
+            },
+            PaletteRow(id: "Previous Wallpaper", icon: "backward.end.fill", title: "Previous Wallpaper", subtitle: "", matchText: "previous wallpaper skip playlist") {
+                AppDelegate.shared.skipToPreviousPlaylistItem()
+            },
+            PaletteRow(id: "Play/Pause", icon: "playpause.fill", title: "Play/Pause", subtitle: "", matchText: "play pause resume wallpaper") {
+                AppDelegate.shared.togglePause()
+            },
+            PaletteRow(id: "Mute/Unmute", icon: "speaker.slash.fill", title: "Mute/Unmute Audio", subtitle: "", matchText: "mute unmute audio volume") {
+                AppDelegate.shared.toggleMute()
             }
         ]
     }
