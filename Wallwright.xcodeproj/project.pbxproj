@@ -46,6 +46,7 @@
 		5EFBB0BB2A2F10EA00E39BEC /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFBB0BA2A2F10EA00E39BEC /* main.swift */; };
 		5EFC591D2A81ACBC005F97E2 /* StatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC591C2A81ACBC005F97E2 /* StatusBar.swift */; };
 		5EFC591F2A81ACC3005F97E2 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC591E2A81ACC3005F97E2 /* MainMenu.swift */; };
+		911B0F8DA50C1675B54A303B /* VideoBlackFrameDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9D198BDBED959A1180A1844 /* VideoBlackFrameDetector.swift */; };
 		AA1B2C3D4E5F600200ABCD05 /* SpriteKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */; };
 		BB0000000000000000000003 /* ObjCExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* ObjCExceptionCatcher.m */; };
 		BC47E385AF42386CC33C75C7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 957985CF80A1727A04F904D2 /* Foundation.framework */; };
@@ -194,6 +195,7 @@
 		8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCropDetectorTests.swift; sourceTree = "<group>"; };
 		8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HotkeyTests.swift; sourceTree = "<group>"; };
 		957985CF80A1727A04F904D2 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		A9D198BDBED959A1180A1844 /* VideoBlackFrameDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoBlackFrameDetector.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SpriteKit.framework; path = System/Library/Frameworks/SpriteKit.framework; sourceTree = SDKROOT; };
 		B4AD1D0F2AA24E8200471AC8 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* ObjCExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCExceptionCatcher.h; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 				EE0000000000000000000042 /* DirectURLImportViewModel.swift */,
 				EE0000000000000000000050 /* WallperViewModel.swift */,
 				EE0000000000000000000038 /* SteamWorkshopImportViewModel.swift */,
+				A9D198BDBED959A1180A1844 /* VideoBlackFrameDetector.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -797,6 +800,7 @@
 				EE000000000000000000007B /* PopupHeader.swift in Sources */,
 				EE000000000000000000003B /* AppMotion.swift in Sources */,
 				EE0000000000000000000055 /* RetryingAsyncImage.swift in Sources */,
+				911B0F8DA50C1675B54A303B /* VideoBlackFrameDetector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

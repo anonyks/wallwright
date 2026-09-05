@@ -107,7 +107,7 @@ struct MotionBgsView: SubviewOfContentView {
         .padding(.vertical, 6)
         // 9, not 7 — matches the search field it sits beside in the same GlassEffectContainer, and
         // every other button/card corner radius across the app's other source-browser views.
-        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: RoundedRectangle(cornerRadius: 9))
+        .glassEffect(isSelected ? .regular : .identity, in: RoundedRectangle(cornerRadius: 9)) // no accentColor tint — reads gray on Graphite
     }
 
     private var categoryPicker: some View {
@@ -124,7 +124,7 @@ struct MotionBgsView: SubviewOfContentView {
                         .foregroundStyle(isSelected ? Color.primary : .secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: Capsule())
+                        .glassEffect(isSelected ? .regular : .identity, in: Capsule()) // no accentColor tint — reads gray on Graphite
                     }
                 }
             }

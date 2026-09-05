@@ -10,9 +10,17 @@ import SwiftUI
 struct ExplorerItem: SubviewOfContentView {
     
     @ObservedObject var viewModel: ContentViewModel
-    @ObservedObject var wallpaperViewModel: WallpaperViewModel
-    
+    // Deliberately NOT `@ObservedObject` — this object also carries `playRate`/`playVolume`
+    // (mutated continuously while dragging the sidebar's Volume/Playback Rate sliders), and
+    // `@ObservedObject` re-renders on ANY `@Published` change on the observed object, not just
+    // the one field (`currentWallpaper`) this view actually cares about. With 58+ grid items each
+    // independently subscribed, every slider tick was re-evaluating all of them. This view only
+    // ever needs to WRITE `nextCurrentWallpaper` (on tap); the one thing it needs to read
+    // (`isCurrent`) comes in as a plain value computed once by the parent instead.
+    let wallpaperViewModel: WallpaperViewModel
+
     var wallpaper: WEWallpaper
+    let isCurrent: Bool
 
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -20,7 +28,6 @@ struct ExplorerItem: SubviewOfContentView {
     private var cornerRadius: CGFloat { 10 }
 
     var body: some View {
-        let isCurrent = wallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaperViewModel.currentWallpaper.wallpaperDirectory)
         let isMultiSelected = viewModel.isSelected(wallpaper)
 
         // A real Button, not a ZStack + `.onTapGesture` — the latter left the entire grid (the

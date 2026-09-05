@@ -30,6 +30,10 @@ struct EditWallpaperSheet: SubviewOfContentView {
     /// bars found" — cleared the next time the sheet's opened for a (possibly different) wallpaper.
     @State private var cropResultMessage: String?
 
+    @State private var isAutoTrimming = false
+    /// Same idea as `cropResultMessage` — transient feedback after an Auto Trim attempt either way.
+    @State private var autoTrimResultMessage: String?
+
     @State private var isManualCropping = false
     /// Normalized (0...1) crop rectangle within the video's own native pixel frame — NOT within the
     /// fixed 340x191.25 box it's drawn in. `ThumbnailImage`'s `.aspectRatio(16/9, contentMode: .fit)`
@@ -307,13 +311,34 @@ struct EditWallpaperSheet: SubviewOfContentView {
                     .disabled(isSavingFrame)
                 }
                 HStack {
-                    Button("Set Trim Start", action: setTrimStart)
-                    Button("Set Trim End", action: setTrimEnd)
+                    Button("Set Start", action: setTrimStart)
+                    Button("Set End", action: setTrimEnd)
+                    // Finds a fade-in/fade-out black stretch and sets both trim points itself,
+                    // rather than scrubbing by hand to find where the real content starts/ends —
+                    // most useful for exactly what "Set Trim Start/End" are least suited to: a
+                    // gradual fade rather than a sharp cut, where there's no single frame that's
+                    // obviously "the" boundary to scrub to.
+                    Button("Auto Trim") {
+                        Task { await autoTrimBlackFrames() }
+                    }
+                    .disabled(isAutoTrimming || project.videoDuration == nil)
+                    if isAutoTrimming {
+                        ProgressView().controlSize(.small)
+                    }
                     Spacer()
                     if project.trimStart != nil || project.trimEnd != nil {
                         Text(trimRangeText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                }
+                if let autoTrimResultMessage {
+                    HStack {
+                        Spacer()
+                        Text(autoTrimResultMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
                 }
             } else if isManualCropping {
@@ -451,6 +476,29 @@ struct EditWallpaperSheet: SubviewOfContentView {
         guard seconds.isFinite, seconds >= 0 else { return }
         if let start = project.trimStart, seconds <= start { return }
         updateProject { $0.trimEnd = seconds }
+    }
+
+    private func autoTrimBlackFrames() async {
+        guard let duration = project.videoDuration else { return }
+        isAutoTrimming = true
+        autoTrimResultMessage = nil
+        defer { isAutoTrimming = false }
+        let url = wallpaper.wallpaperDirectory.appending(path: project.file)
+        guard let result = await VideoBlackFrameDetector.detectBlackTrim(at: url, duration: duration) else {
+            autoTrimResultMessage = "No black fade-in/fade-out found"
+            return
+        }
+        updateProject {
+            if let trimStart = result.trimStart { $0.trimStart = trimStart }
+            if let trimEnd = result.trimEnd { $0.trimEnd = trimEnd }
+        }
+        // Built from `result` directly, not the reactive `trimRangeText` — `wallpaper` is a plain
+        // value-type property on this view, so it won't reflect `updateProject`'s change until
+        // SwiftUI re-renders with fresh parameters, which hasn't happened yet at this point in the
+        // same function call.
+        let startText = result.trimStart.map(Self.formatTime) ?? project.trimStart.map(Self.formatTime) ?? "—"
+        let endText = result.trimEnd.map(Self.formatTime) ?? project.trimEnd.map(Self.formatTime) ?? "—"
+        autoTrimResultMessage = "Trimmed \(startText) – \(endText)"
     }
 
     /// Re-encodes the file in place, so unlike trim (a playback-time constraint, easy to preview

@@ -98,7 +98,10 @@ struct UhdPaperView: SubviewOfContentView {
                         .foregroundStyle(isSelected ? Color.primary : .secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: Capsule())
+                        // No `.tint(.accentColor)` — reads as a flat gray-white pill on the
+                        // Graphite system accent instead of a translucent lens (same fix as the
+                        // main window's other glass controls).
+                        .glassEffect(isSelected ? .regular : .identity, in: Capsule())
                     }
                 }
             }

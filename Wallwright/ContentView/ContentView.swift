@@ -150,6 +150,17 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
+                // This column was relying entirely on SwiftUI's automatic top safe-area inset for
+                // clearance under the transparent title bar — nothing here gave it a fixed value of
+                // its own. That inset isn't a stable constant: opening any of the Displays/Clock/
+                // Playlist/Import popups adds another `.ignoresSafeArea()` view (the dimming scrim)
+                // as a sibling in the same outer `ZStack`, which changed how much top inset SwiftUI
+                // reported here — confirmed live (2026-09-05) as the whole toolbar/search/grid
+                // column visibly jumping up while a popup was open. Ignoring the safe area here and
+                // supplying the standard title-bar height explicitly makes this immune to whatever
+                // else is going on elsewhere in the ZStack.
+                .padding(.top, 28)
+                .ignoresSafeArea(.container, edges: .top)
                 WallpaperPreview(contentViewModel: viewModel, wallpaperViewModel: wallpaperViewModel)
                     .frame(maxWidth: 320)
                     // Scoped to just this panel (via `.overlay`, sized to its own bounds) rather
@@ -170,6 +181,12 @@ struct ContentView: View {
                                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                         }
                     }
+                    // Same fix as the left column's — this panel relied on the same ambient top
+                    // safe-area inset for its own clearance, so it jumped up right along with the
+                    // toolbar/grid whenever a popup's scrim added another `.ignoresSafeArea()`
+                    // sibling. Confirmed live (2026-09-05).
+                    .padding(.top, 28)
+                    .ignoresSafeArea(.container, edges: .top)
             }
             // The scrim below blocks *clicks* on the grid underneath via its own tap gesture, but
             // `.onHover` uses separate hit-testing that a semi-transparent Color layer with just a

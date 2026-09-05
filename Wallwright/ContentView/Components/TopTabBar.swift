@@ -90,8 +90,10 @@ struct TopTabBar: SubviewOfContentView {
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .foregroundStyle(isVideoSourcesActive ? Color.primary : .secondary)
+        // No `.tint(.accentColor)` — matching the Pause/Open Wallpaper fix, a tint here reads as a
+        // flat gray-white chip on the Graphite system accent instead of a translucent lens.
         .glassEffect(
-            isVideoSourcesActive ? .regular.tint(.accentColor).interactive() : .identity,
+            isVideoSourcesActive ? .regular.interactive() : .identity,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .glassEffectID(10, in: glassNamespace)
@@ -116,8 +118,10 @@ struct TopTabBar: SubviewOfContentView {
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .foregroundStyle(isImageSourcesActive ? Color.primary : .secondary)
+        // No `.tint(.accentColor)` — matching the Pause/Open Wallpaper fix, a tint here reads as a
+        // flat gray-white chip on the Graphite system accent instead of a translucent lens.
         .glassEffect(
-            isImageSourcesActive ? .regular.tint(.accentColor).interactive() : .identity,
+            isImageSourcesActive ? .regular.interactive() : .identity,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .glassEffectID(11, in: glassNamespace)

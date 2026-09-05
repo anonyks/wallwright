@@ -133,7 +133,7 @@ struct FilterResults: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? Color.primary : .secondary)
-        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: RoundedRectangle(cornerRadius: 8))
+        .glassEffect(isSelected ? .regular : .identity, in: RoundedRectangle(cornerRadius: 8)) // no accentColor tint — reads gray on Graphite
     }
 
     private var staticFilterRow: some View {
@@ -160,7 +160,7 @@ struct FilterResults: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? Color.primary : .secondary)
-        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: RoundedRectangle(cornerRadius: 8))
+        .glassEffect(isSelected ? .regular : .identity, in: RoundedRectangle(cornerRadius: 8)) // no accentColor tint — reads gray on Graphite
     }
 
     private func tagRow(_ tag: String) -> some View {
@@ -189,6 +189,6 @@ struct FilterResults: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? Color.primary : .secondary)
-        .glassEffect(isSelected ? .regular.tint(.accentColor) : .identity, in: RoundedRectangle(cornerRadius: 8))
+        .glassEffect(isSelected ? .regular : .identity, in: RoundedRectangle(cornerRadius: 8)) // no accentColor tint — reads gray on Graphite
     }
 }

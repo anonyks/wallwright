@@ -47,7 +47,12 @@ struct WallpaperExplorer: SubviewOfContentView {
                     // import landing mid-list), which can transiently show a card's hover/border
                     // `@State` and in-flight thumbnail `.task` against the wrong wallpaper.
                     ForEach(items) { wallpaper in
-                        ExplorerItem(viewModel: viewModel, wallpaperViewModel: wallpaperViewModel, wallpaper: wallpaper)
+                        ExplorerItem(
+                            viewModel: viewModel,
+                            wallpaperViewModel: wallpaperViewModel,
+                            wallpaper: wallpaper,
+                            isCurrent: wallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaperViewModel.currentWallpaper.wallpaperDirectory)
+                        )
                             .contextMenu {
                                 ExplorerItemMenu(contentViewModel: viewModel, wallpaperViewModel: wallpaperViewModel, current: wallpaper)
                             }

@@ -604,7 +604,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let asset = AVURLAsset(url: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file))
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
-            
+            // Nothing downstream (Dock's menu-bar tint sampling, System Settings' wallpaper
+            // thumbnail) needs more than this — uncapped, a 4K source produces a multi-ten-MB
+            // uncompressed TIFF on every single wallpaper switch for zero visible benefit.
+            imageGenerator.maximumSize = CGSize(width: 1920, height: 1080)
+
             let time = CMTimeMake(value: 1, timescale: 1) // 第一帧的时间
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, cgImage, _, _, error in
                 if let error = error {
@@ -617,7 +621,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     // Settings' Wallpaper pane. AerialsInjector's own thumbnail generation uses
                     // this same direct NSBitmapImageRep path and has never shown this problem.
                     let rep = NSBitmapImageRep(cgImage: cgImage)
-                    if let data = rep.representation(using: .tiff, properties: [:]) {
+                    // LZW is lossless (unlike the corrupted-render regression this whole method's
+                    // NSBitmapImageRep path was already written to avoid — see the comment above),
+                    // just compressed — cuts the written file size substantially with no quality
+                    // loss on top of the `maximumSize` cap above.
+                    if let data = rep.representation(using: .tiff, properties: [.compressionMethod: NSBitmapImageRep.TIFFCompression.lzw.rawValue]) {
                         do {
                             // Alternates between two fixed filenames rather than always the same
                             // one — see `usePlaceholderFilenameA`'s own doc comment for why. Still

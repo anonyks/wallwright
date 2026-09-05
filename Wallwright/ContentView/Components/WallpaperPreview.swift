@@ -357,7 +357,13 @@ struct WallpaperPreview: SubviewOfContentView {
                     await loadVideoInfo()
                 }
                 .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { tick in
-                    dynamicFrameTick = tick
+                    // Only actually needed to re-evaluate `dynamicFrameText`, which already early-
+                    // returns for anything but a Dynamic Desktop HEIC — mutating `dynamicFrameTick`
+                    // regardless of wallpaper type invalidated this whole view once a minute even
+                    // while looking at an ordinary video/image.
+                    if wallpaperViewModel.currentWallpaper.project.isDynamicDesktop == true {
+                        dynamicFrameTick = tick
+                    }
                 }
             }
 

@@ -245,41 +245,65 @@ enum VideoImporter {
         projectData.sourceId = sourceId
         projectData.dateAdded = ISO8601DateFormatter().string(from: Date())
 
-        let asset = AVURLAsset(url: url)
-        let imageGenerator = AVAssetImageGenerator(asset: asset)
-        imageGenerator.appliesPreferredTrackTransform = true
-        imageGenerator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
-        let time = CMTimeMake(value: 1, timescale: 1)
-        imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, cgImage, _, _, error in
-            guard error == nil, let cgImage = cgImage,
+        Task {
+            // Same fix `PackageImporter.commitImport` already needed (see its own doc comment) — a
+            // browse-source download can hand back a codec/container AVFoundation can't decode
+            // (VP9/AV1, WebM, MKV — all fine on the source site, none playable here), which
+            // previously copied straight in, "successfully" registering a wallpaper that shows a
+            // black/frozen desktop the moment it's set, and silently misreports `hasAudio` false
+            // (probeVideoMetadata's track-load `try?` swallows the same decode failure). Runs
+            // against the just-copied file inside our own `destination`, not the caller's original
+            // `url` (someone else's scratch download this function doesn't own) — `deleteSourceOnSuccess: true`
+            // since that copy is already ours to manage.
+            let videoURL = destination.appending(path: filename)
+            let playableURL: URL
+            do {
+                (playableURL, _) = try await VideoTranscoder.ensureCompatible(
+                    videoURL, outputDirectory: destination, deleteSourceOnSuccess: true
+                )
+            } catch {
+                print("VideoImporter: transcode failed: \(error)")
+                try? FileManager.default.removeItem(at: destination)
+                await MainActor.run { completion(false) }
+                return
+            }
+            if playableURL != videoURL {
+                projectData.file = playableURL.lastPathComponent
+            }
+
+            let asset = AVURLAsset(url: playableURL)
+            let imageGenerator = AVAssetImageGenerator(asset: asset)
+            imageGenerator.appliesPreferredTrackTransform = true
+            imageGenerator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
+            let time = CMTimeMake(value: 1, timescale: 1)
+            guard let cgImage = try? await imageGenerator.image(at: time).image,
                   let data = NSBitmapImageRep(cgImage: cgImage)
                     .representation(using: .jpeg, properties: [.compressionFactor: 0.85])
             else {
                 try? FileManager.default.removeItem(at: destination)
-                DispatchQueue.main.async { completion(false) }
+                await MainActor.run { completion(false) }
                 return
             }
-            Task {
-                let metadata = await probeVideoMetadata(asset: asset)
-                projectData.videoWidth = metadata.width
-                projectData.videoHeight = metadata.height
-                projectData.hasAudio = metadata.hasAudio
-                projectData.videoDuration = metadata.duration
-                let videoAttributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-                let videoBytes = (videoAttributes?[.size] as? Int64) ?? 0
-                projectData.packageSizeBytes = videoBytes + Int64(data.count)
 
-                await MainActor.run {
-                    do {
-                        try data.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
-                        try JSONEncoder().encode(projectData).write(to: destination.appending(path: "project.json"), options: .atomic)
-                        notifyLibraryChanged()
-                        completion(true)
-                    } catch {
-                        print("VideoImporter: write failed: \(error)")
-                        try? FileManager.default.removeItem(at: destination)
-                        completion(false)
-                    }
+            let metadata = await probeVideoMetadata(asset: asset)
+            projectData.videoWidth = metadata.width
+            projectData.videoHeight = metadata.height
+            projectData.hasAudio = metadata.hasAudio
+            projectData.videoDuration = metadata.duration
+            let videoAttributes = try? FileManager.default.attributesOfItem(atPath: playableURL.path)
+            let videoBytes = (videoAttributes?[.size] as? Int64) ?? 0
+            projectData.packageSizeBytes = videoBytes + Int64(data.count)
+
+            await MainActor.run {
+                do {
+                    try data.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
+                    try JSONEncoder().encode(projectData).write(to: destination.appending(path: "project.json"), options: .atomic)
+                    notifyLibraryChanged()
+                    completion(true)
+                } catch {
+                    print("VideoImporter: write failed: \(error)")
+                    try? FileManager.default.removeItem(at: destination)
+                    completion(false)
                 }
             }
         }
