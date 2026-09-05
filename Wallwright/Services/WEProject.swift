@@ -177,11 +177,19 @@ struct WEWallpaper: Codable, RawRepresentable, Identifiable {
     /// `ThumbnailImage`'s decoded-bitmap cache does.
     private static let wallpaperSizeMemo = NSCache<NSString, NSNumber>()
 
+    /// Shared across every `dateAdded` call — `ISO8601DateFormatter` construction does real ICU
+    /// locale/calendar setup, not a cheap struct init. `dateAdded` is read once per wallpaper on
+    /// every "Recently Added" sort (`ContentViewModel.sortedWallpapers`'s decorate-sort-undecorate
+    /// pass), so a library of any real size was constructing a fresh formatter per item, per sort,
+    /// on the main thread — read-only use (`.date(from:)`, never reconfigured after init) is safe
+    /// to share from the single thread (main) this is always called on.
+    private static let isoDateFormatter = ISO8601DateFormatter()
+
     /// When this wallpaper was added to the library, used for the "Recently Added" sort. Prefers
     /// `project.dateAdded` (set by every importer at commit time) — falls back to the package
     /// directory's filesystem creation date only for wallpapers imported before that field existed.
     var dateAdded: Date? {
-        if let raw = project.dateAdded, let parsed = ISO8601DateFormatter().date(from: raw) {
+        if let raw = project.dateAdded, let parsed = Self.isoDateFormatter.date(from: raw) {
             return parsed
         }
         return try? wallpaperDirectory.resourceValues(forKeys: [.creationDateKey]).creationDate

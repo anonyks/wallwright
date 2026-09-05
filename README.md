@@ -8,11 +8,8 @@ Video wallpapers on your desktop, lock screen, and screensaver — all in sync, 
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#build--run)
 [![Latest release](https://img.shields.io/github/v/release/anonyks/wallwright)](https://github.com/anonyks/wallwright/releases/latest)
-
-<!-- Add a screenshot or a short demo GIF here — a wallpaper engine is a visual product and this
-is the single highest-leverage thing missing from this README. A 5-10s screen recording of a
-video wallpaper playing, converted to GIF, in the space below, does more for this project than
-anything else in this file. -->
+[![GitHub stars](https://img.shields.io/github/stars/anonyks/wallwright?style=flat&color=yellow)](https://github.com/anonyks/wallwright/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/anonyks/wallwright?style=flat)](https://github.com/anonyks/wallwright/fork)
 
 </div>
 
@@ -90,7 +87,9 @@ Prefer to build it yourself, or want to modify it? See [Build & Run](#build--run
 
 ## External Tools
 
-Optional, used only by the feature that needs them.
+Optional, used only by the feature that needs them. Wallwright looks for each one at the
+standard Homebrew locations (`/opt/homebrew/bin`, `/usr/local/bin`) and `/usr/bin`, falling back
+to `which` — a plain `brew install` is enough, no PATH setup needed.
 
 | Tool | Used for | Install |
 |---|---|---|

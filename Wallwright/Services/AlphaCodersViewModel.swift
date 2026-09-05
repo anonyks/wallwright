@@ -165,7 +165,14 @@ final class AlphaCodersViewModel: ObservableObject {
     }
 
     func download(item: AlphaCodersItem) {
-        guard downloadState[item.id] != .completed else { return }
+        // Only checking `!= .completed` let a double-click (or a second click before the button's
+        // own state has visibly updated) pass straight through while a download/import was already
+        // in flight for the same item — two concurrent `Task`s downloading and importing the same
+        // source into two separate destinations, racing each other's progress reporting.
+        switch downloadState[item.id] {
+        case .downloading, .importing: return
+        default: break
+        }
         downloadState[item.id] = .downloading(nil)
         Task {
             do {

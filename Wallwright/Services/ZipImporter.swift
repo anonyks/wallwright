@@ -1,10 +1,10 @@
 import Foundation
 
 enum ZipImporter {
-    /// Extracts a zip file and copies any wallpaper folders (containing project.json) to the wallpapers directory.
-    /// Returns the number of wallpapers successfully imported.
+    /// Extracts a zip file and imports any wallpaper folders (containing project.json) into the
+    /// library. Returns the number of wallpapers successfully imported.
     @discardableResult
-    static func importZip(at zipURL: URL) -> Int {
+    static func importZip(at zipURL: URL) async -> Int {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appending(path: UUID().uuidString)
 
@@ -31,34 +31,29 @@ enum ZipImporter {
         var imported = 0
 
         for url in wallpaperURLs {
-            // Only video/image wallpapers are supported — skip anything else (scene, web, ...)
-            // rather than importing a package with nothing that can actually render it.
-            guard let data = try? Data(contentsOf: url.appending(path: "project.json")),
-                  let project = try? JSONDecoder().decode(WEProject.self, from: data),
-                  project.isSupportedType
-            else {
-                print("ZipImporter: skipping \(url.lastPathComponent) — unsupported wallpaper type")
+            // Was a raw `FileManager.copyItem` straight to `uniqueWallpaperDestination` — unlike
+            // every other package import path (Steam Workshop, drag-and-drop onto the library
+            // window), this skipped `PackageImporter` entirely: no `VideoTranscoder
+            // .ensureCompatible` check (a zipped package with a VP9/AV1/MKV video — fine on
+            // Windows, none of it decodable by AVFoundation — imported "successfully" into an
+            // unplayable black wallpaper), and no metadata probing (`packageSizeBytes` staying nil
+            // forever meant every future sort/impact-badge render fell back to a live recursive
+            // directory walk for it). `preparePending` already handles the unsupported-type check
+            // and the title/directory-name fallback this used to do inline.
+            guard let pending = try? PackageImporter.preparePending(at: url) else {
+                print("ZipImporter: skipping \(url.lastPathComponent) — couldn't prepare (unsupported type, missing project.json, or no preview image)")
                 continue
             }
-
-            // Was `wallpapersDirectory.appending(path: url.lastPathComponent)` + `if
-            // !fileExists`, a silent no-op skip whenever the zip's internal folder name (often
-            // generic, not the wallpaper's real title) collided with anything already in the
-            // library. Named by the wallpaper's actual title instead, with a numeric suffix on
-            // collision rather than silently dropping the whole import.
-            let title = project.title.isEmpty ? url.lastPathComponent : project.title
-            let target = fm.uniqueWallpaperDestination(forTitle: title)
-            do {
-                try fm.copyItem(at: url, to: target)
+            if await PackageImporter.commitImport(pending) {
                 imported += 1
-            } catch {
-                print("ZipImporter: copy failed for \(url.lastPathComponent): \(error)")
+            } else {
+                print("ZipImporter: commit failed for \(url.lastPathComponent)")
             }
         }
 
-        if imported > 0 {
-            VideoImporter.notifyLibraryChanged()
-        }
+        // No separate `notifyLibraryChanged()` needed here — `PackageImporter.commitImport`
+        // already posts it per item, and `ContentViewModel`'s subscriber already debounces a burst
+        // of these into one refresh (see its own doc comment), same as importing several zips does.
         return imported
     }
 

@@ -660,7 +660,7 @@ class ContentViewModel: ObservableObject, DropDelegate {
                 // `waitUntilExit()`, which can take a long time for a large archive. Running that
                 // on the main thread froze the whole app (unresponsive window, no way to cancel)
                 // for as long as extraction took.
-                let count = await Task.detached(priority: .userInitiated) { ZipImporter.importZip(at: url) }.value
+                let count = await Task.detached(priority: .userInitiated) { await ZipImporter.importZip(at: url) }.value
                 if count == 0 {
                     alertImportModal(which: .doesNotContainWallpaper)
                 }

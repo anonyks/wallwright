@@ -51,8 +51,9 @@ extension AppDelegate {
             // all running synchronously on the main thread from the moment the panel closed.
             // Confirmed the same real freeze risk as the drag-and-drop zip path (see
             // `ContentViewModel.performDrop`'s identical fix) — several folders or a zip archive
-            // can make this take real, visible time.
-            DispatchQueue.global(qos: .userInitiated).async {
+            // can make this take real, visible time. `Task.detached`, not `DispatchQueue.global`,
+            // now that the wallpaper-folder loop below awaits `PackageImporter.commitImport`.
+            Task.detached(priority: .userInitiated) {
                 let fm = FileManager.default
 
                 var wallpaperURLs: [URL] = []
@@ -96,33 +97,21 @@ extension AppDelegate {
                     return
                 }
 
-                var copiedAny = false
+                // Was a raw `FileManager.copyItem` straight to `uniqueWallpaperDestination` —
+                // unlike every other package import path, this skipped `PackageImporter` entirely:
+                // no `VideoTranscoder.ensureCompatible` check (a folder with a VP9/AV1/MKV video —
+                // fine on Windows, none of it decodable by AVFoundation — imported "successfully"
+                // into an unplayable black wallpaper), and no metadata probing (`packageSizeBytes`
+                // staying nil forever meant every future sort/impact-badge render fell back to a
+                // live recursive directory walk for it). `preparePending` already handles the
+                // unsupported-type check and the title/directory-name fallback this used to do
+                // inline, and `commitImport` posts its own library-changed notification per item.
                 for url in wallpaperURLs {
-                    // Only video/image wallpapers are supported — skip anything else (scene, web,
-                    // ...) rather than importing a package with nothing that can actually render it.
-                    guard let data = try? Data(contentsOf: url.appending(path: "project.json")),
-                          let project = try? JSONDecoder().decode(WEProject.self, from: data),
-                          project.isSupportedType
-                    else { continue }
-
-                    // Was `wallpapersDirectory.appending(path: url.lastPathComponent)` + `if
-                    // !fileExists`, a silent no-op skip whenever the SOURCE folder's own name
-                    // (often a generic "wallpaper"/"content", or a Steam Workshop numeric ID — not
-                    // the wallpaper's real title) collided with anything already in the library.
-                    // Named by the wallpaper's actual title instead, with a numeric suffix on
-                    // collision rather than silently dropping the whole import.
-                    let title = project.title.isEmpty ? url.lastPathComponent : project.title
-                    let dest = fm.uniqueWallpaperDestination(forTitle: title)
-                    try? fm.copyItem(at: url, to: dest)
-                    copiedAny = true
-                }
-                if copiedAny {
-                    // Safe to post off-main — `ContentViewModel`'s subscriber already hops to
-                    // main via `.receive(on: DispatchQueue.main)`.
-                    VideoImporter.notifyLibraryChanged()
+                    guard let pending = try? PackageImporter.preparePending(at: url) else { continue }
+                    _ = await PackageImporter.commitImport(pending)
                 }
                 for url in zipURLs {
-                    ZipImporter.importZip(at: url)
+                    _ = await ZipImporter.importZip(at: url)
                 }
                 if !videoURLs.isEmpty {
                     Task { @MainActor in

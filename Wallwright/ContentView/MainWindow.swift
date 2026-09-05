@@ -8,6 +8,48 @@
 import Cocoa
 import SwiftUI
 
+/// A titled `NSWindow` that trades AppKit's default `constrainFrameRect` for a much looser one —
+/// used for every real, user-facing window in the app (the main library window, Settings) that
+/// still needs to stay reachable, unlike the fully-unconstrained `ClockOverlayWindow` (borderless,
+/// nothing lost if it's dragged somewhere odd — see its own doc comment). AppKit's stock behavior
+/// hard-stops a window's top edge right at the menu bar and keeps generous margins on every other
+/// edge too — much tighter than the "drag it anywhere, like other apps" feel a floating utility or
+/// media player usually has. This keeps that freedom while guaranteeing `minVisibleMargin` points
+/// of the window stay on-screen on whichever edge it's pushed against, so the title bar can always
+/// be grabbed back — a real window with close/minimize/zoom controls has no equivalent to the
+/// clock overlay's "nothing to lose" if it goes fully off-screen.
+class FreelyDraggableWindow: NSWindow {
+    private static let minVisibleMargin: CGFloat = 30
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        guard let screen else { return frameRect }
+        var rect = frameRect
+        let bounds = screen.frame
+        let margin = Self.minVisibleMargin
+
+        // Top: AppKit's own default clamps this hard at the menu bar (screen.visibleFrame.maxY) —
+        // relaxed here to the screen's actual physical top, still keeping `margin` points of the
+        // window (measured down from its top edge, where the title bar lives) reachable.
+        if rect.maxY > bounds.maxY + margin {
+            rect.origin.y = bounds.maxY + margin - rect.height
+        }
+        // Bottom: don't let the window drop so low its top (draggable) edge goes below the screen.
+        if rect.minY < bounds.minY - rect.height + margin {
+            rect.origin.y = bounds.minY - rect.height + margin
+        }
+        // Left/right: keep `margin` points horizontally reachable on whichever edge it's pushed
+        // against — AppKit's default already allows most of a window off-screen here, but this
+        // makes the bound explicit and consistent with the top/bottom handling above.
+        if rect.minX > bounds.maxX - margin {
+            rect.origin.x = bounds.maxX - margin
+        }
+        if rect.maxX < bounds.minX + margin {
+            rect.origin.x = bounds.minX + margin - rect.width
+        }
+        return rect
+    }
+}
+
 class MainWindowController: NSWindowController, NSWindowDelegate {
     override var window: NSWindow! {
         get {
@@ -17,9 +59,9 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
             super.window = newValue
         }
     }
-    
+
     override init(window: NSWindow?) {
-        super.init(window: NSWindow(
+        super.init(window: FreelyDraggableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false))

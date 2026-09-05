@@ -195,6 +195,18 @@ final class InboxLinksStore: ObservableObject {
     /// here, on the actual tap, rather than the moment the link arrived (see `classify`'s doc
     /// comment for why).
     func importLink(_ link: InboxLink) {
+        // Without this, tapping Import again while a link is already `.downloading` fell into the
+        // `.indirect` branch's `else` (status isn't `.resolved`) and re-ran `resolveIndirectLink` —
+        // a redundant `fetchInfo` metadata probe that overwrites the in-progress `.downloading`
+        // status with `.resolving`, then `.resolved`, even though the real download (and its
+        // progress reporting) is still running underneath. A THIRD tap, now seeing `.resolved`,
+        // would trigger `downloadIndirectLink` again — a genuine second concurrent `yt-dlp` process
+        // for the same URL. Guarding at the entry point stops the status-reverting step that makes
+        // the real duplicate-download reachable in the first place.
+        switch link.status {
+        case .downloading, .importing, .resolving: return
+        default: break
+        }
         switch link.kind {
         case .direct:
             importDirectLink(link)

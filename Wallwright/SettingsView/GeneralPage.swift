@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GeneralPage: SettingsPage {
     @ObservedObject var viewModel: GlobalSettingsViewModel
+    @State private var isResetConfirming = false
 
     init(globalSettings viewModel: GlobalSettingsViewModel) {
         self.viewModel = viewModel
@@ -47,7 +48,7 @@ struct GeneralPage: SettingsPage {
                     Text("Reset Config")
                     Spacer()
                     Button {
-                        viewModel.settings = GlobalSettings()
+                        isResetConfirming = true
                     } label: {
                         Text("Reset").frame(width: 100)
                     }
@@ -58,5 +59,21 @@ struct GeneralPage: SettingsPage {
                 Label("Reset", systemImage: "exclamationmark.triangle.fill")
             }
         }.formStyle(.grouped)
+        // A single click on "Reset" used to wipe every setting instantly — all 5 configurable
+        // global hotkeys, auto-start, clock overlay styling/position, every power-management
+        // trigger, saved Steam credentials — with no way back. Same `.confirmationDialog` pattern
+        // already used elsewhere in this app for other irreversible actions (e.g. removing a
+        // wallpaper from the library).
+        .confirmationDialog(
+            "Reset all settings to default?",
+            isPresented: $isResetConfirming,
+            titleVisibility: .visible
+        ) {
+            Button("Reset Config", role: .destructive) {
+                viewModel.settings = GlobalSettings()
+            }
+        } message: {
+            Text("This clears every hotkey, the clock overlay's styling and position, power-management triggers, and saved Steam credentials. This can't be undone.")
+        }
     }
 }

@@ -199,14 +199,41 @@ final class OtherAudioMonitor {
         for (bundleID, appName) in scriptableApps {
             guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else { continue }
             guard let script = NSAppleScript(source: "tell application \"\(appName)\" to player state as string") else { continue }
-            var error: NSDictionary?
-            let result = script.executeAndReturnError(&error)
-            guard error == nil else { continue }
-            if result.stringValue == "playing" {
+            guard let stringValue = runAppleScriptWithTimeout(script) else {
+                wallpaperDebugLog.notice("OtherAudioMonitor: Apple Event to \(appName, privacy: .public) timed out or errored — falling through")
+                continue
+            }
+            if stringValue == "playing" {
                 return true
             }
         }
         return nil
+    }
+
+    /// Apple Events sent via `NSAppleScript` have no configurable timeout of their own and can
+    /// legitimately block for the system's default (historically up to ~120s) if the target app
+    /// is hung, busy, or showing a blocking modal dialog. `poll()`'s own `isPolling` guard (see its
+    /// doc comment) treats "still running" as "don't start a new poll" — without bounding the wait
+    /// here, a single stuck query to Spotify/Music would silently disable ALL other-app-audio
+    /// detection, including the entirely unrelated CoreAudio fallback below, for however long the
+    /// hang lasts. This can't cancel the underlying Apple Event dispatch itself (`NSAppleScript`
+    /// exposes no such hook) — it only stops THIS poll cycle from waiting on it, so a hang degrades
+    /// to "no answer this cycle, fall through to CoreAudio" instead of stalling the whole monitor.
+    private static func runAppleScriptWithTimeout(_ script: NSAppleScript, timeout: TimeInterval = 3) -> String? {
+        let lock = NSLock()
+        var result: String?
+        let workItem = DispatchWorkItem {
+            var error: NSDictionary?
+            let descriptor = script.executeAndReturnError(&error)
+            lock.lock()
+            result = error == nil ? descriptor.stringValue : nil
+            lock.unlock()
+        }
+        DispatchQueue.global(qos: .utility).async(execute: workItem)
+        guard workItem.wait(timeout: .now() + timeout) == .success else { return nil }
+        lock.lock()
+        defer { lock.unlock() }
+        return result
     }
 
     /// Walks every process CoreAudio knows about and checks whether it has an active output

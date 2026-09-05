@@ -328,7 +328,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
 // MARK: Set Settings Window
     func setSettingsWindow() {
-        self.settingsWindow = NSWindow(
+        // `FreelyDraggableWindow`, not a plain `NSWindow` — see its own doc comment (MainWindow.swift):
+        // same reasoning as the main library window, just applied here too so Settings isn't stuck
+        // with AppKit's much tighter default `constrainFrameRect` while the main window isn't.
+        self.settingsWindow = FreelyDraggableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 300),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false)

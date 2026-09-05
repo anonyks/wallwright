@@ -37,73 +37,94 @@ struct ContentView: View {
             HSplitView {
                 VStack(spacing: 5) {
                     TopTabBar(contentViewModel: viewModel)
-                    switch viewModel.topTabBarSelection {
-                    case 0:
+                    ZStack {
+                        // The Library tab's content used to be a `switch` case like every other
+                        // tab — but each `switch` case is a distinct view identity in SwiftUI, so
+                        // leaving it (by switching to any browse tab) fully deallocated
+                        // `WallpaperExplorer` and every `ExplorerItem`/`ThumbnailImage` inside it,
+                        // and returning rebuilt the whole thing from zero: re-ran `sortedWallpapers`,
+                        // re-triggered every card's `ThumbnailImage` cache-key stat call (a fresh
+                        // `Coordinator` has no `lastCheckedURL` to short-circuit against), and
+                        // restarted every card's `backfillMetadataIfNeeded` `.task` — a real,
+                        // confirmed freeze on a library of any size, worst right after browsing an
+                        // online source tab. Kept permanently mounted here instead, toggling
+                        // visibility (opacity + hit-testing) rather than existence — the browse
+                        // tabs below still tear down/rebuild via `switch` on tab changes among
+                        // themselves, since those aren't the tab someone bounces back to constantly.
                         if viewModel.wallpapers.isEmpty {
                             // Nothing imported yet — the search/filter/sort toolbar and filter
                             // sidebar have nothing to act on, so skip them rather than show them
                             // empty above a blank grid.
-                            LibraryEmptyStateView()
+                            if viewModel.topTabBarSelection == 0 {
+                                LibraryEmptyStateView()
+                            }
                         } else {
-                            ExplorerTopBar(contentViewModel: viewModel)
-                                .environmentObject(globalSettingsViewModel)
-                            HStack(spacing: 0) {
+                            VStack(spacing: 5) {
+                                ExplorerTopBar(contentViewModel: viewModel)
+                                    .environmentObject(globalSettingsViewModel)
                                 HStack(spacing: 0) {
-                                    // MARK: Filter Results
-                                    FilterResults(viewModel: viewModel)
-                                }
-                                .frame(width: viewModel.isFilterReveal ? 225 : 0)
-                                .opacity(viewModel.isFilterReveal ? 1 : 0)
+                                    HStack(spacing: 0) {
+                                        // MARK: Filter Results
+                                        FilterResults(viewModel: viewModel)
+                                    }
+                                    .frame(width: viewModel.isFilterReveal ? 225 : 0)
+                                    .opacity(viewModel.isFilterReveal ? 1 : 0)
 
-                                WallpaperExplorer(contentViewModel: viewModel, wallpaperViewModel: wallpaperViewModel)
-                                .onDrop(of: [.fileURL], delegate: viewModel)
-                                .padding(.leading, viewModel.isFilterReveal ? 10 : 0)
-                            }
-                            // A single animation covering the whole reveal (width, opacity, AND the
-                            // explorer's leading padding) instead of two separate, differently-tuned
-                            // animations on the same click — previously the sidebar sprang open on one
-                            // curve while its neighbor's padding eased in on another, a visible seam on
-                            // one user action. `AppMotion.popupTransition` matches every other popup's feel.
-                            .animation(AppMotion.popupTransition, value: viewModel.isFilterReveal)
-                            HStack {
-                                Button {
-                                    AppDelegate.shared.openImportFromFolderPanel()
-                                } label: {
-                                    Image(systemName: "plus.rectangle.on.folder.fill")
-                                        .frame(width: 22, height: 22)
+                                    WallpaperExplorer(contentViewModel: viewModel, wallpaperViewModel: wallpaperViewModel)
+                                    .onDrop(of: [.fileURL], delegate: viewModel)
+                                    .padding(.leading, viewModel.isFilterReveal ? 10 : 0)
                                 }
-                                .buttonStyle(.glassProminent)
-                                .controlSize(.large)
-                                // Same gap as the Pause button — `.glassProminent` alone renders
-                                // neutral gray, leaving the library's main call-to-action with less
-                                // visual weight than the playlist quick-add button beside it.
-                                .tint(Color.accentColor)
-                                .help("Open Wallpaper (⌘I)")
-                                Text("^[\(viewModel.visibleWallpaperCount) wallpaper](inflect: true)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.leading, 4)
-                                Spacer()
-                                LibraryQuickControls(contentViewModel: viewModel)
+                                // A single animation covering the whole reveal (width, opacity, AND the
+                                // explorer's leading padding) instead of two separate, differently-tuned
+                                // animations on the same click — previously the sidebar sprang open on one
+                                // curve while its neighbor's padding eased in on another, a visible seam on
+                                // one user action. `AppMotion.popupTransition` matches every other popup's feel.
+                                .animation(AppMotion.popupTransition, value: viewModel.isFilterReveal)
+                                HStack {
+                                    Button {
+                                        AppDelegate.shared.openImportFromFolderPanel()
+                                    } label: {
+                                        Image(systemName: "plus.rectangle.on.folder.fill")
+                                            .frame(width: 22, height: 22)
+                                    }
+                                    .buttonStyle(.glassProminent)
+                                    .controlSize(.large)
+                                    // Same gap as the Pause button — `.glassProminent` alone renders
+                                    // neutral gray, leaving the library's main call-to-action with less
+                                    // visual weight than the playlist quick-add button beside it.
+                                    .tint(Color.accentColor)
+                                    .help("Open Wallpaper (⌘I)")
+                                    Text("^[\(viewModel.visibleWallpaperCount) wallpaper](inflect: true)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, 4)
+                                    Spacer()
+                                    LibraryQuickControls(contentViewModel: viewModel)
+                                }
+                                .padding(.top, 8)
                             }
-                            .padding(.top, 8)
+                            .opacity(viewModel.topTabBarSelection == 0 ? 1 : 0)
+                            .allowsHitTesting(viewModel.topTabBarSelection == 0)
                         }
-                    case 1:
-                        MotionBgsView(contentViewModel: viewModel)
-                    case 2:
-                        MoeWallsView(contentViewModel: viewModel)
-                    case 3:
-                        WallperView(contentViewModel: viewModel)
-                    case 4:
-                        DesktopHutView(contentViewModel: viewModel)
-                    case 5:
-                        UhdPaperView(contentViewModel: viewModel)
-                    case 6:
-                        AlphaCodersView(contentViewModel: viewModel)
-                    case 7:
-                        InboxView(contentViewModel: viewModel)
-                    default:
-                        EmptyView()
+
+                        switch viewModel.topTabBarSelection {
+                        case 1:
+                            MotionBgsView(contentViewModel: viewModel)
+                        case 2:
+                            MoeWallsView(contentViewModel: viewModel)
+                        case 3:
+                            WallperView(contentViewModel: viewModel)
+                        case 4:
+                            DesktopHutView(contentViewModel: viewModel)
+                        case 5:
+                            UhdPaperView(contentViewModel: viewModel)
+                        case 6:
+                            AlphaCodersView(contentViewModel: viewModel)
+                        case 7:
+                            InboxView(contentViewModel: viewModel)
+                        default:
+                            EmptyView()
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
