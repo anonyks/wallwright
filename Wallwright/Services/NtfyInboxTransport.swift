@@ -88,10 +88,21 @@ extension NtfyInboxTransport: URLSessionDataDelegate {
         bufferQueue.sync {
             buffer.append(data)
             // SSE frames are newline-delimited; drain every complete line currently in the
-            // buffer, leaving any trailing partial line for the next chunk.
-            while let newlineRange = buffer.range(of: Data([0x0A])) { // "\n"
-                let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
-                buffer.removeSubrange(buffer.startIndex..<newlineRange.upperBound)
+            // buffer, leaving any trailing partial line for the next chunk. Collecting every line
+            // first and doing a single trailing-removal after the loop, rather than
+            // `removeSubrange` from the front on every line, avoids repeatedly shifting the same
+            // remaining bytes down — `Data.removeSubrange` from the start is O(remaining length)
+            // each call, so doing it once per line in this loop was O(lines × remaining length)
+            // for one chunk instead of O(total length) once.
+            var lines: [Data] = []
+            var searchStart = buffer.startIndex
+            while let newlineRange = buffer.range(of: Data([0x0A]), in: searchStart..<buffer.endIndex) { // "\n"
+                lines.append(buffer.subdata(in: searchStart..<newlineRange.lowerBound))
+                searchStart = newlineRange.upperBound
+            }
+            guard searchStart > buffer.startIndex else { return }
+            buffer.removeSubrange(buffer.startIndex..<searchStart)
+            for lineData in lines {
                 guard let line = String(data: lineData, encoding: .utf8) else { continue }
                 handle(line: line)
             }

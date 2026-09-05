@@ -29,8 +29,11 @@ struct LibraryEmptyStateView: View {
             } label: {
                 Label("Import Wallpaper", systemImage: "plus.rectangle.on.folder.fill")
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.glass)
             .controlSize(.large)
+            // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent` reads as a flat
+            // gray fill on the Graphite system accent; plain `.glass` keeps the translucent lens
+            // look consistent with the rest of the main window's chrome.
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

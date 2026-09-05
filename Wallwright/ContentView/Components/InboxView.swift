@@ -161,7 +161,10 @@ struct InboxView: SubviewOfContentView {
                     .frame(width: 200)
                     .onSubmit(saveTopic)
                 Button("Save", action: saveTopic)
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.glass)
+                    // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent` reads as
+                    // a flat gray fill on the Graphite system accent; plain `.glass` keeps the
+                    // translucent lens look consistent with the rest of the main window's chrome.
                     .disabled(topicDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(.horizontal, 10)

@@ -34,6 +34,24 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            // Real desktop vibrancy, not `.ultraThinMaterial` — that SwiftUI material only blurs
+            // whatever's WITHIN this window (useless once the window itself is the thing that's
+            // supposed to look like glass). `WindowGlassBackground` wraps an `NSVisualEffectView`
+            // in `.behindWindow` mode, which macOS composites against the real desktop and other
+            // windows — but only once `MainWindowController` has actually made this window
+            // non-opaque (see its own comment); on an opaque window this would just render as a
+            // flat gray fill.
+            // The window itself stays non-opaque/`.clear` at the AppKit level regardless of this
+            // setting (see `MainWindowController`'s own comment) — toggling `isOpaque` dynamically
+            // at runtime is a real flicker risk, so "off" is just painting a normal opaque color
+            // over the same clear window instead of reconfiguring the window itself.
+            if globalSettingsViewModel.settings.windowVibrancy {
+                WindowGlassBackground()
+                    .ignoresSafeArea()
+            } else {
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea()
+            }
             HSplitView {
                 VStack(spacing: 5) {
                     TopTabBar(contentViewModel: viewModel)
@@ -87,12 +105,15 @@ struct ContentView: View {
                                         Image(systemName: "plus.rectangle.on.folder.fill")
                                             .frame(width: 22, height: 22)
                                     }
-                                    .buttonStyle(.glassProminent)
+                                    .buttonStyle(.glass)
                                     .controlSize(.large)
-                                    // Same gap as the Pause button — `.glassProminent` alone renders
-                                    // neutral gray, leaving the library's main call-to-action with less
-                                    // visual weight than the playlist quick-add button beside it.
-                                    .tint(Color.accentColor)
+                                    // `.glassProminent` renders as an opaque matte fill, not the
+                                    // translucent lens `LibraryQuickControls`' own `.glass`-styled
+                                    // buttons beside it use — mismatched against the rest of the
+                                    // bottom bar. Plain `.glass` matches. No `.tint()` — with the
+                                    // Graphite system accent, tinting just recolors the fill gray
+                                    // while flattening the translucency (confirmed live on the
+                                    // Pause button, 2026-09-05); untinted keeps the pale glass look.
                                     .help("Open Wallpaper (⌘I)")
                                     Text("^[\(viewModel.visibleWallpaperCount) wallpaper](inflect: true)")
                                         .font(.caption)
@@ -432,4 +453,118 @@ struct ContentView_Previews: PreviewProvider {
         ContentView(viewModel: .init(), wallpaperViewModel: .init())
             .environmentObject(GlobalSettingsViewModel())
     }
+}
+
+/// True desktop-blurring vibrancy for the whole main window, dressed up with the cues that read as
+/// "glass" rather than flat frosted blur: a specular rim light tracing the window edge (brightest
+/// where a light source hitting curved glass would catch, per `Corner`) and a faint diagonal tint
+/// for a sense of depth/volume. Only actually visible once the owning window has been made
+/// non-opaque with a `.clear` background (`MainWindowController`/`AppDelegate.setSettingsWindow`) —
+/// on a normal opaque window the blur layer would just render as a flat, undifferentiated fill.
+struct WindowGlassBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            VisualEffectMaterial()
+
+            // Diffuser — `.behindWindow` blending composites against WHATEVER is actually behind
+            // the window, not just the desktop picture: another app's window overlapping this one
+            // shows through too, and `.sidebar` (chosen for being noticeably more translucent than
+            // the semantically "correct" `.underWindowBackground`) let sharp edges/text from a
+            // dark window behind Wallwright bleed through as a visible artifact. This trades back
+            // a little of that vibrancy — still meaningfully more transparent than the original
+            // `.underWindowBackground` — for not showing distracting fragments of unrelated windows.
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(colorScheme == .dark ? 0.35 : 0.20)
+                .allowsHitTesting(false)
+
+            // Depth wash — subtle enough to read as "glass has volume" without tinting content
+            // legibility. Flips lighter-corner/darker-corner between themes so it still reads as
+            // catching light from the same conceptual direction rather than looking inverted.
+            LinearGradient(
+                colors: colorScheme == .dark
+                    ? [Color.white.opacity(0.05), .clear, Color.black.opacity(0.16)]
+                    : [Color.white.opacity(0.35), .clear, Color.black.opacity(0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .allowsHitTesting(false)
+
+            // Refractive accent caustic — a whisper of the system accent color, as if light were
+            // bending through the glass's own volume rather than just reflecting off its surface.
+            // Kept low-opacity deliberately: this reads as tint, not as a colored overlay.
+            RadialGradient(
+                colors: [Color.accentColor.opacity(colorScheme == .dark ? 0.09 : 0.05), .clear],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 700
+            )
+            .allowsHitTesting(false)
+
+            // Top meniscus glint — a hint of light at the top edge, not a bright stripe. Confirmed
+            // live this needed to come down significantly from an earlier, much brighter pass.
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color.white.opacity(colorScheme == .dark ? 0.12 : 0.2), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 1.5)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+
+            // Specular rim — a continuous rounded corner (rather than a sharp `Rectangle`) is meant
+            // to hug the window's own rounded chrome instead of fighting it at the corners, but that
+            // only works if the radius actually approximates the real, OS-controlled physical
+            // window-corner radius (~10-12pt) — this app's own internal corner-radius tier (see
+            // `WallpaperPreview.swift`'s tier comment) is a DIFFERENT thing, for OUR OWN drawn
+            // components, and doesn't apply here. Confirmed live: the earlier `cornerRadius: 20`
+            // (reasoned from that tier instead) was measurably larger than the physical window
+            // corner, so the stroke's curve cut inward and read as a separate inner white frame
+            // instead of hugging the glass edge. Opacity also confirmed too strong at 0.6-0.85 —
+            // a hairline whisper reads as a light-catching edge; that read as a wireframe outline.
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.15 : 0.25),
+                            Color.white.opacity(0.03),
+                            .clear,
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// The raw `NSVisualEffectView` bridge `WindowGlassBackground` layers its specular/tint dressing
+/// on top of.
+private struct VisualEffectMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        // `.sidebar`, not `.hudWindow` (a fixed-dark overlay style, e.g. Quick Look's panel — not
+        // built to be a whole window's own light/dark-adaptive background) or `.underWindowBackground`
+        // (Apple's own semantically-correct choice for "behind a window's content," but tuned heavy
+        // and close to opaque specifically to guarantee text contrast — reads as flat matte plastic
+        // rather than glass). `.sidebar` is noticeably more translucent/vibrant in practice (the
+        // same material behind Finder's own sidebar), letting the desktop's actual color and motion
+        // show through much more than the semantically "correct" choice did.
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        // Not `.active` — that keeps compositing the live blur even while this window is in the
+        // background behind some other app, continuously re-sampling whatever's behind it (for
+        // Wallwright specifically, that can be its own actively-playing video wallpaper) for no
+        // visible benefit, since the user isn't even looking at this window then.
+        // `.followsWindowActiveState` only pays that cost while the window is actually key/frontmost.
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

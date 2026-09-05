@@ -125,9 +125,14 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// state changed. `refresh()` is called once at startup and again whenever
     /// `VideoImporter.wallpaperLibraryDidChangeNotification` fires (posted by every code path
     /// that actually adds/removes/edits a wallpaper on disk).
-    @Published var wallpapers = [WEWallpaper]()
-    
-    
+    @Published var wallpapers = [WEWallpaper]() {
+        // Recomputes `availableTags` only when `wallpapers` itself actually changes, not on every
+        // access — see that property's own doc comment for why a plain computed property there was
+        // real, wasted churn.
+        didSet { availableTags = Set(wallpapers.compactMap(\.project.tags).flatMap { $0 }).sorted() }
+    }
+
+
     @Published var hoveredWallpaper: WEWallpaper?
     
     @Published var isRemoveConfirming = false
@@ -461,9 +466,13 @@ class ContentViewModel: ObservableObject, DropDelegate {
     }
     
     /// Every unique tag currently used by an installed wallpaper, sorted for stable display order.
-    var availableTags: [String] {
-        Set(wallpapers.compactMap(\.project.tags).flatMap { $0 }).sorted()
-    }
+    /// Kept in sync by `wallpapers`'s own `didSet` above rather than recomputed on every access —
+    /// `FilterResults` reads this twice per render (an empty check, then a `ForEach`), and a
+    /// `@ObservedObject` re-renders its observer on ANY `@Published` change on the whole object,
+    /// not just ones the view actually reads — a plain computed property here re-ran this
+    /// Set-and-sort on every search keystroke, sort change, or filter toggle, none of which change
+    /// what tags exist.
+    private(set) var availableTags: [String] = []
 
     private var filteredWallpapers: [WEWallpaper] {
         searchedWallpapers.filter { wallpaper in

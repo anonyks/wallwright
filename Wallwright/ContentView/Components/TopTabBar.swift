@@ -41,8 +41,10 @@ struct TopTabBar: SubviewOfContentView {
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .foregroundStyle(isSelected ? Color.primary : .secondary)
+        // No `.tint(.accentColor)` — matching the Pause/Open Wallpaper fix, a tint here reads as a
+        // flat gray-white chip on the Graphite system accent instead of a translucent lens.
         .glassEffect(
-            isSelected ? .regular.tint(.accentColor).interactive() : .identity,
+            isSelected ? .regular.interactive() : .identity,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .glassEffectID(tag, in: glassNamespace)
@@ -163,8 +165,10 @@ struct TopTabBar: SubviewOfContentView {
                 }
         }
         .foregroundStyle(isSelected ? Color.primary : .secondary)
+        // No `.tint(.accentColor)` — matching the Pause/Open Wallpaper fix, a tint here reads as a
+        // flat gray-white chip on the Graphite system accent instead of a translucent lens.
         .glassEffect(
-            isSelected ? .regular.tint(.accentColor).interactive() : .identity,
+            isSelected ? .regular.interactive() : .identity,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .glassEffectID(12, in: glassNamespace)
@@ -293,8 +297,11 @@ struct TopTabBar: SubviewOfContentView {
                                     Image(systemName: "clock.fill")
                                         .frame(width: 18, height: 18)
                                 }
-                                .buttonStyle(.glassProminent)
-                                .tint(Color.accentColor)
+                                .buttonStyle(.glass)
+                                // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent`
+                                // + accentColor reads as a flat gray fill on the Graphite system
+                                // accent; plain `.glass` keeps the translucent lens look consistent
+                                // with the rest of the main window's chrome.
                                 .help("Turn off clock overlay")
                                 .accessibilityLabel("Turn off clock overlay")
                             } else {

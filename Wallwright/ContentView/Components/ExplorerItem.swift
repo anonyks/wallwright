@@ -107,13 +107,18 @@ struct ExplorerItem: SubviewOfContentView {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay {
+                // `.strokeBorder`, not `.stroke` — the latter centers the line ON the shape's
+                // boundary (half inside, half outside), which visibly bled outside the thumbnail's
+                // own clipped bounds at the corners. `.strokeBorder` keeps the full line width
+                // inside instead. Width nudged down slightly (3 → 2.5) since strokeBorder no
+                // longer extends outward, to keep roughly the same perceived thickness.
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(isCurrent ? Color.accentColor : .clear, lineWidth: 3)
+                    .strokeBorder(isCurrent ? Color.accentColor : .clear, lineWidth: 2.5)
             }
             .overlay {
                 if isHovered && !isCurrent {
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
+                        .strokeBorder(Color.secondary.opacity(0.5), lineWidth: 1.5)
                 }
             }
             .overlay(alignment: .topTrailing) {

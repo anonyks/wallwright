@@ -63,12 +63,21 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
     override init(window: NSWindow?) {
         super.init(window: FreelyDraggableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false))
         self.window.delegate = self
         self.window.isReleasedWhenClosed = false
         self.window.title = "Wallwright \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as! String)"
         self.window.titlebarAppearsTransparent = true
+        // `isOpaque = false` + a `.clear` background are what actually let a `NSVisualEffectView`
+        // in `.behindWindow` mode (see `WindowGlassBackground`, applied to `ContentView`'s root)
+        // sample and blur the real desktop/other windows behind this one — without these two,
+        // AppKit still paints its own solid `windowBackgroundColor` under everything, so the glass
+        // controls throughout this app (`.glassEffect`) were only ever blurring that opaque gray,
+        // never the actual desktop. `.fullSizeContentView` above lets content extend under the
+        // (already-transparent) title bar so the glass fills the whole window, title bar included.
+        self.window.isOpaque = false
+        self.window.backgroundColor = .clear
         self.window.setFrameAutosaveName("MainWindow")
         // Deliberately left at AppKit's default (false) — the window already has a real title bar
         // (`.titled`, just transparent) that lets the user drag it from the top strip. Enabling

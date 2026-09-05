@@ -191,13 +191,16 @@ struct WallpaperPreview: SubviewOfContentView {
                             )
                             .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.glassProminent)
-                        // Without an explicit tint, `.glassProminent` falls back to a neutral gray
-                        // — this is the single primary action in the whole preview panel and was
-                        // rendering with less visual weight than LibraryQuickControls' playlist
-                        // button, a secondary control that already had the accent tint. Confirmed
-                        // live (2026-08-08).
-                        .tint(Color.accentColor)
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                        // `.glassProminent` is a solid, high-emphasis fill (the "Liquid Glass"
+                        // equivalent of `.borderedProminent`) — reads as an opaque matte bar rather
+                        // than a translucent lens. Plain `.glass` is the lower-emphasis, genuinely
+                        // translucent variant. No `.tint()` here — with the Graphite system accent
+                        // a tint just recolors the fill neutral gray while also flattening the
+                        // translucency; leaving it untinted keeps the pale, glassy default material.
+                        // Confirmed live (2026-09-05) that a tinted `.glass` still read as a solid
+                        // flat pill against this panel's dark background.
 
                         // Only for a *policy* pause (battery/fullscreen-app/display-asleep/other-app-
                         // focused) — a manual pause is already self-explanatory from the button label
@@ -368,7 +371,10 @@ struct WallpaperPreview: SubviewOfContentView {
                         .frame(width: 16, height: 16)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glass)
+                // Matches the Pause/Resume and Open Wallpaper buttons elsewhere in this pass —
+                // `.glassProminent`'s opaque fill read as a solid dark chip against the preview;
+                // plain `.glass` keeps it a translucent lens like the rest of this panel's controls.
                 .contentShape(Rectangle())
                 .help("Close")
             }

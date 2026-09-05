@@ -77,8 +77,23 @@ enum DynamicDesktopHEIC {
         return CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary)
     }
 
+    /// Memoized — this does real synchronous file I/O and container parsing
+    /// (`CGImageSourceCreateWithURL`), and `WallpaperPreview.dynamicFrameText` calls it from a
+    /// plain computed property read on every render of the sidebar (any unrelated state change,
+    /// not just its own once-a-minute refresh timer), not just once. A Dynamic Desktop wallpaper's
+    /// frame count is a structural property of the file that doesn't change without a fresh import
+    /// (a new file at a new path, via `uniqueWallpaperDestination`), so a plain path-keyed cache is
+    /// safe with no mtime-based invalidation needed.
+    private static let frameCountCache = NSCache<NSString, NSNumber>()
+
     static func frameCount(in url: URL) -> Int {
+        let key = url.standardizedFileURL.path as NSString
+        if let cached = frameCountCache.object(forKey: key) {
+            return cached.intValue
+        }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return 0 }
-        return CGImageSourceGetCount(source)
+        let count = CGImageSourceGetCount(source)
+        frameCountCache.setObject(NSNumber(value: count), forKey: key)
+        return count
     }
 }

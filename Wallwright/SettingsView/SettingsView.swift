@@ -36,6 +36,24 @@ struct SettingsView: View {
     @EnvironmentObject var viewModel: GlobalSettingsViewModel
 
     var body: some View {
+        ZStack {
+            // Same real desktop vibrancy as the main library window — see `WindowGlassBackground`'s
+            // own doc comment. Only visible once `AppDelegate.setSettingsWindow` has made this
+            // window non-opaque with a `.clear` background too. "Off" paints over the same clear
+            // window rather than reconfiguring `isOpaque` at runtime — see `ContentView`'s identical
+            // comment for why.
+            if viewModel.settings.windowVibrancy {
+                WindowGlassBackground()
+                    .ignoresSafeArea()
+            } else {
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea()
+            }
+            settingsContent
+        }
+    }
+
+    private var settingsContent: some View {
         VStack {
             Group {
                 switch viewModel.selection {
@@ -55,12 +73,12 @@ struct SettingsView: View {
             
             
             HStack {
-                if let savedSettings = GlobalSettingsViewModel.loadPersisted(), viewModel.settings != savedSettings {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.yellow)
-                    Text("Edited")
-                        .foregroundStyle(.secondary)
-                }
+                // No "unsaved changes" indicator here anymore — `GlobalSettingsViewModel` already
+                // autosaves every mutation to disk on a 300ms debounce (see `settingsSaveCancellable`
+                // in GlobalSettingsService.swift), so this comparison against `loadPersisted()` was
+                // stale by design: it read "Edited" for up to 300ms after every single change
+                // (continuously while dragging a slider), even though the change was already being
+                // persisted in the background. OK/Cancel below just close the window now.
                 Spacer()
                 Button {
                     viewModel.save()
@@ -68,7 +86,11 @@ struct SettingsView: View {
                 } label: {
                     Text("OK").frame(width: 50)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glass)
+                // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent` defaults to
+                // accentColor, which reads as a flat gray fill on the Graphite system accent; plain
+                // `.glass` keeps the translucent lens look consistent with the window's own glass
+                // background (see `windowVibrancy`).
                 Button {
                     /*here should be a call of viewModel.reset() but I move it to the delegate */
                     AppDelegate.shared.settingsWindow.close()

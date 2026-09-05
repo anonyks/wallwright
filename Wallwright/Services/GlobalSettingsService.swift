@@ -210,6 +210,13 @@ struct GlobalSettings: Codable, Equatable {
 
     // MARK: Appearance
     var appearance = GSAppearance.followSystem
+    /// Whether the main library and Settings windows use real desktop-blurring vibrancy
+    /// (`WindowGlassBackground`) or a standard opaque `NSColor.windowBackgroundColor` fill. On by
+    /// default to match the look introduced this session; off falls back to the plain look these
+    /// windows always had before, for anyone who'd rather not pay the (window-frontmost-only, via
+    /// `.followsWindowActiveState`) compositing cost of continuously blurring an actively-playing
+    /// video wallpaper behind the window.
+    var windowVibrancy = true
     var showClockOverlay = false
     var clockDayFont = GSClockFormat.anurati
     var clockColor = GSClockColor.white
@@ -315,6 +322,7 @@ struct GlobalSettings: Codable, Equatable {
         inboxNtfyTopic = (try? c.decodeIfPresent(String.self, forKey: .inboxNtfyTopic)) ?? nil ?? ""
         adjustMenuBarTint = (try? c.decodeIfPresent(Bool.self, forKey: .adjustMenuBarTint)) ?? nil ?? true
         appearance = (try? c.decodeIfPresent(GSAppearance.self, forKey: .appearance)) ?? nil ?? .followSystem
+        windowVibrancy = (try? c.decodeIfPresent(Bool.self, forKey: .windowVibrancy)) ?? nil ?? true
         showClockOverlay = (try? c.decodeIfPresent(Bool.self, forKey: .showClockOverlay)) ?? nil ?? false
         clockDayFont = (try? c.decodeIfPresent(GSClockFormat.self, forKey: .clockDayFont)) ?? nil ?? .anurati
         clockColor = (try? c.decodeIfPresent(GSClockColor.self, forKey: .clockColor)) ?? nil ?? .white

@@ -316,7 +316,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 // MARK: - misc methods
     @objc func openSettingsWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        self.settingsWindow.center()
+        // `.center()` used to run here unconditionally on every open — since `settingsWindow` is
+        // the same long-lived `NSWindow` instance for the whole app session (just shown/hidden via
+        // `close()`/`makeKeyAndOrderFront`, not recreated), that reset whatever position/size the
+        // user had just left it at, even within the same session. Centering (only when there's
+        // nothing saved to restore) now happens once, at creation, in `setSettingsWindow()`.
         self.settingsWindow.makeKeyAndOrderFront(nil)
     }
     
@@ -338,7 +342,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.settingsWindow.title = "Settings"
         self.settingsWindow.isReleasedWhenClosed = false
         self.settingsWindow.toolbarStyle = .preference
-        
+        // Same real desktop vibrancy as the main library window — see `MainWindowController`'s and
+        // `WindowGlassBackground`'s own comments for why both `isOpaque`/`backgroundColor` here AND
+        // `SettingsView`'s own `WindowGlassBackground` layer are needed together.
+        self.settingsWindow.isOpaque = false
+        self.settingsWindow.backgroundColor = .clear
+        // Unlike `MainWindowController` (which already calls `setFrameAutosaveName("MainWindow")`),
+        // this window never registered a frame autosave name at all — its size/position was never
+        // persisted across launches, and `openSettingsWindow()` used to force-`.center()` it back
+        // to the default 480×300 on every single open, even within the same session. Restores a
+        // previously-saved frame as part of this same call (per `setFrameAutosaveName`'s documented
+        // behavior) and reports whether one existed; centering now only happens the very first
+        // time, when there's nothing saved yet.
+        let hadSavedFrame = self.settingsWindow.setFrameAutosaveName("SettingsWindow")
+        if !hadSavedFrame {
+            self.settingsWindow.center()
+        }
+
         self.settingsWindow.delegate = self
         
         let toolbar = NSToolbar(identifier: "SettingsToolbar")
@@ -562,6 +582,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// it).
     private var lastPlaceholderImageURLs: [String: URL] = [:]
 
+    /// Alternates the video-frame placeholder between two fixed filenames (`staticWP_A.tiff`/
+    /// `staticWP_B.tiff`) instead of always overwriting the exact same one — some of what samples
+    /// this file for the menu bar's tint (see the `adjustMenuBarTint` machinery below) can treat an
+    /// unchanged URL as "nothing to reload" even after its bytes were atomically rewritten. Only
+    /// ever two files exist at a time either way, so this doesn't reintroduce the per-launch file
+    /// leak the original fixed-filename choice was deliberately avoiding (see the comment where
+    /// it's used).
+    private var usePlaceholderFilenameA = true
+
     func setPlacehoderWallpaper(with wallpaper: WEWallpaper) {
         switch wallpaper.project.type {
         case "video":
@@ -590,11 +619,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     let rep = NSBitmapImageRep(cgImage: cgImage)
                     if let data = rep.representation(using: .tiff, properties: [:]) {
                         do {
-                            // Always the same filename — Swift's .hashValue is randomized per
-                            // process launch, not stable, so hashing into the name here would
-                            // leak a new file (and a new macOS "recently used wallpaper" entry)
-                            // on every single app launch instead of overwriting one.
-                            let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "staticWP_current.tiff")
+                            // Alternates between two fixed filenames rather than always the same
+                            // one — see `usePlaceholderFilenameA`'s own doc comment for why. Still
+                            // bounded to exactly two files, never growing further: Swift's
+                            // `.hashValue` is randomized per process launch, not stable, so hashing
+                            // into the name here would leak a new file (and a new macOS "recently
+                            // used wallpaper" entry) on every single app launch instead of reusing
+                            // (at most) two.
+                            self.usePlaceholderFilenameA.toggle()
+                            let filename = self.usePlaceholderFilenameA ? "staticWP_A.tiff" : "staticWP_B.tiff"
+                            let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: filename)
                             try data.write(to: url, options: .atomic)
                             // `generateCGImagesAsynchronously`'s completion handler runs on an
                             // arbitrary AVFoundation-internal queue, not necessarily main —

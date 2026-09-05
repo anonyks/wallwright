@@ -59,8 +59,11 @@ struct LibraryQuickControls: SubviewOfContentView {
                             Image(systemName: mainIcon)
                                 .frame(width: 18, height: 18)
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Color.accentColor)
+                        .buttonStyle(.glass)
+                        // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent` +
+                        // accentColor reads as a flat gray fill on the Graphite system accent;
+                        // plain `.glass` keeps the translucent lens look consistent with the rest
+                        // of the main window's chrome.
                         .help(mainHelp)
                     } else {
                         Button(action: mainAction) {

@@ -39,6 +39,8 @@ struct GeneralPage: SettingsPage {
                     Text("Dark").tag(GSAppearance.dark)
                     Text("Auto").tag(GSAppearance.followSystem)
                 }
+                Toggle("Window Vibrancy", isOn: $viewModel.settings.windowVibrancy)
+                    .help("Blur the real desktop through the library and Settings windows, instead of a solid background.")
             } header: {
                 Label("Appearance", systemImage: "paintpalette.fill")
             }
