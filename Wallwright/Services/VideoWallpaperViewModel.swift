@@ -311,7 +311,7 @@ class VideoWallpaperViewModel: ObservableObject {
     /// large speculative buffer for a small one.
     private static func capForwardBuffering(_ items: AVPlayerItem...) {
         for item in items {
-            item.preferredForwardBufferDuration = 2.0
+            item.preferredForwardBufferDuration = 1.0
         }
     }
 
@@ -664,8 +664,17 @@ class VideoWallpaperViewModel: ObservableObject {
         let seekGroup = DispatchGroup()
         seekGroup.enter()
         self.player.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in seekGroup.leave() }
-        seekGroup.enter()
-        self.audioPlayer.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in seekGroup.leave() }
+        // `audioOnlyItem` builds a genuinely empty composition (zero tracks) when the file has no
+        // audio track at all — nothing for `audioPlayer` to ever decode. Checking the item's own
+        // tracks here rather than `currentWallpaper.project.hasAudio`: that field can be nil for a
+        // wallpaper imported before audio probing existed, or if probing failed, even when the file
+        // genuinely does have audio — trusting it would silently leave a real audio track un-resynced
+        // on loop restart instead of just skipping a no-op seek.
+        let hasAudioTrack = self.audioPlayer.currentItem?.asset.tracks(withMediaType: .audio).isEmpty == false
+        if hasAudioTrack {
+            seekGroup.enter()
+            self.audioPlayer.seek(to: restartTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in seekGroup.leave() }
+        }
         seekGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
             Self.apply(rate: self.playRate, to: self.player, self.audioPlayer)

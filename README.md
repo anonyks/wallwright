@@ -3,7 +3,7 @@
 # Wallwright
 
 **A native macOS live wallpaper engine.**
-Video wallpapers on your desktop, lock screen, and screensaver — all in sync, all at once.
+Video wallpapers on your desktop, lock screen, and screensaver, all in sync, all at once.
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#build--run)
@@ -15,7 +15,7 @@ Video wallpapers on your desktop, lock screen, and screensaver — all in sync, 
 
 ---
 
-Wallwright turns any video into a live desktop background — synced across your desktop, the
+Wallwright turns any video into a live desktop background, synced across your desktop, the
 lock screen, and the screensaver at once, not just one of the three. It ships with a full
 library manager, playlist rotation, a drag-anywhere clock overlay, and built-in browsers for
 several free wallpaper sites, so you never have to leave the app to find something new.
@@ -26,20 +26,20 @@ but run macOS.
 ## Why Wallwright
 
 Most open-source live-wallpaper projects for macOS are built once and left alone. Wallwright's
-been through repeated, adversarial rounds of live-testing and bug fixing — decode races,
-crash-recovery, per-display stability across reboots — the kind of engineering that a demo
+been through repeated, adversarial rounds of live-testing and bug fixing (decode races,
+crash-recovery, per-display stability across reboots), the kind of engineering that a demo
 doesn't show but a week of actual daily use exposes:
 
 - **Survives reboots and monitor swaps.** Wallpaper assignments key off a stable per-display
-  UUID, not the raw display ID macOS hands out fresh every boot — so your monitor setup doesn't
+  UUID, not the raw display ID macOS hands out fresh every boot, so your monitor setup doesn't
   get scrambled after a restart or a dock/undock.
 - **Recovers from playback failures instead of freezing.** A corrupt file, a dropped external
-  drive, an unplayable codec — Wallwright detects it and retries once, rather than leaving your
+  drive, an unplayable codec: Wallwright detects it and retries once, rather than leaving your
   desktop silently frozen on the last good frame with no explanation.
 - **Actually pauses when it should.** Thermal throttling, low battery, another app in
-  fullscreen, the display asleep — each is its own configurable trigger, checked live, not
+  fullscreen, the display asleep: each is its own configurable trigger, checked live, not
   polled on a timer burning battery to ask "should I still be running?"
-- **No wasted decode.** Video and audio are decoded once each, not twice — a bug present in
+- **No wasted decode.** Video and audio are decoded once each, not twice, a bug present in
   most forks of this codebase that went unnoticed until it was profiled and fixed here.
 
 None of that is visible in a screenshot. It's why the desktop stays correct at 3am on day 40,
@@ -80,7 +80,7 @@ kind macOS ships by default).
 
 ## Install
 
-Grab the latest signed build from **[Releases](https://github.com/anonyks/wallwright/releases/latest)** —
+Grab the latest signed build from **[Releases](https://github.com/anonyks/wallwright/releases/latest)**:
 download, drag to Applications, done. No Xcode required.
 
 Prefer to build it yourself, or want to modify it? See [Build & Run](#build--run) below.
@@ -89,7 +89,7 @@ Prefer to build it yourself, or want to modify it? See [Build & Run](#build--run
 
 Optional, used only by the feature that needs them. Wallwright looks for each one at the
 standard Homebrew locations (`/opt/homebrew/bin`, `/usr/local/bin`) and `/usr/bin`, falling back
-to `which` — a plain `brew install` is enough, no PATH setup needed.
+to `which`, so a plain `brew install` is enough, no PATH setup needed.
 
 | Tool | Used for | Install |
 |---|---|---|
@@ -109,12 +109,13 @@ Requires macOS 26+ and Xcode 26+. Select "Sign to Run Locally", then `Cmd + R`.
 
 ## Contributing
 
-Issues and pull requests are welcome — see [open issues](https://github.com/anonyks/wallwright/issues)
+Issues and pull requests are welcome. See [open issues](https://github.com/anonyks/wallwright/issues)
 for known gaps. This is a personal project maintained in spare time, so response time varies.
 
 ## Author
 
-Wallwright is written and maintained by [anonyks](https://github.com/anonyks).
+Wallwright is written and maintained by [anonyks](https://github.com/anonyks), with development
+assistance from Claude Code (Anthropic).
 
 ## Attribution
 
