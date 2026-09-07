@@ -51,7 +51,7 @@ class VideoWallpaperViewModel: ObservableObject {
         // value from before the most recent slider/rate change at the exact moment this fires.
         // Confirmed live (2026-08-08): dragging Playback Rate to its max then immediately picking a
         // new wallpaper applied a stale intermediate rate instead of the one actually set.
-        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
+        applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)
         self.audioPlayer.volume = self.playVolume
         applyBatteryMode()
     }
@@ -186,7 +186,7 @@ class VideoWallpaperViewModel: ObservableObject {
     /// playing, so the local value is already correct.
     private func retryAfterPlaybackFailure() {
         swapInFreshItems()
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        applyRateToPlayers(playRate)
         self.audioPlayer.volume = self.playVolume
     }
 
@@ -441,13 +441,42 @@ class VideoWallpaperViewModel: ObservableObject {
     }
 
     var playRate: Float = 0 {
-        didSet { Self.apply(rate: playRate, to: player, audioPlayer) }
+        didSet { applyRateToPlayers(playRate) }
     }
 
     var playVolume: Float = 0 {
         didSet {
             self.audioPlayer.volume = playVolume
+            guard playVolume != oldValue else { return }
+            if playVolume == 0 {
+                // Actually stops decode, not just silences output — every rate-reassertion call
+                // site now routes through `applyRateToPlayers`, which already skips `audioPlayer`
+                // whenever muted, but this covers the direct "just muted" transition too, since
+                // nothing else necessarily re-fires at the moment volume itself changes.
+                audioPlayer.rate = 0
+            } else if audioPlayer.rate == 0, playRate > 0 {
+                // Resuming from a mute-driven pause specifically (`audioPlayer.rate == 0` while
+                // playback should be running) — not every nonzero-volume tick while already
+                // audible, e.g. dragging the slider through several values shouldn't reseek on
+                // every step. Audio has to catch back up to wherever video already is, not resume
+                // from whatever position it was paused at.
+                audioPlayer.seek(to: player.currentTime(), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+                    guard let self else { return }
+                    self.applyRateToPlayers(self.playRate)
+                }
+            }
         }
+    }
+
+    /// Applies `rate` to `player` normally, but to `audioPlayer` only when actually audible —
+    /// muted or zero-volume means nothing should be decoding on that player at all (see
+    /// `playVolume`'s own doc comment above). Every rate-reassertion call site in this class
+    /// funnels through here instead of calling `Self.apply` on both players directly, so a muted
+    /// wallpaper's audio decoder can't be silently reawakened by an unrelated pause/resume, loop
+    /// restart, sleep/wake, or occlusion-change event that has nothing to do with volume.
+    private func applyRateToPlayers(_ rate: Float) {
+        Self.apply(rate: rate, to: player)
+        Self.apply(rate: playVolume > 0 ? rate : 0, to: audioPlayer)
     }
 
     /// Muted always — this player exists purely for visual rendering now. See `audioPlayer`.
@@ -610,7 +639,7 @@ class VideoWallpaperViewModel: ObservableObject {
     private func rebuildAfterStop() {
         guard player.currentItem == nil else { return }
         swapInFreshItems()
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        applyRateToPlayers(playRate)
         self.audioPlayer.volume = self.playVolume
         applyBatteryMode()
     }
@@ -677,18 +706,18 @@ class VideoWallpaperViewModel: ObservableObject {
         }
         seekGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
-            Self.apply(rate: self.playRate, to: self.player, self.audioPlayer)
+            self.applyRateToPlayers(self.playRate)
         }
     }
 
     @objc private func playerDidStopPlaying(_ notification: Notification) {
         // Resume playback
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        applyRateToPlayers(playRate)
     }
 
     @objc func systemWillSleep(_ notification: Notification) {
         wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] systemWillSleep (screensDidSleep) fired")
-        Self.apply(rate: 0, to: player, audioPlayer)
+        applyRateToPlayers(0)
     }
 
     @objc private func powerSourceDidChange(_ notification: Notification) {
@@ -713,7 +742,7 @@ class VideoWallpaperViewModel: ObservableObject {
         // (e.g. battery status, which needs its own notification to fire after wake) hasn't
         // necessarily updated the global value's SwiftUI-synced local mirror yet either, but reading
         // the global directly removes the render-cycle half of that lag.
-        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
+        applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)
         // Full system sleep/wake (lid close, or a long enough display sleep) is exactly the kind of
         // suspension that wedges AVPlayerView's render pipeline the same way lock/unlock does — see
         // `reattachPlayerLayer`.
@@ -721,7 +750,7 @@ class VideoWallpaperViewModel: ObservableObject {
     }
 
     @objc private func windowOcclusionStateDidChange(_ notification: Notification) {
-        Self.apply(rate: playRate, to: player, audioPlayer)
+        applyRateToPlayers(playRate)
 
         // The rate-reassertion above (any window, not just ours) is cheap/idempotent and is all a
         // normal desktop/Space switch actually needs — confirmed live (2026-07-30) it alone was
@@ -769,7 +798,7 @@ class VideoWallpaperViewModel: ObservableObject {
         view.player = player
         // See `systemDidWake`'s identical fix and comment — same staleness risk, since this is
         // called from `systemDidWake` (among other places) with no guaranteed sync beforehand.
-        Self.apply(rate: AppDelegate.shared.wallpaperViewModel.playRate, to: player, audioPlayer)
+        applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)
         wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer DONE — after: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
     }
 }
