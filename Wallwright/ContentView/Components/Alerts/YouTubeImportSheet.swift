@@ -140,6 +140,7 @@ struct YouTubeImportSheet: View {
             HStack(spacing: 6) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text("Best available: \(info.width)×\(info.height)" + (info.vcodec.map { " · \(Self.codecLabel($0))" } ?? ""))
                 if let size = info.approxFileSizeBytes {
                     Text("· ~\(Self.formatBytes(size))")

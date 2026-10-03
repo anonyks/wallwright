@@ -83,6 +83,10 @@ kind macOS ships by default).
 Grab the latest signed build from **[Releases](https://github.com/anonyks/wallwright/releases/latest)**:
 download, drag to Applications, done. No Xcode required.
 
+Release builds are not notarized by Apple, so Gatekeeper will warn on first launch. Right-click
+the app and choose Open, or run `xattr -d com.apple.quarantine /Applications/Wallwright.app`,
+to get past it.
+
 Prefer to build it yourself, or want to modify it? See [Build & Run](#build--run) below.
 
 ## External Tools
@@ -123,10 +127,15 @@ Wallwright is a fork, and a few specific mechanisms were adapted from other open
 rather than written from scratch. Credited here for that reason, not as active collaborators on
 this project:
 
-- **MrWindDog**, **[Haren Chen](https://github.com/haren724)**, **[Chen Chia Yang](https://github.com/Unayung)**: original architecture and scene rendering this project was forked from
-- **[1ris_W](https://github.com/Erica-Iris)**, **[Klaus Zhu](https://github.com/klauszhu1105)**, **[baysonfox](https://github.com/baysonfox)**, **[Toby Shi](https://github.com/Toby-Shi-cloud)**, **Keria**: localization, icons, and other pieces present in the original fork
+- Original architecture, scene rendering, localization, icons, and other pieces this project was
+  forked from: see [Unayung/wallpaper-engine-mac](https://github.com/Unayung/wallpaper-engine-mac)
+  for the original authors and contributors
 - **[Raunak Gupta](https://github.com/Raunik2)**: lock-screen sync, Aerial registration, and the command-pipe listener are adapted from [LivePaper](https://github.com/Raunik2/LivePaper) (MIT)
 - **[kageroumado](https://github.com/kageroumado)**: the low-power-conditions auto-pause policy is modeled on [Phosphene](https://github.com/kageroumado/phosphene)'s PowerMonitor (MIT)
+
+Steam and Wallpaper Engine are registered trademarks of Valve Corporation. YouTube is a trademark
+of Google LLC. Wallwright is an independent open-source project and is not affiliated with,
+endorsed by, or sponsored by Valve Corporation, Google LLC, or Apple Inc.
 
 ## License
 

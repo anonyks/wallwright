@@ -25,7 +25,7 @@ struct AboutUsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 50) {
+        VStack(spacing: 24) {
             HStack {
                 if let icon = NSImage(named: "AppIcon") {
                     Image(nsImage: icon)
@@ -34,32 +34,60 @@ struct AboutUsView: View {
                 VStack(alignment: .leading) {
                     Text("Wallwright").bold().font(.title)
                     Text("Live Wallpapers for Mac").font(.footnote)
+                    Text("Version \(version)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
             }
+
+            HStack(spacing: 16) {
+                Label("GPL-3.0", systemImage: "doc.text")
+                Label("100% On-Device", systemImage: "lock.shield")
+                Label("Zero Telemetry", systemImage: "hand.raised")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Link(destination: URL(string: "https://github.com/anonyks/wallwright")!) {
+                    Label("Repository", systemImage: "safari")
+                }
+                Link(destination: URL(string: "https://github.com/anonyks/wallwright/releases")!) {
+                    Label("Releases", systemImage: "sparkles")
+                }
+                Link(destination: URL(string: "https://github.com/anonyks/wallwright/issues")!) {
+                    Label("Report Issue", systemImage: "exclamationmark.bubble")
+                }
+            }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+
+            Divider().frame(width: 260)
+
             VStack(spacing: 12) {
-                Text("Version \(version)")
-
-                Divider().frame(width: 200)
-
                 Text("Contributors")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    creditRow("Haren Chen", handle: "haren724", role: "Original architecture")
-                    creditRow("MrWindDog", handle: nil, role: "Original architecture")
-                    creditRow("Chen Chia Yang", handle: "Unayung", role: "Scene rendering, multi-display support")
-                    creditRow("1ris_W", handle: "Erica-Iris", role: "Chinese localization")
-                    creditRow("Klaus Zhu", handle: "klauszhu1105", role: "App icons")
-                    creditRow("baysonfox", handle: "baysonfox", role: "Repo maintenance, localization")
-                    creditRow("Toby Shi", handle: "Toby-Shi-cloud", role: "Original web wallpaper support")
-                    creditRow("Keria", handle: nil, role: "Internal refactoring")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Link("Unayung/wallpaper-engine-mac", destination: URL(string: "https://github.com/Unayung/wallpaper-engine-mac")!)
+                        Text("Original architecture, scene rendering, and localization this project was forked from")
+                            .foregroundStyle(.secondary)
+                    }
                     creditRow("Raunak Gupta", handle: "Raunik2", role: "Lock-screen/Aerial registration, clock overlay, battery plumbing (from LivePaper, MIT)")
                 }
                 .font(.caption)
             }
+
+            Text("Steam and Wallpaper Engine are registered trademarks of Valve Corporation. YouTube is a\ntrademark of Google LLC. Wallwright is not affiliated with Valve or Google.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
         }
-        .frame(width: 420, height: 420)
+        .padding(.vertical, 20)
+        .frame(width: 440, height: 460)
     }
 }
 

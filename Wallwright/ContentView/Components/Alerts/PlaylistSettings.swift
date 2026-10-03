@@ -121,6 +121,8 @@ struct PlaylistSettings: SubviewOfContentView {
                                 }
                                 .buttonStyle(.borderless)
                                 .disabled(index == 0)
+                                .accessibilityLabel("Move up")
+                                .help("Move up")
                                 Button {
                                     playlistViewModel.moveItems(from: IndexSet(integer: index), to: index + 2)
                                 } label: {
@@ -128,6 +130,8 @@ struct PlaylistSettings: SubviewOfContentView {
                                 }
                                 .buttonStyle(.borderless)
                                 .disabled(index == itemCount - 1)
+                                .accessibilityLabel("Move down")
+                                .help("Move down")
                                 Button {
                                     playlistViewModel.removeItems(at: IndexSet(integer: index))
                                 } label: {
@@ -135,6 +139,8 @@ struct PlaylistSettings: SubviewOfContentView {
                                         .foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.borderless)
+                                .accessibilityLabel("Remove from playlist")
+                                .help("Remove from playlist")
                             }
                         }
                     }

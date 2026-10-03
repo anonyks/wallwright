@@ -38,6 +38,8 @@ private struct HotkeyRow: View {
             }
             .buttonStyle(.borderless)
             .disabled(hotkey == nil)
+            .accessibilityLabel("Clear hotkey")
+            .help("Clear hotkey")
         }
     }
 }

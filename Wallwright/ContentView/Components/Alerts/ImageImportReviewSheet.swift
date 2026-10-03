@@ -89,6 +89,8 @@ private struct ImageImportReviewContent: View {
                                                 Image(systemName: "xmark.circle.fill")
                                             }
                                             .buttonStyle(.plain)
+                                            .accessibilityLabel("Remove tag")
+                                            .help("Remove tag")
                                         }
                                         .font(.footnote)
                                         .padding(.horizontal, 8)
