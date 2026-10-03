@@ -714,6 +714,21 @@ class ContentViewModel: ObservableObject, DropDelegate {
         wallpapers[index] = wallpaper
     }
 
+    /// Toggles the right-click "Pin"/"Unpin" option. Same pattern as `EditWallpaperSheet`'s
+    /// `updateProject`: update in-memory via `updateWallpaperInPlace` (no disk round-trip needed
+    /// to know the new value), then persist `project.json` on a background queue.
+    public func togglePinned(_ wallpaper: WEWallpaper) {
+        var updated = wallpaper
+        updated.project.isPinned = !wallpaper.isPinned
+        updateWallpaperInPlace(updated)
+        let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
+        let project = updated.project
+        DispatchQueue.global(qos: .utility).async {
+            guard let data = try? JSONEncoder().encode(project) else { return }
+            try? data.write(to: destination, options: .atomic)
+        }
+    }
+
     public func refresh() {
         let urls = self.urls
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in

@@ -50,7 +50,7 @@ struct ExplorerItem: SubviewOfContentView {
                 // the whole grid) — re-decoding project.json from disk here again, per item, per
                 // render, was pure redundant I/O for information already sitting in memory.
                 ThumbnailImage(contentsOf: wallpaper.project == .invalid || wallpaper.project.preview.isEmpty
-                    ? Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
+                    ? AppResources.wallpaperNotFoundVideoURL
                     : wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview))
                 .resizable()
                 // Removing this (in an earlier attempt to fix the double hover-scale below) broke
@@ -147,9 +147,18 @@ struct ExplorerItem: SubviewOfContentView {
                     .help("Estimated system impact: \(impact.label)")
             }
             .overlay(alignment: .topTrailing) {
-                // Shares the corner with the multi-select checkmark — the checkmark takes priority
-                // when both would apply, since selection state is the more actionable signal.
-                if !isMultiSelected, wallpaper.project.hasAudio == true {
+                // Shares the corner with the multi-select checkmark and audio-note badge — the
+                // checkmark takes priority over both (selection is the more actionable signal),
+                // and pinned takes priority over the audio note (a user-set choice over a passive
+                // metadata badge).
+                if !isMultiSelected, wallpaper.isPinned {
+                    Image(systemName: "pin.fill")
+                        .badgeStyle()
+                        .help("Pinned")
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if !isMultiSelected, !wallpaper.isPinned, wallpaper.project.hasAudio == true {
                     Image(systemName: "music.note")
                         .badgeStyle()
                 }

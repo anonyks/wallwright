@@ -24,6 +24,18 @@ struct ExplorerItemMenu: SubviewOfContentView {
         Group {
             Section {
                 Button {
+                    viewModel.togglePinned(hoveredWallpaper)
+                } label: {
+                    if hoveredWallpaper.isPinned {
+                        Label("Unpin", systemImage: "pin.slash")
+                    } else {
+                        Label("Pin", systemImage: "pin")
+                    }
+                }
+            }
+
+            Section {
+                Button {
                     viewModel.hoveredWallpaper = hoveredWallpaper
                     viewModel.isEditWallpaperReveal = true
                 } label: {

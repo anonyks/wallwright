@@ -114,6 +114,10 @@ struct WEProject: Codable, Equatable, Hashable {
     /// live. Nil for wallpapers imported before this existed.
     var packageSizeBytes: Int64?
 
+    /// User-set via the library grid's right-click "Pin" option — shows a pin badge on the card.
+    /// Nil/false means not pinned, same convention as the other optional flags on this type.
+    var isPinned: Bool?
+
     /// "M:SS" formatted `videoDuration`, or nil if it hasn't been probed.
     var durationText: String? {
         guard let videoDuration, videoDuration.isFinite, videoDuration > 0 else { return nil }
@@ -142,13 +146,15 @@ struct WEWallpaper: Codable, RawRepresentable, Identifiable {
             let rawValueData = try JSONEncoder().encode(self)
             return String(data: rawValueData, encoding: .utf8)!
         } catch {
-            print(error)
+            WWLog.app.error("\(error)")
             return ""
         }
     }
     
     var wallpaperDirectory: URL
     var project: WEProject
+
+    var isPinned: Bool { project.isPinned ?? false }
     
     /// Prefers `project.packageSizeBytes` (computed once at import time) over a live directory
     /// walk — this is read for every wallpaper on every sort/filter, so recomputing it from disk
