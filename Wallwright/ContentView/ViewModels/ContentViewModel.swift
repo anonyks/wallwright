@@ -496,6 +496,14 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// expensive value exactly once before sorting — the standard decorate/sort/undecorate
     /// pattern — turns that into O(n) calls regardless of comparator cost.
     private var sortedWallpapers: [WEWallpaper] {
+        // Pinned wallpapers float to the top regardless of the chosen sort, same convention as
+        // pinned chats/notes/tabs elsewhere. `sorted(by:)` is stable (Swift 5+), so this only
+        // reorders pinned-vs-unpinned; everything within each group keeps whatever order the
+        // switch below already gave it.
+        return sortedByChosenCriteria.sorted { $0.isPinned && !$1.isPinned }
+    }
+
+    private var sortedByChosenCriteria: [WEWallpaper] {
         let items = filteredWallpapers
         // Every case here used to compare via `if a <= b, increase { return false }` / `if a >= b,
         // decrease { return false }` — not a valid strict-weak-ordering predicate, and one that
