@@ -102,7 +102,7 @@ struct DisplaySettings: SubviewOfContentView {
         // `wallpaper.project` is already decoded and in memory — no need to re-read and
         // re-decode project.json from disk just to get the same `preview` field back out.
         guard !wallpaper.project.preview.isEmpty else {
-            return Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
+            return AppResources.wallpaperNotFoundVideoURL
         }
         return wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview)
     }

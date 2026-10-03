@@ -12,8 +12,6 @@ import ServiceManagement
 import Carbon.HIToolbox
 import os
 
-private let wallpaperDebugLog2 = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 enum GSPlayback: String, CaseIterable, Identifiable, Codable {
     var id: Self { self }
     case keepRunning, mute, pause, stop
@@ -782,7 +780,7 @@ class GlobalSettingsViewModel: ObservableObject {
 
     /// Applies the "Other Application Fullscreen" policy — same shape as the reactions above.
     func otherApplicationFullscreenDidChange() {
-        wallpaperDebugLog2.notice("otherApplicationFullscreenDidChange() — isOtherAppFullscreen=\(FullscreenAppMonitor.shared.isOtherAppFullscreen), policy=\(String(describing: self.settings.otherApplicationFullscreen), privacy: .public)")
+        WWLog.playback.notice("otherApplicationFullscreenDidChange() — isOtherAppFullscreen=\(FullscreenAppMonitor.shared.isOtherAppFullscreen), policy=\(String(describing: self.settings.otherApplicationFullscreen), privacy: .public)")
         if FullscreenAppMonitor.shared.isOtherAppFullscreen {
             switch settings.otherApplicationFullscreen {
             case .pause:
@@ -804,10 +802,10 @@ class GlobalSettingsViewModel: ObservableObject {
                 AppDelegate.shared.wallpaperViewModel.isStopped = false
                 for window in AppDelegate.shared.wallpaperWindows.values { window.orderFront(nil) }
                 guard !shouldWallpaperStayPaused else {
-                    wallpaperDebugLog2.notice("otherApplicationFullscreenDidChange() — windows ordered front but shouldWallpaperStayPaused, NOT resuming")
+                    WWLog.playback.notice("otherApplicationFullscreenDidChange() — windows ordered front but shouldWallpaperStayPaused, NOT resuming")
                     break
                 }
-                wallpaperDebugLog2.notice("otherApplicationFullscreenDidChange() — calling AppDelegate.resume()")
+                WWLog.playback.notice("otherApplicationFullscreenDidChange() — calling AppDelegate.resume()")
                 AppDelegate.shared.resume()
             case .keepRunning, .mute:
                 break
@@ -858,7 +856,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 try appService.unregister()
             }
         } catch {
-            print(error)
+            WWLog.settings.error("\(error)")
         }
     }
     
@@ -877,7 +875,7 @@ class GlobalSettingsViewModel: ObservableObject {
                     do {
                         try NSWorkspace.shared.setDesktopImageURL(wallpaper, for: mainScreen)
                     } catch {
-                        print("didChangeAdjustMenuBarTint: failed to restore original wallpaper: \(error)")
+                        WWLog.settings.error("didChangeAdjustMenuBarTint: failed to restore original wallpaper: \(error)")
                     }
                 }
             } else {
@@ -944,7 +942,10 @@ class GlobalSettingsViewModel: ObservableObject {
     }
 
     func save() {
-        let data = try! JSONEncoder().encode(settings)
+        guard let data = try? JSONEncoder().encode(settings) else {
+            WWLog.settings.error("Failed to encode settings — not writing to disk or UserDefaults")
+            return
+        }
         try? data.write(to: Self.settingsFileURL, options: .atomic)
         // Also mirrored to UserDefaults for anything else that might still read the old key —
         // the file above is the actual durable source of truth now.

@@ -11,7 +11,7 @@ import SwiftUI
 /// Provide Wallpaper Database for WallpaperView and ContentView etc.
 class WallpaperViewModel: ObservableObject {
     @Published var nextCurrentWallpaper: WEWallpaper =
-    WEWallpaper(using: .invalid, where: Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!) {
+    WEWallpaper(using: .invalid, where: AppResources.wallpaperNotFoundVideoURL) {
         willSet {
             self.setWallpaper(newValue, for: selectedScreenId)
         }
@@ -44,7 +44,7 @@ class WallpaperViewModel: ObservableObject {
     /// The screen currently selected in the UI for configuration.
     @Published var selectedScreenId: String = ""
 
-    static let defaultWallpaper = WEWallpaper(using: .invalid, where: Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!)
+    static let defaultWallpaper = WEWallpaper(using: .invalid, where: AppResources.wallpaperNotFoundVideoURL)
 
     // MARK: - Recent wallpapers
 

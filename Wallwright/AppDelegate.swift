@@ -10,10 +10,6 @@ import SwiftUI
 import AVKit
 import os
 
-/// Temporary diagnostic logging for the lock/screensaver "paused but not paused" bug — same
-/// subsystem/category as `VideoWallpaperViewModel`'s own instance so both interleave in one query.
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     var statusItem: NSStatusItem!
@@ -236,7 +232,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     func applicationDidBecomeActive(_ notification: Notification) {
-        wallpaperDebugLog.notice("applicationDidBecomeActive fired")
+        WWLog.playback.notice("applicationDidBecomeActive fired")
         NSApp.activate(ignoringOtherApps: true)
         ActiveInboxTransport.shared.start()
     }
@@ -249,13 +245,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        wallpaperDebugLog.notice("applicationShouldHandleReopen fired — hasVisibleWindows=\(flag), mainWindow.isVisible=\(self.mainWindowController.window.isVisible), settingsWindow.isVisible=\(self.settingsWindow.isVisible)")
+        WWLog.playback.notice("applicationShouldHandleReopen fired — hasVisibleWindows=\(flag), mainWindow.isVisible=\(self.mainWindowController.window.isVisible), settingsWindow.isVisible=\(self.settingsWindow.isVisible)")
         if !self.mainWindowController.window.isVisible && !settingsWindow.isVisible {
             // `openMainWindow()`, not a bare `makeKeyAndOrderFront` — that call alone doesn't
             // activate the app, so the window appeared but keyboard focus silently stayed on
             // whatever was frontmost before (Terminal, Finder, ...) until the user clicked inside
             // it. `openMainWindow()` already does both.
-            wallpaperDebugLog.notice("applicationShouldHandleReopen — calling openMainWindow()")
+            WWLog.playback.notice("applicationShouldHandleReopen — calling openMainWindow()")
             openMainWindow()
         }
 
@@ -305,10 +301,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         } catch {
-            print(error)
+            WWLog.app.error("Failed to clear stale static-wallpaper cache files: \(error)")
         }
     }
-    
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
@@ -325,7 +321,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     @objc func openMainWindow() {
-        wallpaperDebugLog.notice("openMainWindow() called")
+        WWLog.playback.notice("openMainWindow() called")
         self.mainWindowController.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -364,7 +360,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let toolbar = NSToolbar(identifier: "SettingsToolbar")
         toolbar.delegate = self
         
-        toolbar.selectedItemIdentifier = SettingsToolbarIdentifiers.performance
+        toolbar.selectedItemIdentifier = SettingsToolbarIdentifiers.general
         
         self.settingsWindow.toolbar = toolbar
         self.settingsWindow.contentView = NSHostingView(rootView: SettingsView().environmentObject(self.globalSettingsViewModel))
@@ -480,13 +476,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var pendingScreensChangedWorkItem: DispatchWorkItem?
 
     @objc func screensChanged() {
-        wallpaperDebugLog.notice("screensChanged() notification received — debouncing 0.5s")
+        WWLog.playback.notice("screensChanged() notification received — debouncing 0.5s")
         pendingScreensChangedWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             let signature = Self.screenConfigurationSignature()
             guard signature != self.lastScreenConfigurationSignature else {
-                wallpaperDebugLog.notice("screensChanged() — signature unchanged, skipping rebuild")
+                WWLog.playback.notice("screensChanged() — signature unchanged, skipping rebuild")
                 return
             }
             self.lastScreenConfigurationSignature = signature
@@ -509,7 +505,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if !connectedIds.contains(self.wallpaperViewModel.selectedScreenId) {
                 self.wallpaperViewModel.selectedScreenId = WallpaperViewModel.mainScreenId()
             }
-            wallpaperDebugLog.notice("screensChanged() — signature CHANGED, rebuilding wallpaper windows")
+            WWLog.playback.notice("screensChanged() — signature CHANGED, rebuilding wallpaper windows")
             self.rebuildWallpaperWindows()
             self.rebuildClockWindows()
         }
@@ -612,7 +608,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let time = CMTimeMake(value: 1, timescale: 1) // 第一帧的时间
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, cgImage, _, _, error in
                 if let error = error {
-                    print(error)
+                    WWLog.app.error("Failed to generate placeholder thumbnail frame: \(error)")
                 } else if let cgImage = cgImage {
                     // Build the TIFF data directly from the CGImage via NSBitmapImageRep, not by
                     // wrapping it in a zero-sized NSImage first and asking for .tiffRepresentation
@@ -652,12 +648,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                     do {
                                         try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
                                     } catch {
-                                        print(error)
+                                        WWLog.app.error("Failed to set placeholder desktop image for screen: \(error)")
                                     }
                                 }
                             }
                         } catch {
-                            print(error)
+                            WWLog.app.error("Failed to write placeholder thumbnail to disk: \(error)")
                         }
                     }
                 }
@@ -701,7 +697,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
                     lastPlaceholderImageURLs[screenId] = url
                 } catch {
-                    print(error)
+                    WWLog.app.error("Failed to set static-image desktop wallpaper for screen: \(error)")
                 }
             }
             // Reverted: registering this image as the system's "Idle" (screensaver) choice too,

@@ -8,8 +8,6 @@
 import SwiftUI
 import os
 
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 struct WallpaperPreview: SubviewOfContentView {
     @ObservedObject var viewModel: ContentViewModel
     @ObservedObject var wallpaperViewModel: WallpaperViewModel
@@ -101,7 +99,7 @@ struct WallpaperPreview: SubviewOfContentView {
                         ThumbnailImage(contentsOf: {
                             let project = wallpaperViewModel.currentWallpaper.project
                             return project == .invalid || project.preview.isEmpty
-                                ? Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
+                                ? AppResources.wallpaperNotFoundVideoURL
                                 : wallpaperViewModel.currentWallpaper.wallpaperDirectory.appending(path: project.preview)
                         }())
                             .resizable()
@@ -370,7 +368,7 @@ struct WallpaperPreview: SubviewOfContentView {
             HStack {
                 Spacer()
                 Button {
-                    wallpaperDebugLog.notice("WallpaperPreview close (xmark) button tapped")
+                    WWLog.playback.notice("WallpaperPreview close (xmark) button tapped")
                     AppDelegate.shared.mainWindowController.close()
                 } label: {
                     Image(systemName: "xmark")

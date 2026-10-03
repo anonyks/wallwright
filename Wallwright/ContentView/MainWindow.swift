@@ -67,7 +67,7 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered, defer: false))
         self.window.delegate = self
         self.window.isReleasedWhenClosed = false
-        self.window.title = "Wallwright \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as! String)"
+        self.window.title = "Wallwright \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")"
         self.window.titlebarAppearsTransparent = true
         // `isOpaque = false` + a `.clear` background are what actually let a `NSVisualEffectView`
         // in `.behindWindow` mode (see `WindowGlassBackground`, applied to `ContentView`'s root)

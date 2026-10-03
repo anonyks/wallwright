@@ -121,7 +121,7 @@ final class AerialsInjector {
     private func checkHealth() {
         guard let videoURL = lastVideoURL, let name = lastVideoName else { return }
         guard !isInjectionHealthy() else { return }
-        print("AerialsInjector: health check failed — re-injecting")
+        WWLog.aerial.notice("AerialsInjector: health check failed — re-injecting")
         inject(videoURL: videoURL, name: name)
     }
 
@@ -238,7 +238,7 @@ final class AerialsInjector {
                 if fm.fileExists(atPath: destPath) { try fm.removeItem(atPath: destPath) }
                 try fm.copyItem(at: sourceForCopy, to: URL(fileURLWithPath: destPath))
             } catch {
-                print("AerialsInjector: failed to copy video: \(error)")
+                WWLog.aerial.error("AerialsInjector: failed to copy video: \(error)")
                 if sourceForCopy != videoURL { try? fm.removeItem(at: sourceForCopy) }
                 return
             }
@@ -260,11 +260,11 @@ final class AerialsInjector {
         }
 
         guard updateEntriesJSON(assetID: uuid, videoName: name) else {
-            print("AerialsInjector: failed to update entries.json")
+            WWLog.aerial.error("AerialsInjector: failed to update entries.json")
             return
         }
         guard updateWallpaperStore(assetID: uuid) else {
-            print("AerialsInjector: failed to update wallpaper store")
+            WWLog.aerial.error("AerialsInjector: failed to update wallpaper store")
             return
         }
 
@@ -331,7 +331,7 @@ final class AerialsInjector {
                 cursor = CMTimeAdd(cursor, asset.duration)
             }
         } catch {
-            print("AerialsInjector: loop composition build failed, using original file: \(error)")
+            WWLog.aerial.error("AerialsInjector: loop composition build failed, using original file: \(error)")
             return sourceURL
         }
 
@@ -349,7 +349,7 @@ final class AerialsInjector {
         semaphore.wait()
 
         guard exportSession.status == .completed else {
-            print("AerialsInjector: loop export failed (\(exportSession.error?.localizedDescription ?? "unknown")), using original file")
+            WWLog.aerial.error("AerialsInjector: loop export failed (\(exportSession.error?.localizedDescription ?? "unknown")), using original file")
             try? FileManager.default.removeItem(at: tmpURL)
             return sourceURL
         }
@@ -404,7 +404,7 @@ final class AerialsInjector {
             try newData.write(to: tmpURL)
             _ = try FileManager.default.replaceItemAt(storeURL, withItemAt: tmpURL)
         } catch {
-            print("AerialsInjector: failed to clear stale store entries: \(error)")
+            WWLog.aerial.error("AerialsInjector: failed to clear stale store entries: \(error)")
         }
     }
 
@@ -619,7 +619,7 @@ final class AerialsInjector {
             _ = try fm.replaceItemAt(URL(fileURLWithPath: entriesPath), withItemAt: tmpURL)
             return true
         } catch {
-            print("AerialsInjector: failed to write entries.json: \(error)")
+            WWLog.aerial.error("AerialsInjector: failed to write entries.json: \(error)")
             return false
         }
     }
@@ -741,7 +741,7 @@ final class AerialsInjector {
             _ = try FileManager.default.replaceItemAt(storeURL, withItemAt: tmpURL)
             return true
         } catch {
-            print("AerialsInjector: failed to write wallpaper store: \(error)")
+            WWLog.aerial.error("AerialsInjector: failed to write wallpaper store: \(error)")
             return false
         }
     }

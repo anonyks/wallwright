@@ -67,7 +67,7 @@ struct EditWallpaperSheet: SubviewOfContentView {
                             VideoFrameScrubberView(player: scrubPlayer)
                         } else {
                             ThumbnailImage(contentsOf: project == .invalid || project.preview.isEmpty
-                                ? Bundle.main.url(forResource: "WallpaperNotFound", withExtension: "mp4")!
+                                ? AppResources.wallpaperNotFoundVideoURL
                                 : wallpaper.wallpaperDirectory.appending(path: project.preview))
                                 .resizable()
                                 .aspectRatio(16.0 / 9.0, contentMode: .fit)

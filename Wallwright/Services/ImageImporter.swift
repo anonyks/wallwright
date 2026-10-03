@@ -147,7 +147,7 @@ enum ImageImporter {
         } catch {
             // Same cleanup-on-partial-write-failure as VideoImporter.commitImport — see its
             // comment for why.
-            print("ImageImporter: write failed: \(error)")
+            WWLog.importing.error("ImageImporter: write failed: \(error)")
             try? FileManager.default.removeItem(at: destination)
             return false
         }

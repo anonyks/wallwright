@@ -47,37 +47,8 @@ enum VideoTranscoder {
     /// the codec inside is already compatible (e.g. an already-H.264 .mkv).
     private static let nativeContainerExtensions: Set<String> = ["mp4", "mov", "m4v"]
 
-    /// Checked in order before falling back to a PATH lookup — a GUI-launched app's process
-    /// environment often doesn't include Homebrew's (or MacPorts', or Nix's) bin directory on PATH
-    /// the way an interactive Terminal session does, so the common install locations are tried
-    /// directly first.
-    private static func resolveBinary(named name: String) -> String? {
-        let candidates = [
-            "/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", "/usr/bin/\(name)",
-            "/opt/local/bin/\(name)",
-            NSString(string: "~/.nix-profile/bin/\(name)").expandingTildeInPath,
-        ]
-        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
-            return path
-        }
-        let which = Process()
-        which.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        which.arguments = [name]
-        let pipe = Pipe()
-        which.standardOutput = pipe
-        which.standardError = Pipe()
-        guard (try? which.run()) != nil else { return nil }
-        which.waitUntilExit()
-        guard which.terminationStatus == 0,
-              let path = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                  .trimmingCharacters(in: .whitespacesAndNewlines),
-              !path.isEmpty
-        else { return nil }
-        return path
-    }
-
-    static var ffmpegPath: String? { resolveBinary(named: "ffmpeg") }
-    static var ffprobePath: String? { resolveBinary(named: "ffprobe") }
+    static var ffmpegPath: String? { ProcessRunner.resolveBinary(named: "ffmpeg") }
+    static var ffprobePath: String? { ProcessRunner.resolveBinary(named: "ffprobe") }
     static var isAvailable: Bool { ffmpegPath != nil }
 
     static func probeVideoInfo(at url: URL) -> VideoFileInfo? {

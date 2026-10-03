@@ -13,6 +13,10 @@
 		4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */; };
 		4E42DA3B74C81EFDA1AF4100 /* WallpaperDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2799B323BA1B8CF9D6A0F4D /* WallpaperDirectoryTests.swift */; };
 		5E0700E62A859FAD00ADFE2E /* WallpaperNotFound.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */; };
+		8E6AF5F8F2C04B1A99697546 /* WWLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200E00B6CD024C21B973FB2A /* WWLog.swift */; };
+		AF10B2534B2F4B9BA0E8C6F1 /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7EBE4C46D5421BB52A775C /* ProcessRunner.swift */; };
+		80E3A5D961AC46939AADFC2D /* AppResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F4689D19F94ED79AEE91D7 /* AppResources.swift */; };
+		5A56008A519E4D0F8AC51501 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BA15CEE64AEF436B99DD0AEE /* PrivacyInfo.xcprivacy */; };
 		5E2F1E892A57DF2D0081D69D /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5E2F1E882A57DF2D0081D69D /* Localizable.xcstrings */; };
 		5E32ABFE2A4D595D00A0EEEC /* FilterResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E32ABFD2A4D595D00A0EEEC /* FilterResults.swift */; };
 		5E51A43C2AA33F5500E46E99 /* GlobalSettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E51A43B2AA33F5500E46E99 /* GlobalSettingsService.swift */; };
@@ -148,6 +152,7 @@
 		355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InboxClassifierTests.swift; sourceTree = "<group>"; };
 		3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicDesktopHEICTests.swift; sourceTree = "<group>"; };
 		5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = WallpaperNotFound.mp4; sourceTree = "<group>"; };
+		BA15CEE64AEF436B99DD0AEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		5E1670732A88EBEF00D1B199 /* change-signing-certificate.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "change-signing-certificate.png"; sourceTree = "<group>"; };
 		5E1670742A88ED8400D1B199 /* import-menu.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "import-menu.png"; sourceTree = "<group>"; };
 		5E1670752A88EDF000D1B199 /* import-panel.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "import-panel.png"; sourceTree = "<group>"; };
@@ -221,6 +226,9 @@
 		EE0000000000000000000014 /* Hotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hotkey.swift; sourceTree = "<group>"; };
 		EE0000000000000000000016 /* ReservedShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservedShortcuts.swift; sourceTree = "<group>"; };
 		EE0000000000000000000018 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
+		200E00B6CD024C21B973FB2A /* WWLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WWLog.swift; sourceTree = "<group>"; };
+		1A7EBE4C46D5421BB52A775C /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
+		D5F4689D19F94ED79AEE91D7 /* AppResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppResources.swift; sourceTree = "<group>"; };
 		EE000000000000000000001A /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		EE000000000000000000001C /* HotkeysPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeysPage.swift; sourceTree = "<group>"; };
 		EE000000000000000000001E /* ClockColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockColorPicker.swift; sourceTree = "<group>"; };
@@ -382,6 +390,9 @@
 				5EF28EBE2A8986AC0013ABBE /* WallpaperViewModel.swift */,
 				5EF28EC02A8990D90013ABBE /* VideoWallpaperViewModel.swift */,
 				5E51A43B2AA33F5500E46E99 /* GlobalSettingsService.swift */,
+				200E00B6CD024C21B973FB2A /* WWLog.swift */,
+				1A7EBE4C46D5421BB52A775C /* ProcessRunner.swift */,
+				D5F4689D19F94ED79AEE91D7 /* AppResources.swift */,
 				BB0000000000000000000001 /* ObjCExceptionCatcher.h */,
 				BB0000000000000000000002 /* ObjCExceptionCatcher.m */,
 				CC0000000000000000000002 /* WallpaperDirectory.swift */,
@@ -507,6 +518,7 @@
 				5E98F6CC2A826ED500C12E34 /* Resources */,
 				5EC47E7F2A2DB2E700120CCC /* Preview Content */,
 				5E2F1E882A57DF2D0081D69D /* Localizable.xcstrings */,
+				BA15CEE64AEF436B99DD0AEE /* PrivacyInfo.xcprivacy */,
 				5EC47E872A2DB2E700120CCC /* Wallwright.entitlements */,
 				5EB152A02A82ADEB007EA845 /* Wallwright.docc */,
 			);
@@ -678,6 +690,7 @@
 				5EC47E812A2DB2E700120CCC /* Preview Assets.xcassets in Resources */,
 				5E2F1E892A57DF2D0081D69D /* Localizable.xcstrings in Resources */,
 				5E0700E62A859FAD00ADFE2E /* WallpaperNotFound.mp4 in Resources */,
+				5A56008A519E4D0F8AC51501 /* PrivacyInfo.xcprivacy in Resources */,
 				5EC47E7E2A2DB2E700120CCC /* Assets.xcassets in Resources */,
 				EE000000000000000000000E /* Fonts in Resources */,
 			);
@@ -768,6 +781,9 @@
 				EE0000000000000000000013 /* Hotkey.swift in Sources */,
 				EE0000000000000000000015 /* ReservedShortcuts.swift in Sources */,
 				EE0000000000000000000017 /* GlobalHotkeyManager.swift in Sources */,
+				8E6AF5F8F2C04B1A99697546 /* WWLog.swift in Sources */,
+				AF10B2534B2F4B9BA0E8C6F1 /* ProcessRunner.swift in Sources */,
+				80E3A5D961AC46939AADFC2D /* AppResources.swift in Sources */,
 				EE0000000000000000000019 /* HotkeyRecorderView.swift in Sources */,
 				EE000000000000000000001B /* HotkeysPage.swift in Sources */,
 				EE000000000000000000001D /* ClockColorPicker.swift in Sources */,
@@ -995,7 +1011,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = NO;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2023-2026 Wallwright Authors. Licensed under GPL-3.0.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1032,7 +1048,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = NO;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2023-2026 Wallwright Authors. Licensed under GPL-3.0.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

@@ -18,11 +18,11 @@ enum ZipImporter {
             try process.run()
             process.waitUntilExit()
         } catch {
-            print("ZipImporter: ditto failed: \(error)")
+            WWLog.importing.error("ZipImporter: ditto failed: \(error)")
             return 0
         }
         guard process.terminationStatus == 0 else {
-            print("ZipImporter: ditto exited with status \(process.terminationStatus)")
+            WWLog.importing.error("ZipImporter: ditto exited with status \(process.terminationStatus)")
             return 0
         }
 
@@ -41,13 +41,13 @@ enum ZipImporter {
             // directory walk for it). `preparePending` already handles the unsupported-type check
             // and the title/directory-name fallback this used to do inline.
             guard let pending = try? PackageImporter.preparePending(at: url) else {
-                print("ZipImporter: skipping \(url.lastPathComponent) — couldn't prepare (unsupported type, missing project.json, or no preview image)")
+                WWLog.importing.notice("ZipImporter: skipping \(url.lastPathComponent) — couldn't prepare (unsupported type, missing project.json, or no preview image)")
                 continue
             }
             if await PackageImporter.commitImport(pending) {
                 imported += 1
             } else {
-                print("ZipImporter: commit failed for \(url.lastPathComponent)")
+                WWLog.importing.error("ZipImporter: commit failed for \(url.lastPathComponent)")
             }
         }
 

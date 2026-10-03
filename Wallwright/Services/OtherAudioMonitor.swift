@@ -40,8 +40,6 @@ import CoreAudio
 import Foundation
 import os
 
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 final class OtherAudioMonitor {
     static let shared = OtherAudioMonitor()
 
@@ -141,7 +139,7 @@ final class OtherAudioMonitor {
 
     private func poll() {
         guard !isPolling else {
-            wallpaperDebugLog.notice("OtherAudioMonitor: poll() skipped — previous poll still in flight")
+            WWLog.playback.notice("OtherAudioMonitor: poll() skipped — previous poll still in flight")
             return
         }
         isPolling = true
@@ -162,7 +160,7 @@ final class OtherAudioMonitor {
                 self.isPolling = false
                 guard coreAudioPlaying else {
                     if self.consecutiveCoreAudioTrueCount > 0 {
-                        wallpaperDebugLog.notice("OtherAudioMonitor: coreAudioPlaying=false, resetting count from \(self.consecutiveCoreAudioTrueCount)")
+                        WWLog.playback.notice("OtherAudioMonitor: coreAudioPlaying=false, resetting count from \(self.consecutiveCoreAudioTrueCount)")
                     }
                     self.consecutiveCoreAudioTrueCount = 0
                     self.isOtherAppPlaying = false
@@ -176,7 +174,7 @@ final class OtherAudioMonitor {
                 // made it, no allowlist needed, while still catching a genuinely sustained source
                 // (a call, music, screen sharing) within one extra poll cycle.
                 self.consecutiveCoreAudioTrueCount += 1
-                wallpaperDebugLog.notice("OtherAudioMonitor: coreAudioPlaying=true, consecutiveCount=\(self.consecutiveCoreAudioTrueCount)")
+                WWLog.playback.notice("OtherAudioMonitor: coreAudioPlaying=true, consecutiveCount=\(self.consecutiveCoreAudioTrueCount)")
                 self.isOtherAppPlaying = self.consecutiveCoreAudioTrueCount >= 2
             }
         }
@@ -200,7 +198,7 @@ final class OtherAudioMonitor {
             guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else { continue }
             guard let script = NSAppleScript(source: "tell application \"\(appName)\" to player state as string") else { continue }
             guard let stringValue = runAppleScriptWithTimeout(script) else {
-                wallpaperDebugLog.notice("OtherAudioMonitor: Apple Event to \(appName, privacy: .public) timed out or errored — falling through")
+                WWLog.playback.notice("OtherAudioMonitor: Apple Event to \(appName, privacy: .public) timed out or errored — falling through")
                 continue
             }
             if stringValue == "playing" {

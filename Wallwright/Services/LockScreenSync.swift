@@ -24,10 +24,6 @@ import Foundation
 import IOKit.pwr_mgt
 import os
 
-/// Temporary diagnostic logging for the lock/screensaver "paused but not paused" bug — same
-/// subsystem/category as `VideoWallpaperViewModel`'s own instance so both interleave in one query.
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 final class LockScreenSync {
     static let shared = LockScreenSync()
 
@@ -98,18 +94,18 @@ final class LockScreenSync {
     }
 
     @objc private func screensaverDidDeactivate() {
-        wallpaperDebugLog.notice("GROUND TRUTH: com.apple.screensaver.didStop received")
+        WWLog.playback.notice("GROUND TRUTH: com.apple.screensaver.didStop received")
         AerialsInjector.shared.prewarmForNextActivation()
     }
 
     @objc private func powerSourceDidChange() {
         guard assertionID != 0, BatteryMonitor.checkOnBattery() else { return }
-        wallpaperDebugLog.notice("power source changed to battery while locked — releasing display-sleep assertion")
+        WWLog.playback.notice("power source changed to battery while locked — releasing display-sleep assertion")
         releaseAssertion()
     }
 
     private func screenLocked() {
-        wallpaperDebugLog.notice("GROUND TRUTH: screenIsLocked received")
+        WWLog.playback.notice("GROUND TRUTH: screenIsLocked received")
         guard assertionID == 0, !BatteryMonitor.checkOnBattery() else { return }
         IOPMAssertionCreateWithName(
             kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
@@ -133,7 +129,7 @@ final class LockScreenSync {
     }
 
     private func screenUnlocked() {
-        wallpaperDebugLog.notice("GROUND TRUTH: screenIsUnlocked received")
+        WWLog.playback.notice("GROUND TRUTH: screenIsUnlocked received")
         NotificationCenter.default.post(name: Self.screenDidUnlockNotification, object: nil)
         releaseAssertion()
 

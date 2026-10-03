@@ -133,7 +133,7 @@ enum PackageImporter {
                         videoURL, outputDirectory: destination, deleteSourceOnSuccess: true
                     )
                 } catch {
-                    print("PackageImporter: transcode failed: \(error)")
+                    WWLog.importing.error("PackageImporter: transcode failed: \(error)")
                     try? fm.removeItem(at: destination)
                     return false
                 }
@@ -155,7 +155,7 @@ enum PackageImporter {
             VideoImporter.notifyLibraryChanged()
             return true
         } catch {
-            print("PackageImporter: commit failed: \(error)")
+            WWLog.importing.error("PackageImporter: commit failed: \(error)")
             try? fm.removeItem(at: destination)
             return false
         }

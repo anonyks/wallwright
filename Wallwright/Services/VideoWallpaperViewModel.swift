@@ -12,11 +12,6 @@ import Combine
 import os
 import VideoToolbox
 
-/// Temporary diagnostic logging for the lock/screensaver "paused but not paused" bug — uses
-/// `os.Logger` (not `print`) specifically so it's captured by the unified log and queryable via
-/// `log show`/Console even when the app was launched normally (not attached to a debugger).
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 class VideoWallpaperViewModel: ObservableObject {
     var currentWallpaper: WEWallpaper {
         didSet {
@@ -171,10 +166,10 @@ class VideoWallpaperViewModel: ObservableObject {
                 guard let self, status == .failed, self.player.currentItem === item else { return }
                 let reason = item.error?.localizedDescription ?? "unknown"
                 guard !self.didRetryCurrentItemAfterFailure else {
-                    wallpaperDebugLog.error("[\(self.screenId, privacy: .public)] wallpaper item failed again after retry (\(reason, privacy: .public)) — giving up, desktop stays on last good frame")
+                    WWLog.playback.error("[\(self.screenId, privacy: .public)] wallpaper item failed again after retry (\(reason, privacy: .public)) — giving up, desktop stays on last good frame")
                     return
                 }
-                wallpaperDebugLog.error("[\(self.screenId, privacy: .public)] wallpaper item failed (\(reason, privacy: .public)) — retrying once")
+                WWLog.playback.error("[\(self.screenId, privacy: .public)] wallpaper item failed (\(reason, privacy: .public)) — retrying once")
                 self.didRetryCurrentItemAfterFailure = true
                 self.retryAfterPlaybackFailure()
             }
@@ -216,21 +211,21 @@ class VideoWallpaperViewModel: ObservableObject {
             // `audioPlayer` decodes the entire video a second time for a file with no audio to
             // ever play, defeating the whole point. An item over a genuinely empty composition
             // has zero tracks, so nothing (video or audio) ever gets decoded for it.
-            wallpaperDebugLog.notice("audioOnlyItem: no audio track found, using an empty (silent) item")
+            WWLog.playback.notice("audioOnlyItem: no audio track found, using an empty (silent) item")
             return AVPlayerItem(asset: AVMutableComposition())
         }
         let composition = AVMutableComposition()
         guard let compositionTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            wallpaperDebugLog.notice("audioOnlyItem: addMutableTrack failed, falling back to full URL")
+            WWLog.playback.notice("audioOnlyItem: addMutableTrack failed, falling back to full URL")
             return AVPlayerItem(url: url)
         }
         do {
             try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: asset.duration), of: audioTrack, at: .zero)
         } catch {
-            wallpaperDebugLog.notice("audioOnlyItem: insertTimeRange failed (\(error.localizedDescription, privacy: .public)), falling back to full URL")
+            WWLog.playback.notice("audioOnlyItem: insertTimeRange failed (\(error.localizedDescription, privacy: .public)), falling back to full URL")
             return AVPlayerItem(url: url)
         }
-        wallpaperDebugLog.notice("audioOnlyItem: composition built successfully, using audio-only item")
+        WWLog.playback.notice("audioOnlyItem: composition built successfully, using audio-only item")
         return AVPlayerItem(asset: composition)
     }
 
@@ -257,17 +252,17 @@ class VideoWallpaperViewModel: ObservableObject {
         }
         let composition = AVMutableComposition()
         guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            wallpaperDebugLog.notice("videoOnlyItem: addMutableTrack failed, falling back to full URL")
+            WWLog.playback.notice("videoOnlyItem: addMutableTrack failed, falling back to full URL")
             return AVPlayerItem(url: url)
         }
         do {
             try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: asset.duration), of: videoTrack, at: .zero)
         } catch {
-            wallpaperDebugLog.notice("videoOnlyItem: insertTimeRange failed (\(error.localizedDescription, privacy: .public)), falling back to full URL")
+            WWLog.playback.notice("videoOnlyItem: insertTimeRange failed (\(error.localizedDescription, privacy: .public)), falling back to full URL")
             return AVPlayerItem(url: url)
         }
         compositionTrack.preferredTransform = videoTrack.preferredTransform
-        wallpaperDebugLog.notice("videoOnlyItem: composition built successfully, using video-only item")
+        WWLog.playback.notice("videoOnlyItem: composition built successfully, using video-only item")
         return AVPlayerItem(asset: composition)
     }
 
@@ -279,6 +274,11 @@ class VideoWallpaperViewModel: ObservableObject {
     /// VideoToolbox rather than assumed either way. This is detection/logging only, not a fix —
     /// making the actual codec play would need transcoding, which is out of scope here.
     private static func warnIfCodecMayNotDecode(videoTrack: AVAssetTrack, url: URL) {
+        // `as!` to the optional type (not `as? CMFormatDescription`) is deliberate: a plain
+        // conditional downcast to this CoreFoundation-bridged type is a hard compiler error here
+        // ("conditional downcast ... will always succeed"), and this form sidesteps that while
+        // still participating safely in the guard-let — it cannot crash, CMFormatDescription
+        // toll-free bridging guarantees the cast succeeds whenever `raw` is non-nil.
         guard let raw = videoTrack.formatDescriptions.first, let formatDescription = raw as! CMFormatDescription? else {
             return
         }
@@ -286,10 +286,10 @@ class VideoWallpaperViewModel: ObservableObject {
         let fourCC = fourCCString(codec)
         switch fourCC {
         case "vp08", "vp09":
-            wallpaperDebugLog.error("'\(url.lastPathComponent, privacy: .public)' uses video codec '\(fourCC, privacy: .public)' — macOS has no built-in decoder for this at all; this wallpaper will likely show as black/frozen despite playback appearing to run.")
+            WWLog.playback.error("'\(url.lastPathComponent, privacy: .public)' uses video codec '\(fourCC, privacy: .public)' — macOS has no built-in decoder for this at all; this wallpaper will likely show as black/frozen despite playback appearing to run.")
         case "av01":
             guard !VTIsHardwareDecodeSupported(codec) else { return }
-            wallpaperDebugLog.error("'\(url.lastPathComponent, privacy: .public)' uses video codec 'av01' (AV1) and this Mac has no hardware decoder for it — depending on macOS version this may fail to decode, showing as black/frozen despite playback appearing to run.")
+            WWLog.playback.error("'\(url.lastPathComponent, privacy: .public)' uses video codec 'av01' (AV1) and this Mac has no hardware decoder for it — depending on macOS version this may fail to decode, showing as black/frozen despite playback appearing to run.")
         default:
             break
         }
@@ -716,7 +716,7 @@ class VideoWallpaperViewModel: ObservableObject {
     }
 
     @objc func systemWillSleep(_ notification: Notification) {
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] systemWillSleep (screensDidSleep) fired")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] systemWillSleep (screensDidSleep) fired")
         applyRateToPlayers(0)
     }
 
@@ -729,12 +729,12 @@ class VideoWallpaperViewModel: ObservableObject {
     /// needs): this notification only ever posts on an actual unlock, never on a Space-switch or
     /// other transient blip, so there's no "was this just a blip" ambiguity to guard against here.
     @objc private func screenDidUnlock(_ notification: Notification) {
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] screenDidUnlock notification — reattaching unconditionally")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] screenDidUnlock notification — reattaching unconditionally")
         reattachPlayerLayer()
     }
 
     @objc func systemDidWake(_ notification: Notification) {
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] systemDidWake (screensDidWake) fired — playRate=\(self.playRate), player.rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] systemDidWake (screensDidWake) fired — playRate=\(self.playRate), player.rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
         // Global source of truth, not `self.playRate` — same staleness `seedInitialFrameIfStartingPaused`'s
         // own doc comment already covers: this fires from a direct `NSWorkspace` notification, with
         // no guaranteed ordering against `VideoWallpaperView.updateNSView`'s next render (which is
@@ -772,7 +772,7 @@ class VideoWallpaperViewModel: ObservableObject {
         // nothing is lost by no longer also trying (and misfiring) here.
         guard let ownWindow = playerView?.window else { return }
         let isVisible = ownWindow.occlusionState.contains(.visible)
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] occlusionStateDidChange (checking own window directly) — visible=\(isVisible)")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] occlusionStateDidChange (checking own window directly) — visible=\(isVisible)")
     }
 
     /// Detaches and reattaches the player from its `AVPlayerView` to force AVKit to rebuild its
@@ -783,22 +783,22 @@ class VideoWallpaperViewModel: ObservableObject {
     /// Nil-ing `AVPlayerView.player` and reassigning it forces a fresh render connection instead.
     private func reattachPlayerLayer() {
         guard let view = playerView else {
-            wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer called but playerView is nil")
+            WWLog.playback.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer called but playerView is nil")
             return
         }
         // See `lastReattachAt`'s doc comment — collapses the wake+unlock double-fire into one run.
         let now = Date()
         guard now.timeIntervalSince(lastReattachAt) > 2 else {
-            wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer skipped — already ran \(now.timeIntervalSince(self.lastReattachAt), format: .fixed(precision: 2))s ago")
+            WWLog.playback.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer skipped — already ran \(now.timeIntervalSince(self.lastReattachAt), format: .fixed(precision: 2))s ago")
             return
         }
         lastReattachAt = now
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer RUNNING — before: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer RUNNING — before: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
         view.player = nil
         view.player = player
         // See `systemDidWake`'s identical fix and comment — same staleness risk, since this is
         // called from `systemDidWake` (among other places) with no guaranteed sync beforehand.
         applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)
-        wallpaperDebugLog.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer DONE — after: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] reattachPlayerLayer DONE — after: rate=\(self.player.rate), timeControlStatus=\(self.player.timeControlStatus.rawValue)")
     }
 }

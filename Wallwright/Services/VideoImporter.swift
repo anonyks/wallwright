@@ -187,7 +187,7 @@ enum VideoImporter {
             // (`ContentViewModel.refresh()` just silently skips anything without a valid
             // project.json — it never deletes it), same as `PackageImporter.commitImport`'s own
             // failure path.
-            print("VideoImporter: write failed: \(error)")
+            WWLog.importing.error("VideoImporter: write failed: \(error)")
             try? FileManager.default.removeItem(at: destination)
             return false
         }
@@ -233,7 +233,7 @@ enum VideoImporter {
             try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: url, to: destination.appending(path: filename))
         } catch {
-            print("VideoImporter: copy failed: \(error)")
+            WWLog.importing.error("VideoImporter: copy failed: \(error)")
             try? FileManager.default.removeItem(at: destination)
             DispatchQueue.main.async { completion(false) }
             return
@@ -262,7 +262,7 @@ enum VideoImporter {
                     videoURL, outputDirectory: destination, deleteSourceOnSuccess: true
                 )
             } catch {
-                print("VideoImporter: transcode failed: \(error)")
+                WWLog.importing.error("VideoImporter: transcode failed: \(error)")
                 try? FileManager.default.removeItem(at: destination)
                 await MainActor.run { completion(false) }
                 return
@@ -301,7 +301,7 @@ enum VideoImporter {
                     notifyLibraryChanged()
                     completion(true)
                 } catch {
-                    print("VideoImporter: write failed: \(error)")
+                    WWLog.importing.error("VideoImporter: write failed: \(error)")
                     try? FileManager.default.removeItem(at: destination)
                     completion(false)
                 }

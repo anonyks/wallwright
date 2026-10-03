@@ -17,8 +17,6 @@
 import Foundation
 import os
 
-private let inboxDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "InboxDebug")
-
 final class NtfyInboxTransport: NSObject, InboxTransport {
     var onLinkReceived: ((String) -> Void)?
 
@@ -43,7 +41,7 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
         // Inbox just stopped receiving after one sleep cycle with no way to recover short of
         // relaunching the app.
         guard task?.state != .running else {
-            inboxDebugLog.notice("start() skipped — task already running")
+            WWLog.inbox.notice("start() skipped — task already running")
             return
         }
         task?.cancel()
@@ -56,7 +54,7 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
         let topic = AppDelegate.shared.globalSettingsViewModel.settings.inboxNtfyTopic
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !topic.isEmpty, let url = URL(string: "https://ntfy.sh/\(topic)/sse") else {
-            inboxDebugLog.notice("start() aborted — empty topic or bad URL (topic=\(topic, privacy: .public))")
+            WWLog.inbox.notice("start() aborted — empty topic or bad URL (topic=\(topic, privacy: .public))")
             return
         }
 
@@ -68,7 +66,7 @@ final class NtfyInboxTransport: NSObject, InboxTransport {
         let task = session.dataTask(with: url)
         self.task = task
         task.resume()
-        inboxDebugLog.notice("start() connecting to \(url.absoluteString, privacy: .public)")
+        WWLog.inbox.notice("start() connecting to \(url.absoluteString, privacy: .public)")
     }
 
     func stop() {
@@ -114,7 +112,7 @@ extension NtfyInboxTransport: URLSessionDataDelegate {
         // Deliberately no retry-on-a-timer here — clearing `self.task` just lets the next
         // lifecycle-triggered call to `start()` (unlock, wake, becomeActive, or the next launch)
         // reconnect, matching every other idempotent-restart service in this app.
-        inboxDebugLog.notice("didCompleteWithError: \(error?.localizedDescription ?? "nil", privacy: .public)")
+        WWLog.inbox.notice("didCompleteWithError: \(error?.localizedDescription ?? "nil", privacy: .public)")
         self.task = nil
         // Same reasoning as `start()`/`stop()`'s own `invalidateAndCancel()` calls — a bare
         // `session = nil` here would drop our reference but leave `URLSession` holding its own

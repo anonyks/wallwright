@@ -20,8 +20,6 @@
 import AppKit
 import os
 
-private let wallpaperDebugLog = Logger(subsystem: "com.wallwright.Wallwright", category: "VideoWallpaperDebug")
-
 final class FullscreenAppMonitor {
     static let shared = FullscreenAppMonitor()
     static let didChangeNotification = Notification.Name("FullscreenAppMonitor.didChange")
@@ -29,7 +27,7 @@ final class FullscreenAppMonitor {
     private(set) var isOtherAppFullscreen = false {
         didSet {
             guard oldValue != isOtherAppFullscreen else { return }
-            wallpaperDebugLog.notice("FullscreenAppMonitor.isOtherAppFullscreen changed to \(self.isOtherAppFullscreen)")
+            WWLog.playback.notice("FullscreenAppMonitor.isOtherAppFullscreen changed to \(self.isOtherAppFullscreen)")
             NotificationCenter.default.post(name: Self.didChangeNotification, object: nil)
             isOtherAppFullscreen ? startSafetyNetTimer() : stopSafetyNetTimer()
         }
@@ -169,7 +167,7 @@ final class FullscreenAppMonitor {
                 && AppDelegate.shared.settingsWindow.isOnActiveSpace
                 && AppDelegate.shared.settingsWindow.occlusionState.contains(.visible))
         let effectiveOtherAppFullscreen = allOccluded && !ownWindowIsCovering
-        wallpaperDebugLog.notice("FullscreenAppMonitor.recompute() — allOccluded=\(allOccluded), ownWindowIsCovering=\(ownWindowIsCovering), was isOtherAppFullscreen=\(self.isOtherAppFullscreen)")
+        WWLog.playback.notice("FullscreenAppMonitor.recompute() — allOccluded=\(allOccluded), ownWindowIsCovering=\(ownWindowIsCovering), was isOtherAppFullscreen=\(self.isOtherAppFullscreen)")
 
         guard effectiveOtherAppFullscreen else {
             pendingFullscreenConfirmationWorkItem?.cancel()

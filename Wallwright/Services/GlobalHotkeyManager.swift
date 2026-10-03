@@ -68,7 +68,7 @@ final class GlobalHotkeyManager {
             &ref
         )
         if status != noErr {
-            print("GlobalHotkeyManager: failed to register hotkey for \(id): OSStatus \(status)")
+            WWLog.hotkeys.error("GlobalHotkeyManager: failed to register hotkey for \(String(describing: id)): OSStatus \(status)")
             return nil
         }
         return ref
