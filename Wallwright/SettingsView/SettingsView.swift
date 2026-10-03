@@ -15,19 +15,19 @@ protocol SettingsPage: View {
 }
 
 extension AppDelegate {
-    @objc func jumpToPerformance() {
+    @objc func jumpToGeneral() {
         self.globalSettingsViewModel.selection = 0
     }
 
-    @objc func jumpToGeneral() {
+    @objc func jumpToPerformance() {
         self.globalSettingsViewModel.selection = 1
     }
 
-    @objc func jumpToAbout() {
+    @objc func jumpToHotkeys() {
         self.globalSettingsViewModel.selection = 2
     }
 
-    @objc func jumpToHotkeys() {
+    @objc func jumpToAbout() {
         self.globalSettingsViewModel.selection = 3
     }
 }
@@ -58,44 +58,25 @@ struct SettingsView: View {
             Group {
                 switch viewModel.selection {
                 case 0:
-                    PerformancePage(globalSettings: viewModel)
-                case 1:
                     GeneralPage(globalSettings: viewModel)
+                case 1:
+                    PerformancePage(globalSettings: viewModel)
                 case 2:
-                    AboutUsView()
-                case 3:
                     HotkeysPage(globalSettings: viewModel)
+                case 3:
+                    AboutUsView()
                 default:
                     fatalError()
                 }
             }
             .frame(minHeight: 400, maxHeight: 800)
-            
-            
+
             HStack {
-                // No "unsaved changes" indicator here anymore — `GlobalSettingsViewModel` already
-                // autosaves every mutation to disk on a 300ms debounce (see `settingsSaveCancellable`
-                // in GlobalSettingsService.swift), so this comparison against `loadPersisted()` was
-                // stale by design: it read "Edited" for up to 300ms after every single change
-                // (continuously while dragging a slider), even though the change was already being
-                // persisted in the background. OK/Cancel below just close the window now.
                 Spacer()
                 Button {
-                    viewModel.save()
                     AppDelegate.shared.settingsWindow.close()
                 } label: {
-                    Text("OK").frame(width: 50)
-                }
-                .buttonStyle(.glass)
-                // Untinted, matching the Pause/Open Wallpaper fix — `.glassProminent` defaults to
-                // accentColor, which reads as a flat gray fill on the Graphite system accent; plain
-                // `.glass` keeps the translucent lens look consistent with the window's own glass
-                // background (see `windowVibrancy`).
-                Button {
-                    /*here should be a call of viewModel.reset() but I move it to the delegate */
-                    AppDelegate.shared.settingsWindow.close()
-                } label: {
-                    Text("Cancel").frame(width: 50)
+                    Text("Close").frame(width: 60)
                 }
                 .buttonStyle(.glass)
             }
@@ -107,15 +88,15 @@ struct SettingsView: View {
 
 extension AppDelegate: NSToolbarDelegate {
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
+        [SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
+        [SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
+        [SettingsToolbarIdentifiers.general, SettingsToolbarIdentifiers.performance, SettingsToolbarIdentifiers.hotkeys, SettingsToolbarIdentifiers.about]
     }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
@@ -139,7 +120,7 @@ extension AppDelegate: NSToolbarDelegate {
 
         case SettingsToolbarIdentifiers.about:
             toolbarItem.action = #selector(jumpToAbout)
-            toolbarItem.image = NSImage(systemSymbolName: "person.3", accessibilityDescription: nil)
+            toolbarItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil)
             toolbarItem.label = String(localized: "About")
 
         default:
@@ -157,7 +138,7 @@ struct SettingsView_Previews: PreviewProvider {
         SettingsView()
             .environmentObject({ () -> GlobalSettingsViewModel in 
                 let viewModel = GlobalSettingsViewModel()
-                viewModel.selection = 2
+                viewModel.selection = 3
                 return viewModel
             }())
             .frame(width: 500, height: 600)
