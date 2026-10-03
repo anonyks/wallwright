@@ -164,6 +164,14 @@ final class AerialsInjector {
         return isWallpaperAgentRunning()
     }
 
+    private static func currentOSBuild() -> String {
+        var size = 0
+        sysctlbyname("kern.osversion", nil, &size, nil, 0)
+        var buffer = [CChar](repeating: 0, count: size)
+        sysctlbyname("kern.osversion", &buffer, &size, nil, 0)
+        return String(cString: buffer)
+    }
+
     /// Registers `videoURL` as the system's aerial wallpaper, syncing desktop, lock screen, and
     /// screensaver to it. Skips the file copy/thumbnail work if the video hasn't changed, but
     /// always restarts WallpaperAgent regardless — see the comment on `restartWallpaperAgent()`'s
@@ -201,7 +209,14 @@ final class AerialsInjector {
         let previousUUID = aerialsAssetID
         let previousDestExists = previousUUID.map { fm.fileExists(atPath: (videosDir as NSString).appendingPathComponent("\($0).mov")) } ?? false
         let srcSize = (try? fm.attributesOfItem(atPath: videoURL.path)[.size] as? Int) ?? -1
-        let videoChanged = videoURL != previousInjectedURL || srcSize != lastInjectedSourceSize || !previousDestExists
+        // A macOS update can leave WallpaperAgent and the aerials extension with stale internal
+        // state keyed on the old asset ID (the lock screen stopped showing the video after the
+        // 26.x to 27.0 update until the app re-registered from scratch). Treating a changed OS
+        // build like a changed video mints a fresh asset ID, re-copies the file and rebuilds the
+        // thumbnail, which invalidates anything cached against the old registration.
+        let currentOSBuild = Self.currentOSBuild()
+        let osChanged = UserDefaults.standard.string(forKey: "AerialsLastOSBuild") != currentOSBuild
+        let videoChanged = videoURL != previousInjectedURL || srcSize != lastInjectedSourceSize || !previousDestExists || osChanged
 
         // Mint a FRESH asset UUID whenever the video content actually changes, rather than reusing
         // the previous one. Confirmed live (2026-07-31): reusing the same UUID across genuinely
@@ -254,6 +269,7 @@ final class AerialsInjector {
         }
 
         aerialsAssetID = uuid
+        UserDefaults.standard.set(currentOSBuild, forKey: "AerialsLastOSBuild")
         pruneOrphanedAssets(keeping: uuid)
 
         // Always restart, even when the video itself is unchanged (e.g. a health-check
