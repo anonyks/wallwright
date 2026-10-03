@@ -472,6 +472,15 @@ class GlobalSettingsViewModel: ObservableObject {
         self.$settings
             .removeDuplicates { $0.autoStart == $1.autoStart }
             .map { $0.autoStart }
+            // `@Published` emits the current value immediately on subscribe, which otherwise ran
+            // this on every single launch, not just an actual toggle, including launches from
+            // wherever Xcode or `xcodebuild test` happens to put the built app that run, silently
+            // re-registering the SMAppService login item to point at that ephemeral build path
+            // instead of leaving an already-correct registration alone. Confirmed live
+            // (2026-10-03) via `sfltool dumpbtm`: a login item pointing at a /private/tmp scratch
+            // build path, left behind by a test run. Same pattern as this file's other
+            // `dropFirst()` sinks further down, which already guard against this exact class of bug.
+            .dropFirst()
             .sink { [weak self] in self?.didAddToLoginItem($0) }
         
         self.didChangeAdjustMenuBarTintCancellable =
