@@ -9,6 +9,7 @@
 //    echo "volume 50"  > /tmp/wallwright-501.pipe
 //    echo "next"       > /tmp/wallwright-501.pipe
 //    echo "prev"       > /tmp/wallwright-501.pipe
+//    echo "pin"        > /tmp/wallwright-501.pipe
 //    echo "quit"       > /tmp/wallwright-501.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
@@ -121,6 +122,13 @@ final class CommandListener {
             }
         case "next", "skip": AppDelegate.shared.skipToNextPlaylistItem()
         case "prev", "previous": AppDelegate.shared.skipToPreviousPlaylistItem()
+        case "pin", "togglepin":
+            // `wallpaperViewModel.currentWallpaper` is the wallpaper for whichever screen is
+            // selected in the Display Settings UI, not necessarily what's actually showing on
+            // the main display, and a CLI caller has no UI context to have selected anything.
+            // The main screen's wallpaper is the only sensible target without one.
+            let mainId = WallpaperViewModel.mainScreenId()
+            AppDelegate.shared.contentViewModel.togglePinned(AppDelegate.shared.wallpaperViewModel.wallpaper(for: mainId))
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()

@@ -11,6 +11,13 @@ All notable changes to Wallwright are documented here. Format follows
 - Auto Trim for imported video wallpapers.
 - A `WallwrightTests` unit test target with initial coverage.
 - Real Liquid Glass window chrome across the app, with translucent-button tinting fixes.
+- Wallpaper pinning: a right-click Pin/Unpin option, a pin badge on the library grid, and pinned
+  wallpapers float to the top of the grid regardless of the active sort. Also available over the
+  named-pipe command interface (`echo "pin" > /tmp/wallwright-$(id -u).pipe`).
+- `PrivacyInfo.xcprivacy` privacy manifest declaring zero tracking and the app's actual
+  UserDefaults/FileTimestamp API usage.
+- A GitHub Actions CI workflow (build and test on push/PR to main).
+- `PinningTests` and `ProcessRunnerTests` unit test suites.
 
 ### Changed
 - Replaced manual "Load More" buttons and pagination with continuous auto-load-on-scroll in browse tabs.
@@ -18,6 +25,12 @@ All notable changes to Wallwright are documented here. Format follows
 - Library UI polish: single hover scale, playlist menu actions, HIG wording pass.
 - Every popup now closes with Escape, not just the Command Palette.
 - README rewritten with a real pitch, install instructions, and license/release badges.
+- Simplified attribution to a single link to the upstream fork for contributors already credited
+  there, keeping the separate LivePaper/Phosphene adapted-from credits as their own entries.
+- About screen now shows license/privacy badges and repository/releases/issues links instead of
+  just a contributor list.
+- The application menu's Quit item moved to the bottom, after Hide/Hide Others, matching standard
+  macOS ordering.
 
 ### Fixed
 - Path traversal and other unsafe destination handling across all importers (video, image, package, YouTube).
@@ -45,12 +58,32 @@ All notable changes to Wallwright are documented here. Format follows
 - Double audio decode and a duplicate `WallpaperAgent` restart.
 - The clock color popover not closing, and an unbounded sleep assertion.
 - The audio player decoding while muted or at zero volume.
+- Browse-tab search text not clearing consistently across tabs, and empty-state messaging
+  wrongly blaming the hide feature for a plain empty or failed fetch.
+- DesktopHut's markup selectors and two category URLs, which had drifted from the live site.
+- The single-instance guard exiting before XCTest could attach when launched as a test host.
+- The About window stacking a new instance on every click instead of reusing one, and showing a
+  blank title.
+- A settings sink that re-registered the login item on every app launch (not just an actual
+  toggle), silently re-pointing it at whatever ephemeral path last launched the app, including a
+  test run's temporary build location.
+- Toggling pin on the wallpaper actually assigned to a screen only updated the library grid's
+  copy, never the separate per-screen assignment dictionary, so a second toggle (e.g. via the
+  pipe interface's "pin" command) kept reading back the same stale value instead of flipping it.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
 - Moved disk I/O and image decoding off the main thread.
 - Cached the clock overlay's `DateFormatter` instead of allocating one per draw.
 - Trimmed video loop-restart overhead.
+- Declared `NSSupportsAutomaticGraphicsSwitching` so dual-GPU Intel Macs aren't forced onto the
+  discrete GPU just to render the wallpaper.
+
+### Internal
+- Centralized logging into `WWLog`, replacing 8 scattered `Logger` instances and 29 `print()` calls.
+- Extracted `ProcessRunner.resolveBinary(named:)` and `AppResources`, removing duplicated binary-
+  resolution code and several identical force-unwrapped bundle-resource lookups.
+- Removed remaining unsafe `try!`/`as!` force-unwraps that could crash the app.
 
 ## [1.0.0] - 2026-08-08
 Initial public release: live video wallpapers synced across desktop, lock screen, and screensaver,

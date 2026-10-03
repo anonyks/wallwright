@@ -729,6 +729,18 @@ class ContentViewModel: ObservableObject, DropDelegate {
         var updated = wallpaper
         updated.project.isPinned = !wallpaper.isPinned
         updateWallpaperInPlace(updated)
+        // Also mirrored into `wallpaperViewModel.wallpapers` (the separate per-screen assignment
+        // dictionary), same as `EditWallpaperSheet.propagateUpdatedProject` already does for
+        // title/tag/crop edits. Without this, toggling pin on whatever's actually assigned to a
+        // screen (e.g. via the CommandListener pipe's "pin" command, which targets the main
+        // screen's current wallpaper) kept reading back the same stale, never-updated copy on
+        // every subsequent toggle, since this dictionary isn't rescanned from disk on launch the
+        // way the library list is. Confirmed live (2026-10-03): the pipe command's toggle wrote
+        // the same flipped value to disk repeatedly, never actually landing, until this was added.
+        for (screenId, screenWallpaper) in AppDelegate.shared.wallpaperViewModel.wallpapers
+        where screenWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) {
+            AppDelegate.shared.wallpaperViewModel.wallpapers[screenId] = updated
+        }
         let destination = wallpaper.wallpaperDirectory.appending(path: "project.json")
         let project = updated.project
         DispatchQueue.global(qos: .utility).async {
