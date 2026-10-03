@@ -63,10 +63,12 @@ enum DesktopHutCategory: CaseIterable, Identifiable {
         case .anime: return "/category/anime-live-wallpapers"
         case .abstract: return "/category/abstract-live-wallpapers"
         case .animals: return "/category/animals-live-wallpapers"
-        case .sciFi: return "/category/fantasy-sci-fi-live-wallpapers"
+        // The site has since swapped the word order and added "-and-" to these two slugs, the
+        // old ones 404 outright now. Confirmed live (2026-10-03) against the real site.
+        case .sciFi: return "/category/sci-fi-fantasy-live-wallpapers"
         case .games: return "/category/games-live-wallpapers"
         case .landscape: return "/category/landscape-live-wallpapers"
-        case .moviesTv: return "/category/movies-tv-live-wallpapers"
+        case .moviesTv: return "/category/movies-and-tv-live-wallpapers"
         case .pixelArt: return "/category/pixel-art-live-wallpapers"
         case .cars: return "/category/cars-motorcycles-live-wallpapers"
         case .comics: return "/category/comics-live-wallpapers"
@@ -147,8 +149,14 @@ final class DesktopHutService {
     /// `card-title` element inside the hover overlay is the one thing present and correctly scoped
     /// on every page variant, so per-card slicing + extracting within each slice is what's robust.
     static func parseItems(from html: String) -> [DesktopHutItem] {
-        guard let anchorRegex = try? NSRegularExpression(pattern: #"<a href="(/[a-z0-9-]+)" class="wallpaper-card""#),
-              let imgRegex = try? NSRegularExpression(pattern: #"<img src="(https://www\.desktophut\.com/images/[^"]+\.webp)""#),
+        // The site has since added a second, space-separated class onto the card anchor
+        // (`class="wallpaper-card mtile"`) and moved thumbnails from `/images/*.webp` to a
+        // sized `/img/{WxH}/*.{webp,jpg,png}` path. The old exact-match patterns required
+        // `class="wallpaper-card"` with nothing else inside the quotes and only `/images/*.webp`,
+        // so every single card silently failed to parse on every category, not just Anime.
+        // Confirmed live (2026-10-03) against the real HTML for both Trending and a category page.
+        guard let anchorRegex = try? NSRegularExpression(pattern: #"<a href="(/[a-z0-9-]+)" class="wallpaper-card"#),
+              let imgRegex = try? NSRegularExpression(pattern: #"<img src="(https://www\.desktophut\.com/img/[^"]+\.(?:webp|jpe?g|png))""#),
               let titleRegex = try? NSRegularExpression(pattern: #"card-title">([^<]+)<"#),
               let previewRegex = try? NSRegularExpression(pattern: #"card-preview-video[^>]*data-src="(https://www\.desktophut\.com/previews/[^"]+\.mp4)""#)
         else { return [] }

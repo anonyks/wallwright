@@ -25,10 +25,18 @@ final class WallperViewModel: ObservableObject {
     @Published var downloadState: [String: DownloadState] = [:]
 
     @Published var category: WallperCategory = .all
+    /// The live text in the search field, updated on every keystroke.
     @Published var searchQuery = ""
+    /// What's actually applied to `matchingItems` below, only ever set by `search()`/`clearSearch()`.
+    /// Kept separate from `searchQuery` so typing doesn't filter the grid until Enter is pressed,
+    /// matching every other browse source (MoeWalls, DesktopHut, AlphaCoders, MotionBgs, UhdPaper),
+    /// all of which only search on submit. This one used to filter `matchingItems` straight off the
+    /// live `searchQuery`, and its own `.onChange` called `search()` on every keystroke too, so it
+    /// alone filtered as you typed while every other source required pressing Enter first.
+    @Published private(set) var committedSearchQuery = ""
     @Published private(set) var hiddenItemIDs: Set<String>
 
-    /// How many of the filtered results are currently revealed — "Load More" just raises this,
+    /// How many of the filtered results are currently revealed, "Load More" just raises this,
     /// no network call needed since `allItems` already has everything.
     @Published private var visibleCount = 60
     private static let pageSize = 60
@@ -42,7 +50,7 @@ final class WallperViewModel: ObservableObject {
     }
 
     private var matchingItems: [WallperItem] {
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = committedSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return allItems.filter { item in
             guard hiddenItemIDs.contains(item.id) == false else { return false }
             guard category == .all || item.category == category.rawValue else { return false }
@@ -78,11 +86,13 @@ final class WallperViewModel: ObservableObject {
     }
 
     func search() {
+        committedSearchQuery = searchQuery
         visibleCount = Self.pageSize
     }
 
     func clearSearch() {
-        guard !searchQuery.isEmpty else { return }
+        guard !searchQuery.isEmpty || !committedSearchQuery.isEmpty else { return }
+        committedSearchQuery = ""
         searchQuery = ""
         visibleCount = Self.pageSize
     }

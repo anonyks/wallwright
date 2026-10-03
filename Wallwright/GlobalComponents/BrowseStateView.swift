@@ -19,6 +19,7 @@ struct BrowseStateView: View {
             Image(systemName: icon)
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)

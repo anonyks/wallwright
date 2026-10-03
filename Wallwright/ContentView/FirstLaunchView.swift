@@ -76,6 +76,7 @@ extension FirstLaunchView {
                     .frame(width: 50, height: 50)
                     .font(.largeTitle)
                     .foregroundStyle(imageColor)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading) {
                     Text(title)
                         .foregroundStyle(textColor)

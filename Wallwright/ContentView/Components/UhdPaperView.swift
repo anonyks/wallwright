@@ -28,10 +28,11 @@ struct UhdPaperView: SubviewOfContentView {
             content
         }
         .onAppear {
-            // Pre-fill from whatever was last typed on another source's search bar, but
-            // only if this source's own query is still blank — never clobber an
-            // in-progress search already running on this tab.
-            if uhdPaperVM.searchQuery.isEmpty && !viewModel.lastBrowseSearchText.isEmpty {
+            // Sync the search box from whatever was last typed on another source, as long as
+            // this tab doesn't have its own search actually running. Used to only ever fill in
+            // a blank box, so clearing the search on another tab never propagated here, a tab
+            // that already had stale leftover text kept showing it forever.
+            if !uhdPaperVM.isSearchActive, uhdPaperVM.searchQuery != viewModel.lastBrowseSearchText {
                 uhdPaperVM.searchQuery = viewModel.lastBrowseSearchText
             }
             uhdPaperVM.loadInitialIfNeeded()
@@ -121,8 +122,13 @@ struct UhdPaperView: SubviewOfContentView {
             }
         } else if uhdPaperVM.visibleItems.isEmpty {
             BrowseStateView(
-                icon: uhdPaperVM.isSearchActive ? "magnifyingglass" : "eye.slash",
-                message: uhdPaperVM.isSearchActive ? "No results for \"\(uhdPaperVM.searchQuery)\"" : "Everything here is hidden"
+                icon: uhdPaperVM.isSearchActive ? "magnifyingglass" : (uhdPaperVM.items.isEmpty ? "square.grid.2x2" : "eye.slash"),
+                // "Everything here is hidden" implies the user did that themselves: showing it
+                // when `items` is just plain empty (nothing came back for this category at all)
+                // falsely blamed the hide feature for what's actually an empty or failed fetch.
+                message: uhdPaperVM.isSearchActive
+                    ? "No results for \"\(uhdPaperVM.searchQuery)\""
+                    : (uhdPaperVM.items.isEmpty ? "No wallpapers found" : "Everything here is hidden")
             )
         } else {
             ScrollView {

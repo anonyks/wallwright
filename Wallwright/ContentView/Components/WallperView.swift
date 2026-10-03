@@ -26,9 +26,11 @@ struct WallperView: SubviewOfContentView {
             content
         }
         .onAppear {
-            // Pre-fill from whatever was last typed on another source's search bar, but only if
-            // this source's own query is still blank — never clobber a query already set here.
-            if wallperVM.searchQuery.isEmpty && !viewModel.lastBrowseSearchText.isEmpty {
+            // Sync the (uncommitted) search box from whatever was last typed on another source,
+            // as long as nothing has actually been submitted here yet. Used to only ever fill in
+            // a blank box, so clearing the search on another tab never propagated here, a tab
+            // that already had stale leftover text kept showing it forever.
+            if wallperVM.committedSearchQuery.isEmpty, wallperVM.searchQuery != viewModel.lastBrowseSearchText {
                 wallperVM.searchQuery = viewModel.lastBrowseSearchText
             }
             wallperVM.loadInitialIfNeeded()
@@ -44,12 +46,10 @@ struct WallperView: SubviewOfContentView {
                     TextField("Search Wallper...", text: $wallperVM.searchQuery)
                         .textFieldStyle(.plain)
                         .onSubmit { wallperVM.search() }
-                        .onChange(of: wallperVM.searchQuery) { _, newValue in
-                            wallperVM.search()
-                            // Saves the typed text (not a live search on other sources) so
-                            // switching source pre-fills its search bar with the same query.
-                            viewModel.lastBrowseSearchText = newValue
-                        }
+                        // Only saves the typed text for cross-tab pre-fill, does NOT call
+                        // search() here, that used to filter the grid on every keystroke instead
+                        // of waiting for Enter like every other browse source.
+                        .onChange(of: wallperVM.searchQuery) { _, newValue in viewModel.lastBrowseSearchText = newValue }
                     if !wallperVM.searchQuery.isEmpty {
                         Button {
                             wallperVM.clearSearch()
@@ -119,9 +119,18 @@ struct WallperView: SubviewOfContentView {
                 Task { await wallperVM.loadIndex() }
             }
         } else if wallperVM.visibleItems.isEmpty {
+            // "Everything here is hidden" implies the user did that themselves, only true when
+            // this category genuinely has items and the hide list is what's filtering them all
+            // out. A category with nothing in it at all (or a search with no matches) needs a
+            // different message instead of blaming the hide feature for either of those.
+            let categoryHasContent = wallperVM.allItems.contains {
+                wallperVM.category == .all || $0.category == wallperVM.category.rawValue
+            }
             BrowseStateView(
-                icon: wallperVM.searchQuery.isEmpty ? "eye.slash" : "magnifyingglass",
-                message: wallperVM.searchQuery.isEmpty ? "Everything here is hidden" : "No results for \"\(wallperVM.searchQuery)\""
+                icon: !wallperVM.committedSearchQuery.isEmpty ? "magnifyingglass" : (categoryHasContent ? "eye.slash" : "square.grid.2x2"),
+                message: !wallperVM.committedSearchQuery.isEmpty
+                    ? "No results for \"\(wallperVM.committedSearchQuery)\""
+                    : (categoryHasContent ? "Everything here is hidden" : "No wallpapers found")
             )
         } else {
             ScrollView {

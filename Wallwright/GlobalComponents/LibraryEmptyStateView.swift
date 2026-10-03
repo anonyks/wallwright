@@ -17,6 +17,7 @@ struct LibraryEmptyStateView: View {
             Image(systemName: "photo.stack")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("No wallpapers yet")
                 .font(.title3.weight(.semibold))
             Text("Import a video or image from your files, or browse one of the sources in the sidebar to get started.")

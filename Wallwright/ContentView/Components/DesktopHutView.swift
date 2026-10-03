@@ -28,10 +28,11 @@ struct DesktopHutView: SubviewOfContentView {
             content
         }
         .onAppear {
-            // Pre-fill from whatever was last typed on another source's search bar, but
-            // only if this source's own query is still blank — never clobber an
-            // in-progress search already running on this tab.
-            if desktopHutVM.searchQuery.isEmpty && !viewModel.lastBrowseSearchText.isEmpty {
+            // Sync the search box from whatever was last typed on another source, as long as
+            // this tab doesn't have its own search actually running. Used to only ever fill in
+            // a blank box, so clearing the search on another tab never propagated here, a tab
+            // that already had stale leftover text kept showing it forever.
+            if !desktopHutVM.isSearchActive, desktopHutVM.searchQuery != viewModel.lastBrowseSearchText {
                 desktopHutVM.searchQuery = viewModel.lastBrowseSearchText
             }
             desktopHutVM.loadInitialIfNeeded()
@@ -121,8 +122,13 @@ struct DesktopHutView: SubviewOfContentView {
             }
         } else if desktopHutVM.visibleItems.isEmpty {
             BrowseStateView(
-                icon: desktopHutVM.isSearchActive ? "magnifyingglass" : "eye.slash",
-                message: desktopHutVM.isSearchActive ? "No results for \"\(desktopHutVM.searchQuery)\"" : "Everything here is hidden"
+                icon: desktopHutVM.isSearchActive ? "magnifyingglass" : (desktopHutVM.items.isEmpty ? "square.grid.2x2" : "eye.slash"),
+                // "Everything here is hidden" implies the user did that themselves: showing it
+                // when `items` is just plain empty (nothing came back for this category at all)
+                // falsely blamed the hide feature for what's actually an empty or failed fetch.
+                message: desktopHutVM.isSearchActive
+                    ? "No results for \"\(desktopHutVM.searchQuery)\""
+                    : (desktopHutVM.items.isEmpty ? "No wallpapers found" : "Everything here is hidden")
             )
         } else {
             ScrollView {

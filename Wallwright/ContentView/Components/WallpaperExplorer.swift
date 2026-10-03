@@ -27,6 +27,7 @@ struct WallpaperExplorer: SubviewOfContentView {
                     Image(systemName: "photo.stack")
                         .font(.system(size: 40))
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                     Text("No wallpapers found")
                         .font(.title3.weight(.semibold))
                     Text("Expand or reset the categories in the filter sidebar, or try another search term.")
