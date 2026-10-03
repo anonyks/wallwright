@@ -18,14 +18,15 @@ extension AppDelegate {
             .separator(),
             .init(title: String(localized: "Settings..."), action: #selector(openSettingsWindow), keyEquivalent: ","),
             .separator(),
-            .init(title: String(localized: "Quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
-            .separator(),
             .init(title: String(localized: "Hide"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             {
                 let item = NSMenuItem(title: String(localized: "Hide Others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
                 item.keyEquivalentModifierMask = [.command, .option]
                 return item
-            }()
+            }(),
+            .separator(),
+            // Quit last, per macOS convention: it was sitting above Hide/Hide Others before.
+            .init(title: String(localized: "Quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
         ]
 
         // 导入子菜单

@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */; };
+		52086E7C07E84B37B2C12955 /* PinningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178A61B2E8014832A76A5E82 /* PinningTests.swift */; };
+		271C3024465E4FFBA503F69A /* ProcessRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200EEFAE01F549D4AA04CBCD /* ProcessRunnerTests.swift */; };
 		192281A7FDCB950BF47612D2 /* ReservedShortcutsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */; };
 		1AD4E921BD6C2F8F8F5F36DE /* VideoCropDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */; };
 		4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */; };
@@ -199,6 +201,8 @@
 		7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReservedShortcutsTests.swift; sourceTree = "<group>"; };
 		8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCropDetectorTests.swift; sourceTree = "<group>"; };
 		8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HotkeyTests.swift; sourceTree = "<group>"; };
+		178A61B2E8014832A76A5E82 /* PinningTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PinningTests.swift; sourceTree = "<group>"; };
+		200EEFAE01F549D4AA04CBCD /* ProcessRunnerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProcessRunnerTests.swift; sourceTree = "<group>"; };
 		957985CF80A1727A04F904D2 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		A9D198BDBED959A1180A1844 /* VideoBlackFrameDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoBlackFrameDetector.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SpriteKit.framework; path = System/Library/Frameworks/SpriteKit.framework; sourceTree = SDKROOT; };
@@ -578,6 +582,8 @@
 			children = (
 				3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */,
 				8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */,
+				178A61B2E8014832A76A5E82 /* PinningTests.swift */,
+				200EEFAE01F549D4AA04CBCD /* ProcessRunnerTests.swift */,
 				355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */,
 				7DBEC354080CA2234577D6E3 /* ReservedShortcutsTests.swift */,
 				8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */,
@@ -826,6 +832,8 @@
 			files = (
 				4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */,
 				05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */,
+				52086E7C07E84B37B2C12955 /* PinningTests.swift in Sources */,
+				271C3024465E4FFBA503F69A /* ProcessRunnerTests.swift in Sources */,
 				E536FDFF8651C7C8409B3B07 /* InboxClassifierTests.swift in Sources */,
 				192281A7FDCB950BF47612D2 /* ReservedShortcutsTests.swift in Sources */,
 				1AD4E921BD6C2F8F8F5F36DE /* VideoCropDetectorTests.swift in Sources */,
