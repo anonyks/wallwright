@@ -8,7 +8,10 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    # Not a pinned version (e.g. macos-15): this project's deployment target tracks whatever
+    # macOS/Xcode is current, and a pinned runner image can lag behind the SDK a new target
+    # version needs. macos-latest always points at GitHub's newest available image instead.
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -17,9 +20,9 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Build
-        # Signing disabled on the CLI invocation (not in the project itself) — the project's
-        # own DEVELOPMENT_TEAM/Automatic signing is for local development, and a CI runner has
-        # no access to that certificate. CODE_SIGNING_ALLOWED=NO lets it build and run tests
+        # Signing disabled on the CLI invocation, not in the project itself. The project's own
+        # DEVELOPMENT_TEAM/Automatic signing is for local development, and a CI runner has no
+        # access to that certificate. CODE_SIGNING_ALLOWED=NO lets it build and run tests
         # unsigned instead of failing outright.
         run: >
           xcodebuild -project Wallwright.xcodeproj -scheme Wallwright
