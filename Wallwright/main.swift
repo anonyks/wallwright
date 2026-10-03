@@ -12,7 +12,15 @@ import Cocoa
 // pointing at a different build path, a manual open) simply ran alongside the first. Runs before
 // `AppDelegate.shared` is touched so a duplicate exits before creating any state. The older
 // process wins; if both start at once, ordering by launch date (then pid) means exactly one exits.
-if let bundleID = Bundle.main.bundleIdentifier {
+//
+// Skipped entirely when launched as an XCTest host: Xcode runs the unit test bundle inside the
+// actual Wallwright.app process, and if a regular (non-test) instance happens to already be
+// running at the time, this guard would otherwise see it as "older" and exit before XCTest can
+// even attach, failing every test run with "Early unexpected exit... before establishing
+// connection" (confirmed live 2026-10-03: reproduced the exact failure with a regular instance
+// running, and confirmed the test suite passes once that instance is killed).
+let isRunningUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+if !isRunningUnderXCTest, let bundleID = Bundle.main.bundleIdentifier {
     let me = NSRunningApplication.current
     let iAmNewer = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
         .filter { $0.processIdentifier != me.processIdentifier && !$0.isTerminated }

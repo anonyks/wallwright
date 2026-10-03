@@ -7,15 +7,24 @@
 
 import SwiftUI
 
+private let aboutWindowIdentifier = NSUserInterfaceItemIdentifier("AboutWallwrightWindow")
+
 extension AppDelegate {
     @objc func showAboutUs() {
+        if let existing = NSApp.windows.first(where: { $0.identifier == aboutWindowIdentifier }) {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         let window = NSWindow()
+        window.identifier = aboutWindowIdentifier
         window.styleMask = [.closable, .titled]
         window.isReleasedWhenClosed = false
-        window.title = ""
+        window.title = String(localized: "About Wallwright")
         window.contentView = NSHostingView(rootView: AboutUsView())
         window.center()
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build
+        # Signing disabled on the CLI invocation (not in the project itself) — the project's
+        # own DEVELOPMENT_TEAM/Automatic signing is for local development, and a CI runner has
+        # no access to that certificate. CODE_SIGNING_ALLOWED=NO lets it build and run tests
+        # unsigned instead of failing outright.
+        run: >
+          xcodebuild -project Wallwright.xcodeproj -scheme Wallwright
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          build
+
+      - name: Run tests
+        run: >
+          xcodebuild -project Wallwright.xcodeproj -scheme Wallwright
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          test
