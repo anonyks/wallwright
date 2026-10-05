@@ -171,6 +171,18 @@ struct SteamWorkshopImportSheet: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    if preview.isScene, let workshopType = preview.workshopType {
+                        Label("This is a \"\(workshopType)\" wallpaper. Wallwright doesn't render live scenes, so it will be imported as a static wallpaper (Scene Preview).", systemImage: "info.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if preview.isUnsupportedType, let workshopType = preview.workshopType {
+                        Label("This is a \"\(workshopType)\" wallpaper. Wallwright only supports Video and Scene wallpapers, so downloading it will still use the full file size before failing to import.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     if model.isDownloading {
                         ProgressView(model.downloadStatusLine.isEmpty ? "Starting steamcmd…" : model.downloadStatusLine)
                             .frame(maxWidth: .infinity)

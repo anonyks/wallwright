@@ -27,6 +27,25 @@ struct SteamWorkshopPreview {
     let title: String
     let previewImageURL: URL?
     let fileSizeText: String?
+    /// The Workshop page's own "Type:" tag (e.g. "Video", "Scene", "Web", "Application"). Lets the
+    /// import sheet warn before committing to the full steamcmd download, rather than only finding
+    /// out it's an unsupported type (see `WEProject.supportedTypes`) after paying that cost.
+    /// Confirmed live (2026-10-04): a 247MB download that only then rejected at import, when the
+    /// page itself already said "Type: Scene" for free.
+    let workshopType: String?
+
+    /// Whether this is a Scene wallpaper, which Wallwright can import as a static image via SceneFallback.
+    var isScene: Bool {
+        guard let workshopType else { return false }
+        return workshopType.caseInsensitiveCompare("Scene") == .orderedSame
+    }
+
+    /// True for types Wallwright cannot render or import even via fallback (e.g. "Web", "Application").
+    var isUnsupportedType: Bool {
+        guard let workshopType else { return false }
+        return workshopType.caseInsensitiveCompare("Video") != .orderedSame
+            && workshopType.caseInsensitiveCompare("Scene") != .orderedSame
+    }
 }
 
 enum SteamWorkshopError: LocalizedError {
@@ -97,12 +116,25 @@ enum SteamWorkshopService {
         let imageURLString = extractMetaContent(property: "og:image", html: html)?
             .replacingOccurrences(of: "&amp;", with: "&")
         let fileSizeText = extractLabeledStat(label: "File Size", html: html)
+        let workshopType = extractWorkshopTypeTag(html: html)
 
         return SteamWorkshopPreview(
             title: title,
             previewImageURL: imageURLString.flatMap(URL.init(string:)),
-            fileSizeText: fileSizeText
+            fileSizeText: fileSizeText,
+            workshopType: workshopType
         )
+    }
+
+    /// The page's "Type:" tag renders as `<span class="workshopTagsTitle">Type:&nbsp;</span>`
+    /// immediately followed by a single `<a>` whose text is the actual value (e.g. "Scene").
+    /// Confirmed live (2026-10-04) against a real Scene-type item's page.
+    private static func extractWorkshopTypeTag(html: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: #"workshopTagsTitle">Type:&nbsp;</span><a[^>]*>([^<]+)</a>"#),
+              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+              let range = Range(match.range(at: 1), in: html)
+        else { return nil }
+        return String(html[range])
     }
 
     private static func extractMetaContent(property: String, html: String) -> String? {

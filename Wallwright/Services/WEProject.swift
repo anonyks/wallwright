@@ -59,11 +59,22 @@ struct WEProject: Codable, Equatable, Hashable {
     var workshopid: WorkshopId?
     var type: String
 
-    /// Wallpaper types Wallwright can actually import and render — video (AVFoundation playback)
-    /// and image (static). Anything else (e.g. "scene"/"web" from a Steam Workshop package) is
-    /// rejected at import and excluded from the library, since there's no renderer for it.
+    /// Wallpaper types Wallwright can actually render: video (AVFoundation playback) and image
+    /// (static). A committed library item should never actually have any other `type`: "scene" is
+    /// accepted at import via `fallbackTypes` below but always converted to "image" by
+    /// `SceneFallback` before anything is written to disk, and anything else (e.g. "web") is
+    /// rejected outright, since there's no renderer for it.
     static let supportedTypes: Set<String> = ["video", "image"]
     var isSupportedType: Bool { Self.supportedTypes.contains(type.lowercased()) }
+
+    /// Types `PackageImporter` will accept at import time but can't render directly. Currently
+    /// just "scene": `PackageImporter.commitImport` downgrades it via `SceneFallback` to a static
+    /// "image" wallpaper using the scene's own bundled preview, since real Wallpaper Engine scene
+    /// rendering (layered textures, particles, shaders) isn't implemented. Kept separate from
+    /// `supportedTypes` so a type this app only ever imports through a fallback doesn't get
+    /// conflated with one it genuinely renders.
+    static let fallbackTypes: Set<String> = ["scene"]
+    var isImportableType: Bool { isSupportedType || Self.fallbackTypes.contains(type.lowercased()) }
 
     /// Where this wallpaper came from, when it wasn't added manually (e.g. "motionbgs"). Lets
     /// us detect "you already have this" before re-downloading it and wasting storage/bandwidth.

@@ -5,9 +5,10 @@
 //  Imports an already-formed Wallpaper Engine package (a folder with its own project.json, preview
 //  image, and asset files) into the wallpapers directory — as opposed to VideoImporter, which wraps
 //  a single bare video file into that shape itself. Used by SteamWorkshopService's downloads, and
-//  any other future source that hands over a complete package rather than raw media. Only
-//  video/image packages are accepted — see `preparePending`'s type check — since those are the
-//  only types this app can actually render (see `WEProject.isSupportedType`).
+//  any other future source that hands over a complete package rather than raw media. Video/image
+//  packages are imported as-is; scene packages are downgraded to a static image via SceneFallback
+//  (see its own doc comment); anything else is rejected: see `preparePending`'s type check,
+//  `WEProject.isSupportedType`/`isImportableType`.
 //
 
 import AppKit
@@ -52,7 +53,7 @@ enum PackageImporter {
     /// `project`/`directory` are usually already available from the caller (e.g.
     /// `SteamWorkshopResult`), so this only re-reads from disk for the preview image.
     static func preparePending(project: WEProject, directory: URL, sourceId: String? = nil, sourceProvider: String? = nil) throws -> PendingPackageImport {
-        guard project.isSupportedType else {
+        guard project.isImportableType else {
             throw PackageImportError.unsupportedType(project.type)
         }
         // Downsampled at decode time, not loaded full-size — a third-party package (e.g. a Steam
@@ -61,9 +62,16 @@ enum PackageImporter {
         guard let thumbnail = ThumbnailDownsampler.downsampledThumbnail(at: directory.appending(path: project.preview))?.image else {
             throw PackageImportError.previewLoadFailed
         }
+        let baseTitle = project.title.isEmpty ? directory.lastPathComponent : project.title
+        // Flagged here, not inside SceneFallback (which runs later, at commit time): this is the
+        // title the user actually sees and can edit in the review sheet, so the marker needs to be
+        // visible and removable before anything is committed, not silently appended afterward.
+        let title = WEProject.fallbackTypes.contains(project.type.lowercased())
+            && !baseTitle.localizedCaseInsensitiveContains("scene preview")
+            ? "\(baseTitle) (Scene Preview)" : baseTitle
         return PendingPackageImport(
             sourceDirectory: directory,
-            title: project.title.isEmpty ? directory.lastPathComponent : project.title,
+            title: title,
             tags: project.tags ?? [],
             thumbnail: thumbnail,
             type: project.type,
@@ -106,6 +114,20 @@ enum PackageImporter {
             project.sourceProvider = pending.sourceProvider
             project.sourceId = pending.sourceId
             project.dateAdded = ISO8601DateFormatter().string(from: Date())
+
+            // Downgrades a scene to a static image using its own bundled preview, since this app
+            // can't render Wallpaper Engine scenes directly: see SceneFallback's own doc comment.
+            // Must run before the video-type check below: it rewrites `project.type` to "image",
+            // so by the time that check runs for a former scene, it's correctly skipped.
+            if WEProject.fallbackTypes.contains(project.type.lowercased()) {
+                do {
+                    project = try await SceneFallback.apply(to: project, in: destination)
+                } catch {
+                    WWLog.importing.error("PackageImporter: scene fallback failed: \(error)")
+                    try? fm.removeItem(at: destination)
+                    return false
+                }
+            }
 
             // Unlike VideoImporter's manual-file path, a package import never checked whether its
             // video is actually playable on macOS at all — a Steam Workshop/Wallpaper Engine
