@@ -64,6 +64,7 @@
 		CC000000000000000000000F /* MotionBgsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000010 /* MotionBgsService.swift */; };
 		CC0000000000000000000011 /* MotionBgsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000012 /* MotionBgsViewModel.swift */; };
 		CC0000000000000000000013 /* MotionBgsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000014 /* MotionBgsView.swift */; };
+		56E3F57409874BE7914E27F8 /* SteamWorkshopBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 425B49FA6C884D43A3B0BC0D /* SteamWorkshopBrowseView.swift */; };
 		CC0000000000000000000015 /* WallpaperImpactEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000016 /* WallpaperImpactEstimator.swift */; };
 		CC0000000000000000000017 /* SystemUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000018 /* SystemUsageMonitor.swift */; };
 		E536FDFF8651C7C8409B3B07 /* InboxClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355EB12A8833536FCF05AAAD /* InboxClassifierTests.swift */; };
@@ -222,6 +223,7 @@
 		CC0000000000000000000010 /* MotionBgsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsService.swift; sourceTree = "<group>"; };
 		CC0000000000000000000012 /* MotionBgsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsViewModel.swift; sourceTree = "<group>"; };
 		CC0000000000000000000014 /* MotionBgsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBgsView.swift; sourceTree = "<group>"; };
+		425B49FA6C884D43A3B0BC0D /* SteamWorkshopBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopBrowseView.swift; sourceTree = "<group>"; };
 		CC0000000000000000000016 /* WallpaperImpactEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperImpactEstimator.swift; sourceTree = "<group>"; };
 		CC0000000000000000000018 /* SystemUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUsageMonitor.swift; sourceTree = "<group>"; };
 		D2799B323BA1B8CF9D6A0F4D /* WallpaperDirectoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WallpaperDirectoryTests.swift; sourceTree = "<group>"; };
@@ -355,6 +357,7 @@
 				5E66A0D92A8ADECC00EE79D6 /* TopTabBar.swift */,
 				5E66A0E52A8BA69B00EE79D6 /* WallpaperExplorer.swift */,
 				CC0000000000000000000014 /* MotionBgsView.swift */,
+				425B49FA6C884D43A3B0BC0D /* SteamWorkshopBrowseView.swift */,
 				EE000000000000000000004C /* MoeWallsView.swift */,
 				EE0000000000000000000064 /* DesktopHutView.swift */,
 				EE0000000000000000000052 /* WallperView.swift */,
@@ -782,6 +785,7 @@
 				CC000000000000000000000F /* MotionBgsService.swift in Sources */,
 				CC0000000000000000000011 /* MotionBgsViewModel.swift in Sources */,
 				CC0000000000000000000013 /* MotionBgsView.swift in Sources */,
+				56E3F57409874BE7914E27F8 /* SteamWorkshopBrowseView.swift in Sources */,
 				EE0000000000000000000047 /* MoeWallsService.swift in Sources */,
 				EE0000000000000000000049 /* MoeWallsViewModel.swift in Sources */,
 				EE000000000000000000004B /* MoeWallsView.swift in Sources */,

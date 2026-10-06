@@ -29,6 +29,13 @@ struct GeneralPage: SettingsPage {
             } header: {
                 Label("macOS", systemImage: "apple.logo")
             }
+            // MARK: Steam Workshop
+            Section {
+                Toggle("Safe Mode", isOn: $viewModel.settings.steamWorkshopSafeMode)
+                    .help("While on, every Steam Workshop search is limited to Age Rating \"Everyone\" and Category \"Wallpaper\" — no Mature/Questionable results, no Preset/Asset clutter. Turning this off removes both limits.")
+            } header: {
+                Label("Steam Workshop", systemImage: "gamecontroller.fill")
+            }
             // MARK: Appearance
             // Clock overlay configuration lives entirely in its own quick-access popover (the
             // chevron next to the clock toggle in the tab bar) rather than duplicated here too —

@@ -6,6 +6,20 @@ All notable changes to Wallwright are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- Steam Workshop import can now search by keyword, not just paste a link/ID. The Steam icon's own
+  popup gained a Link/Search toggle for a quick one-off paste-and-go (with its own freely-
+  changeable Video/Scene/All Type picker); "WEVideo" (Video Sources popover) and "WEScene" (Image
+  Sources popover — a Scene result commits as a static image, so it's grouped with UHDPaper/
+  AlphaCoders rather than with WEVideo) open full browsable Workshop grids matching every other
+  source's tab here: search, Genre and Miscellaneous filter chips (tap to include, tap again to
+  exclude, matching Steam's own +/- filter chips), square thumbnails three across, load-more,
+  one-click download. WEVideo shows Video results only and WEScene shows Scene results only — a
+  hard lock, not a default, the same way MotionBgs's tab never shows AlphaCoders results. A new
+  Settings > General > Steam Workshop > Safe Mode toggle (on by default) scopes every search to
+  Age Rating "Everyone" and Category "Wallpaper" — no Mature/Questionable results, no Preset/Asset
+  clutter — and can be turned off to lift both limits. Downloads still go through the same
+  title/tags review step as before, including the scene-art picker when a Scene result bundles
+  more than one candidate image.
 - Steam Workshop Scene wallpapers are now imported instead of rejected: the real background
   artwork is extracted from the scene's own package (direct image decode, DXT1/3/5 texture
   decompression, or a frame grabbed from an embedded video) and set as a static image wallpaper,

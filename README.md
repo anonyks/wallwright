@@ -76,7 +76,9 @@ Wallwright is not affiliated with any of these sites. Media remains subject to e
 ## Supported Types
 
 Video and static images, including HEIC dynamic desktop wallpapers (the time-of-day-shifting
-kind macOS ships by default).
+kind macOS ships by default). Steam Workshop Scene wallpapers are imported too: Wallwright
+doesn't render live scenes, so it extracts the real background art from the package and sets
+it as a static image instead.
 
 ## Install
 

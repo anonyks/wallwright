@@ -53,13 +53,14 @@ struct TopTabBar: SubviewOfContentView {
     }
 
     /// True whenever the currently-shown top-level view is one this popover picks between — the
-    /// icon reads as "selected" for MotionBgs/MoeWalls/Wallper/DesktopHut the same way Installed's
-    /// tab button does, since all of them are still just tabs under the hood, only reached through
-    /// one extra click now.
-    private var isVideoSourcesActive: Bool { (1...4).contains(viewModel.topTabBarSelection) }
+    /// icon reads as "selected" for MotionBgs/MoeWalls/Wallper/DesktopHut/WEVideo the same way
+    /// Installed's tab button does, since all of them are still just tabs under the hood, only
+    /// reached through one extra click now. 8 (not contiguous with 1...4) is WEVideo.
+    private var isVideoSourcesActive: Bool { (1...4).contains(viewModel.topTabBarSelection) || viewModel.topTabBarSelection == 8 }
 
-    /// Same idea as `isVideoSourcesActive`, for the image-sources tab range.
-    private var isImageSourcesActive: Bool { (5...6).contains(viewModel.topTabBarSelection) }
+    /// Same idea as `isVideoSourcesActive`, for the image-sources tab range. 9 (not contiguous
+    /// with 5...6) is WEScene — a Scene result commits as a static image, so it's grouped here.
+    private var isImageSourcesActive: Bool { (5...6).contains(viewModel.topTabBarSelection) || viewModel.topTabBarSelection == 9 }
 
     // Replaces what used to be a dedicated "MotionBgs" tab icon — as more sources (Wallper.app,
     // Moewalls, DesktopHut, UHDPaper, direct URLs, ...) get added, giving each its own permanent
@@ -69,10 +70,17 @@ struct TopTabBar: SubviewOfContentView {
     // existing screen (a direct-URL row opens the shared download-from-URL popup instead, which
     // already auto-detects video vs. image from the downloaded file and needs no duplication).
     //
-    // YouTube and Steam Workshop deliberately stay as their own dedicated icons, not folded into
-    // either popover — they're a different kind of action (an immediate one-off import flow, not a
-    // browsable catalog of wallpapers to page through) and are common enough to warrant staying a
-    // single click away.
+    // YouTube and Steam Workshop's quick paste-a-link/ID flow deliberately stay as their own
+    // dedicated icons, not folded into either popover — that's a different kind of action (an
+    // immediate one-off import, not a browsable catalog of wallpapers to page through) and is
+    // common enough to warrant staying a single click away. Steam Workshop's own *search*, though,
+    // is exactly the browsable-catalog kind of action these popovers are for, so it gets a row in
+    // each — "WEVideo" here, "WEScene" in Image Sources below — rather than a third icon: both open
+    // the same full SteamWorkshopBrowseView tab (tags 8/9 respectively), pre-scoped to that type,
+    // the same "row just navigates to a tab" shape every other row here already uses. Split the
+    // same way every other source already is, by what the result actually becomes once downloaded:
+    // a Scene commits as a static image via SceneFallback, so it's grouped with UHDPaper/
+    // AlphaCoders, not with WEVideo here.
     private var videoSourcesButton: some View {
         Button {
             // If exactly one source has an active download and we're not already looking at it,
@@ -215,6 +223,15 @@ struct TopTabBar: SubviewOfContentView {
             sourceRow(icon: "square.grid.3x3.fill", title: "DesktopHut", dismissing: $isVideoSourcesPopoverPresented) {
                 viewModel.topTabBarSelection = 4
             }
+            // Steam Workshop's Video results — "WEVideo" navigates to its own full tab
+            // (SteamWorkshopBrowseView, tag 8), the same "row just sets topTabBarSelection" shape
+            // every other row above already uses, not the small Link/Search popup. Its Scene
+            // counterpart lives in the Image Sources popover instead (see that popover's own
+            // comment) — a Scene result still commits as a static image, so it belongs with the
+            // other image sources, not here.
+            sourceRow(icon: "gamecontroller.fill", title: "WEVideo", dismissing: $isVideoSourcesPopoverPresented) {
+                viewModel.topTabBarSelection = 8
+            }
         }
         .padding(6)
         .frame(width: 220)
@@ -230,6 +247,13 @@ struct TopTabBar: SubviewOfContentView {
             }
             sourceRow(icon: "star.fill", title: "AlphaCoders", dismissing: $isImageSourcesPopoverPresented) {
                 viewModel.topTabBarSelection = 6
+            }
+            // Steam Workshop's Scene results — a Scene commits as a static image via SceneFallback
+            // once downloaded (see WEProject.file's own doc comment for why that invariant always
+            // holds), the exact same end shape UHDPaper/AlphaCoders results end up in, so it
+            // belongs in this popover rather than alongside WEVideo in the video one.
+            sourceRow(icon: "gamecontroller.fill", title: "WEScene", dismissing: $isImageSourcesPopoverPresented) {
+                viewModel.topTabBarSelection = 9
             }
         }
         .padding(6)
@@ -264,6 +288,14 @@ struct TopTabBar: SubviewOfContentView {
                         .accessibilityLabel("Import from YouTube")
 
                         Button {
+                            // Deterministically back to the original type-agnostic entry point —
+                            // Link mode, no type filter — rather than whatever `mode`/`typeFilter`
+                            // a prior visit through the Video/Image Sources popover row left behind.
+                            // Only these two fields reset: an in-progress/completed download or
+                            // already-fetched preview (which hide this picker entirely anyway) are
+                            // untouched, same as every other re-open of this sheet.
+                            viewModel.steamWorkshopImportViewModel.mode = .link
+                            viewModel.steamWorkshopImportViewModel.typeFilter = nil
                             viewModel.isSteamWorkshopImportReveal = true
                         } label: {
                             // No bundled Steam logo (trademark, and this app is explicitly

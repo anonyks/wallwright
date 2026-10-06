@@ -143,6 +143,10 @@ struct ContentView: View {
                             AlphaCodersView(contentViewModel: viewModel)
                         case 7:
                             InboxView(contentViewModel: viewModel)
+                        case 8:
+                            SteamWorkshopBrowseView(contentViewModel: viewModel, fixedType: "Video")
+                        case 9:
+                            SteamWorkshopBrowseView(contentViewModel: viewModel, fixedType: "Scene")
                         default:
                             EmptyView()
                         }
@@ -323,7 +327,7 @@ struct ContentView: View {
             viewModel.pendingSteamWorkshopDownload = nil
             Task {
                 try? await Task.sleep(for: .milliseconds(350))
-                viewModel.enqueuePackageImport(directory: result.contentDirectory, project: result.project, sourceId: result.project.workshopid?.rawValue)
+                await viewModel.enqueuePackageImport(directory: result.contentDirectory, project: result.project, sourceId: result.project.workshopid?.rawValue)
             }
         }
         .onChange(of: viewModel.isDirectURLImportReveal) { _, isPresented in

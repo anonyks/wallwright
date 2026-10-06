@@ -130,6 +130,27 @@ struct SteamWorkshopImportSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            // Hidden once a link's already been fetched or a download is running — switching tabs
+            // mid-flow would orphan whichever request is in progress for no benefit.
+            if model.preview == nil, !model.isDownloading {
+                Picker("", selection: $model.mode) {
+                    Text("Link").tag(SteamWorkshopImportViewModel.Mode.link)
+                    Text("Search").tag(SteamWorkshopImportViewModel.Mode.search)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            if model.mode == .search, model.preview == nil, !model.isDownloading {
+                searchForm
+            } else {
+                linkForm
+            }
+        }
+    }
+
+    private var linkForm: some View {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 TextField("Workshop URL or item ID", text: $model.urlString)
                     .glassFieldStyle()
@@ -199,6 +220,146 @@ struct SteamWorkshopImportSheet: View {
                 }
             }
         }
+    }
+
+    private var searchForm: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                TextField("Search Workshop (e.g. \"cat\", \"cyberpunk\")", text: $model.searchQuery)
+                    .glassFieldStyle()
+                    .disabled(model.isSearching)
+                    .onSubmit { Task { await model.search() } }
+                Button("Search") { Task { await model.search() } }
+                    .disabled(model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isSearching)
+            }
+
+            // Type, not a free-form tag: mirrors this app's own Video Sources/Image Sources split
+            // (a "Scene" result commits as a static image, same as every Image Sources result).
+            Picker("Type", selection: $model.typeFilter) {
+                Text("All").tag(String?.none)
+                Text("Video").tag(String?.some("Video"))
+                Text("Scene").tag(String?.some("Scene"))
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            // Genre and Miscellaneous, Steam's own two facet names, as one combined scrollable row
+            // rather than two stacked ones — still two separate underlying filters (separate
+            // include/exclude sets, separate `requiredtags[]` values), just not worth two full
+            // lines of vertical space in this already-small popup. Tap cycles + (must have) →
+            // - (must not have) → neutral, the same three states Steam's own chips cycle through.
+            // Age Rating and Category aren't offered as chips here — they're governed by
+            // Settings > General > Steam Workshop > Safe Mode instead (see WorkshopTag's own doc
+            // comments), not a per-search choice.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(WorkshopTag.genreTags, id: \.self) { tag in
+                        genreChip(tag, isIncluded: model.includedGenreTags.contains(tag), isExcluded: model.excludedGenreTags.contains(tag)) {
+                            model.cycleGenreTag(tag)
+                        }
+                    }
+                    ForEach(WorkshopTag.miscellaneousTags, id: \.self) { tag in
+                        genreChip(tag, isIncluded: model.includedMiscTags.contains(tag), isExcluded: model.excludedMiscTags.contains(tag)) {
+                            model.cycleMiscTag(tag)
+                        }
+                    }
+                }
+            }
+            // Re-runs the current search with the new filters applied — only once a search has
+            // actually been performed; toggling filters before that would just be inert state.
+            .onChange(of: model.typeFilter) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            .onChange(of: model.includedGenreTags) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            .onChange(of: model.excludedGenreTags) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            .onChange(of: model.includedMiscTags) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            .onChange(of: model.excludedMiscTags) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            // Same reactivity as the full-tab browse views — flipping Safe Mode in Settings while
+            // this popup already has results showing shouldn't leave them stale.
+            .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+
+            if let searchErrorMessage = model.searchErrorMessage {
+                Text(searchErrorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if model.isSearching, model.searchResults.isEmpty {
+                ProgressView("Searching…")
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 20)
+            } else if model.searchResults.isEmpty, !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, model.searchErrorMessage == nil {
+                Text("No results.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 20)
+            } else if !model.searchResults.isEmpty {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
+                        ForEach(model.searchResults) { result in
+                            Button {
+                                Task { await model.selectSearchResult(result) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    RetryingAsyncImage(url: result.thumbnailURL) { phase in
+                                        if let image = phase.image {
+                                            image.resizable().aspectRatio(contentMode: .fill)
+                                        } else {
+                                            Rectangle().fill(.quaternary)
+                                        }
+                                    }
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    Text(result.title)
+                                        .font(.caption2)
+                                        .lineLimit(2)
+                                        .foregroundStyle(.primary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if model.hasMoreSearchResults {
+                        Button {
+                            Task { await model.loadMoreSearchResults() }
+                        } label: {
+                            if model.isSearching {
+                                ProgressView().frame(maxWidth: .infinity)
+                            } else {
+                                Text("Load More").frame(maxWidth: .infinity)
+                            }
+                        }
+                        .disabled(model.isSearching)
+                        .padding(.top, 10)
+                    }
+                }
+                .frame(maxHeight: 320)
+            }
+        }
+    }
+
+    /// One filter chip (Genre or Miscellaneous), three visual states matching `model.cycleGenreTag`
+    /// /`cycleMiscTag`'s three states: a plain secondary-gray neutral chip, a green "+ tag" once
+    /// included, an orange "- tag" once excluded — same colors Steam's own filter chips use.
+    private func genreChip(_ tag: String, isIncluded: Bool, isExcluded: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                if isIncluded {
+                    Image(systemName: "plus")
+                } else if isExcluded {
+                    Image(systemName: "minus")
+                }
+                Text(tag)
+            }
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isIncluded ? .green : (isExcluded ? .orange : .secondary))
+        .glassEffect((isIncluded || isExcluded) ? .regular : .identity, in: Capsule()) // no accentColor tint — reads gray on Graphite
     }
 
     private func completedSummary(_ result: SteamWorkshopResult) -> some View {

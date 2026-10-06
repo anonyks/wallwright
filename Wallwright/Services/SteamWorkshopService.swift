@@ -48,6 +48,66 @@ struct SteamWorkshopPreview {
     }
 }
 
+/// One row from a Workshop search/browse result page — just enough to show a thumbnail grid and
+/// let the user pick one, which then flows into the exact same `fetchPreview(itemId:)` the
+/// paste-a-link path already uses (type validation, file size, the full preview). Search never
+/// pre-filters by type itself; that check already happens for free once a result is selected.
+struct SteamWorkshopSearchResult: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let thumbnailURL: URL?
+}
+
+/// Steam's own `requiredtags[]` filter values this app offers in the search UI — see
+/// `SteamWorkshopService.searchItems`'s own doc comment for how/why this list is scoped to only
+/// what's confirmed to actually work, not Workshop's full (unpublished) tag taxonomy.
+/// Steam's real Workshop filter taxonomy for Wallpaper Engine, read directly off
+/// steamcommunity.com/workshop/browse's own filter sidebar (2026-10-05) rather than guessed —
+/// an earlier guessed list missed several real genres (CGI, Cyberpunk, Medieval, MMD, Relaxing,
+/// Vehicle, ...) and included at least one that isn't a real Genre value there at all ("Space" —
+/// it happened to still return results, but as a loose text match, not a real tag). Every list
+/// below is copied verbatim from that sidebar's own section headings and values; nothing here is
+/// invented or assumed.
+enum WorkshopTag {
+    /// Mirrors this app's own Video-Source/Image-Source split: a "Video" result plays as a real
+    /// video wallpaper; a "Scene" result is converted to a static image via SceneFallback and
+    /// behaves exactly like any other image-source wallpaper from here on — picking one in search
+    /// is the Steam equivalent of picking a source from the Image Sources popover.
+    static let typeTags = ["Video", "Scene"]
+
+    /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on (the default) — not a user-
+    /// facing chip itself. The sidebar's own "Category" facet also offers "Preset" and "Asset",
+    /// neither of which is a real importable wallpaper (a preset is saved settings for an
+    /// existing wallpaper; an asset is raw material for the editor, not a finished scene), so
+    /// Safe Mode scopes every search to real wallpapers only, the same way every other browse
+    /// source in this app only ever lists its own kind of content. Turning Safe Mode off stops
+    /// sending this, the same way any other optional filter here would be left off.
+    static let requiredCategoryTag = "Wallpaper"
+
+    /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on (the default) — not a user-
+    /// facing chip itself. The sidebar's own "Age Rating" facet also offers "Questionable" and
+    /// "Mature"; Safe Mode scopes every search to "Everyone" only. Turning Safe Mode off stops
+    /// sending this, the same way any other optional filter here would be left off.
+    static let requiredAgeRatingTag = "Everyone"
+
+    /// The sidebar's "Genre" facet, verbatim — every value it actually lists, alphabetical
+    /// ordering preserved as shown there. "Unspecified" is real (untagged items) but surfaced
+    /// last since including it is a narrower, less typical choice than every named genre above it.
+    static let genreTags = [
+        "Abstract", "Animal", "Anime", "Cartoon", "CGI", "Cyberpunk", "Fantasy", "Game", "Girls",
+        "Guys", "Landscape", "Medieval", "Memes", "MMD", "Music", "Nature", "Pixel art", "Relaxing",
+        "Retro", "Sci-Fi", "Sports", "Technology", "Television", "Vehicle", "Unspecified",
+    ]
+
+    /// The sidebar's "Miscellaneous" facet, verbatim — technical/interactivity properties rather
+    /// than visual genre (e.g. "Audio responsive" = reacts to system audio, "Puppet Warp" = has
+    /// bone-rigged animated parts), same ordering shown there.
+    static let miscellaneousTags = [
+        "Approved", "Audio responsive", "3D", "Customizable", "Puppet Warp", "HDR",
+        "Media Integration", "User Shortcut", "Video Texture", "Asset Pack",
+    ]
+}
+
 enum SteamWorkshopError: LocalizedError {
     case notInstalled
     case invalidURL
@@ -80,6 +140,16 @@ enum SteamWorkshopError: LocalizedError {
 
 enum SteamWorkshopService {
     static let wallpaperEngineAppId = "431960"
+
+    // Compiled once, not on every call — `searchItems` alone can run per keystroke of a chip tap
+    // or "load more" scroll, and `NSRegularExpression`'s pattern compile is real, avoidable work
+    // against a fixed, never-varying literal pattern.
+    private static let searchResultRegex = try? NSRegularExpression(
+        pattern: #"href="https://steamcommunity\.com/sharedfiles/filedetails/\?id=(\d+)"[^>]*><img src="([^"]+)"[^>]*alt="([^"]*)""#
+    )
+    private static let workshopTypeTagRegex = try? NSRegularExpression(pattern: #"workshopTagsTitle">Type:&nbsp;</span><a[^>]*>([^<]+)</a>"#)
+    private static let detailsStatLeftRegex = try? NSRegularExpression(pattern: #"detailsStatLeft\">([^<]*)<"#)
+    private static let detailsStatRightRegex = try? NSRegularExpression(pattern: #"detailsStatRight\">([^<]*)<"#)
 
     static var steamcmdPath: String? { ProcessRunner.resolveBinary(named: "steamcmd") }
     static var isAvailable: Bool { steamcmdPath != nil }
@@ -126,11 +196,106 @@ enum SteamWorkshopService {
         )
     }
 
+    /// Scrapes the public Workshop *browse* page (`workshop/browse/?searchtext=...`) — a different,
+    /// modern React-rendered template than `fetchPreview`'s single-item page, with hashed/
+    /// build-specific CSS class names that aren't stable to match against. The one thing that *is*
+    /// stable: each result renders as an `<a href=".../filedetails/?id=N">` immediately wrapping an
+    /// `<img src="thumbnail" alt="title">` — confirmed live (2026-10-05) against real search
+    /// results. `page` is Steam's own 1-based `p=` query param (confirmed live to return a distinct
+    /// result set per page, i.e. real pagination, not a no-op).
+    ///
+    /// No login, no steamcmd — same anonymous plain-HTTP approach as `fetchPreview`. Mature-rated
+    /// items are gated behind a content-preference cookie real browsers carry; an anonymous
+    /// request like this one doesn't send it, so Steam's own browse page already excludes most
+    /// mature-flagged results before this ever sees the HTML — not something this app filters
+    /// itself, since there's no reliable signal for it in this page's markup to filter *with*.
+    /// `requiredTags`: Steam's own `requiredtags[]` browse-page filter — confirmed live (2026-10-05)
+    /// that multiple values AND together (narrow, not widen) the same way checking several boxes
+    /// in Steam's own sidebar filter would. `WorkshopTag.typeTags`/`.topicTags` below are the
+    /// subset this app actually offers, each individually confirmed live to return real, distinct
+    /// results — Steam's tag taxonomy isn't published anywhere, and a handful of plausible-looking
+    /// guesses (e.g. "Cars", "Movies", "4K") came back empty, so this list is deliberately only
+    /// what was actually verified, not every tag Workshop might really support.
+    /// Empty `query` falls back to Steam's own "Trending" sort with no `searchtext` at all —
+    /// confirmed live (2026-10-05) that this still returns 60 real, current results, same as the
+    /// browse tabs for every other source here default to "trending"/"newest" on first open rather
+    /// than requiring the user to type something before seeing anything.
+    /// `excludedTags`: Steam's own `excludedtags[]` — confirmed live (2026-10-05) to genuinely
+    /// remove matching items (zero ID overlap between a tag's own `requiredtags[]` result set and
+    /// the same search's `excludedtags[]` result set), not just a no-op query param.
+    static func searchItems(query: String, page: Int = 1, requiredTags: [String] = [], excludedTags: [String] = []) async throws -> [SteamWorkshopSearchResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        var components = URLComponents(string: "https://steamcommunity.com/workshop/browse/")!
+        var queryItems = [
+            URLQueryItem(name: "appid", value: wallpaperEngineAppId),
+            URLQueryItem(name: "p", value: String(max(1, page))),
+        ]
+        if trimmed.isEmpty {
+            // "Most Popular (Six Months)" — same default Steam's own Workshop browse page used
+            // before any filter was touched. "Most Popular" is `browsesort=trend`; the time frame
+            // is a separate param (`days=180` for Six Months) — confirmed live (2026-10-06) by
+            // actually selecting both in Steam's own sort dropdown and reading the resulting URL,
+            // not guessed. Mandatory, matching how every other browse source's own default sort
+            // isn't user-configurable either (MotionBgs opens on "Trending", not a saved choice).
+            queryItems.append(URLQueryItem(name: "browsesort", value: "trend"))
+            queryItems.append(URLQueryItem(name: "days", value: "180"))
+        } else {
+            queryItems.append(URLQueryItem(name: "searchtext", value: trimmed))
+            queryItems.append(URLQueryItem(name: "browsesort", value: "textsearch"))
+        }
+        queryItems += requiredTags.map { URLQueryItem(name: "requiredtags[]", value: $0) }
+        queryItems += excludedTags.map { URLQueryItem(name: "excludedtags[]", value: $0) }
+        components.queryItems = queryItems
+        guard let pageURL = components.url else { throw SteamWorkshopError.invalidURL }
+
+        let (data, response) = try await URLSession.browseSource.data(from: pageURL)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200, let html = String(data: data, encoding: .utf8) else {
+            throw SteamWorkshopError.downloadFailed("Couldn't load Workshop search results")
+        }
+
+        guard let regex = searchResultRegex else { return [] }
+        let nsHTML = html as NSString
+        let matches = regex.matches(in: html, range: NSRange(location: 0, length: nsHTML.length))
+
+        var results: [SteamWorkshopSearchResult] = []
+        var seenIds = Set<String>()
+        for match in matches where match.numberOfRanges == 4 {
+            let id = nsHTML.substring(with: match.range(at: 1))
+            guard !seenIds.contains(id) else { continue }
+            seenIds.insert(id)
+            let rawThumbnailURL = URL(string: nsHTML.substring(with: match.range(at: 2)).replacingOccurrences(of: "&amp;", with: "&"))
+            let title = nsHTML.substring(with: match.range(at: 3)).decodingHTMLEntities()
+            results.append(SteamWorkshopSearchResult(id: id, title: title, thumbnailURL: nonLetterboxedThumbnail(rawThumbnailURL)))
+        }
+        return results
+    }
+
+    /// The browse page's own `<img>` thumbnails force `letterbox=true` at a fixed 322×322 square —
+    /// every non-square source image gets padded with visible black bars to fill that square,
+    /// confirmed live (2026-10-05) by comparing both against a handful of real results. The exact
+    /// same underlying image, at the exact same CDN path, renders properly fit-not-padded when
+    /// asked for with `letterbox=false` instead — confirmed by comparing to `fetchPreview`'s own
+    /// `og:image` URL for the same items, which already uses this recipe (that page was never
+    /// letterboxed to begin with). Rewriting the query here keeps every thumbnail in this app —
+    /// search results and the single-item preview alike — visually consistent, with one fewer
+    /// network request than re-fetching each result's own detail page just for a better image.
+    private static func nonLetterboxedThumbnail(_ url: URL?) -> URL? {
+        guard var components = url.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else { return url }
+        components.queryItems = [
+            URLQueryItem(name: "imw", value: "512"),
+            URLQueryItem(name: "ima", value: "fit"),
+            URLQueryItem(name: "impolicy", value: "Letterbox"),
+            URLQueryItem(name: "imcolor", value: "#000000"),
+            URLQueryItem(name: "letterbox", value: "false"),
+        ]
+        return components.url ?? url
+    }
+
     /// The page's "Type:" tag renders as `<span class="workshopTagsTitle">Type:&nbsp;</span>`
     /// immediately followed by a single `<a>` whose text is the actual value (e.g. "Scene").
     /// Confirmed live (2026-10-04) against a real Scene-type item's page.
     private static func extractWorkshopTypeTag(html: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: #"workshopTagsTitle">Type:&nbsp;</span><a[^>]*>([^<]+)</a>"#),
+        guard let regex = workshopTypeTagRegex,
               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
               let range = Range(match.range(at: 1), in: html)
         else { return nil }
@@ -148,16 +313,16 @@ enum SteamWorkshopService {
     /// "Posted", ...) and `detailsStatRight` values, in matching order — so the label's index
     /// gives the value's index rather than needing to know each stat's exact position up front.
     private static func extractLabeledStat(label: String, html: String) -> String? {
-        let labels = regexMatches(#"detailsStatLeft\">([^<]*)<"#, in: html)
-        let values = regexMatches(#"detailsStatRight\">([^<]*)<"#, in: html)
+        guard let labelRegex = detailsStatLeftRegex, let valueRegex = detailsStatRightRegex else { return nil }
+        let labels = regexMatches(labelRegex, in: html)
+        let values = regexMatches(valueRegex, in: html)
         guard let index = labels.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == label }), index < values.count else {
             return nil
         }
         return values[index].trimmingCharacters(in: .whitespaces)
     }
 
-    private static func regexMatches(_ pattern: String, in text: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+    private static func regexMatches(_ regex: NSRegularExpression, in text: String) -> [String] {
         let nsText = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: nsText.length)).compactMap { match in
             guard match.numberOfRanges > 1 else { return nil }

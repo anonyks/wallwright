@@ -275,6 +275,14 @@ struct GlobalSettings: Codable, Equatable {
     /// account the app should tell steamcmd to reuse afterward. See SteamWorkshopService.
     var steamUsername: String? = nil
 
+    /// On (default): every Steam Workshop search here is unconditionally scoped to Age Rating
+    /// "Everyone" and Category "Wallpaper" — no Mature/Questionable results, no Preset/Asset
+    /// clutter. Off: those two filters are simply not sent, same as any other optional Workshop
+    /// filter this app doesn't apply by default. See `WorkshopTag.requiredCategoryTag`/
+    /// `.requiredAgeRatingTag`'s own doc comments for why they exist; this setting is what makes
+    /// "mandatory" actually mean "mandatory while this is on," not an unconditional hardcode.
+    var steamWorkshopSafeMode = true
+
     // MARK: Hotkeys
     var pauseHotkey: Hotkey? = Self.defaultPauseHotkey
     var muteHotkey: Hotkey? = Self.defaultMuteHotkey
@@ -338,6 +346,7 @@ struct GlobalSettings: Codable, Equatable {
         clockDraggable = (try? c.decodeIfPresent(Bool.self, forKey: .clockDraggable)) ?? nil ?? false
         clockCustomOrigins = (try? c.decodeIfPresent([String: CGPoint].self, forKey: .clockCustomOrigins)) ?? nil
         steamUsername = (try? c.decodeIfPresent(String.self, forKey: .steamUsername)) ?? nil
+        steamWorkshopSafeMode = (try? c.decodeIfPresent(Bool.self, forKey: .steamWorkshopSafeMode)) ?? nil ?? true
         pauseHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .pauseHotkey)) ?? nil ?? Self.defaultPauseHotkey
         muteHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .muteHotkey)) ?? nil ?? Self.defaultMuteHotkey
         clockHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .clockHotkey)) ?? nil ?? Self.defaultClockHotkey
