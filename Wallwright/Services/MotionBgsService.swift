@@ -221,8 +221,13 @@ final class MotionBgsService {
     struct ExistingLibraryIndex {
         /// Source item IDs recorded via `sourceProvider`/`sourceId` — the precise match.
         let sourceIds: Set<Int>
-        /// Lowercased titles of every wallpaper in the library — a fallback match for items
-        /// downloaded before source-ID tracking existed, which have no `sourceId` to compare.
+        /// Lowercased titles of wallpapers with no `sourceId` at all — a fallback match for items
+        /// downloaded before source-ID tracking existed, which have nothing else to compare. Only
+        /// populated from untracked items specifically: a wallpaper that DOES have a `sourceId`
+        /// (from this source or any other) is matched solely by that, never by title, so two
+        /// unrelated wallpapers that merely share a common title (e.g. "Minecraft Sunset" showing
+        /// up across several sites) don't falsely mark each other as "Added" — confirmed live
+        /// 2026-10-06 as a real false positive this caused.
         let titles: Set<String>
     }
 
@@ -237,7 +242,9 @@ final class MotionBgsService {
         var titles = Set<String>()
         for wallpaper in wallpapers {
             let project = wallpaper.project
-            titles.insert(project.title.lowercased())
+            if project.sourceId == nil {
+                titles.insert(project.title.lowercased())
+            }
 
             if project.sourceProvider == "motionbgs",
                let sourceId = project.sourceId,

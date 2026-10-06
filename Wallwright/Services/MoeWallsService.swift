@@ -203,6 +203,7 @@ final class MoeWallsService {
     /// re-downloading from MoeWalls — same pattern as `MotionBgsService.existingLibraryIndex()`.
     struct ExistingLibraryIndex {
         let sourceIds: Set<Int>
+        /// Only from wallpapers with no `sourceId` at all — see `MotionBgsService.ExistingLibraryIndex.titles`'s own doc comment for why this can't include every wallpaper's title.
         let titles: Set<String>
     }
 
@@ -214,7 +215,9 @@ final class MoeWallsService {
         var titles = Set<String>()
         for wallpaper in wallpapers {
             let project = wallpaper.project
-            titles.insert(project.title.lowercased())
+            if project.sourceId == nil {
+                titles.insert(project.title.lowercased())
+            }
 
             if project.sourceProvider == "moewalls", let sourceId = project.sourceId, let id = Int(sourceId) {
                 sourceIds.insert(id)

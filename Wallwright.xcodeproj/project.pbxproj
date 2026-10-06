@@ -16,6 +16,7 @@
 		4E42DA3B74C81EFDA1AF4100 /* WallpaperDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2799B323BA1B8CF9D6A0F4D /* WallpaperDirectoryTests.swift */; };
 		95B759FB57F148CBAD1BFE2C /* SceneFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B7981BE9D74BC9B2CDC380 /* SceneFallbackTests.swift */; };
 		856230075E4E4BF397548CED /* SceneTextureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472924820B04B12BC0AC730 /* SceneTextureTests.swift */; };
+		F3DC8D8A4F6D446D903D7FAD /* ExistingLibraryIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB8129CDE80344A780DCAA61 /* ExistingLibraryIndexTests.swift */; };
 		5E0700E62A859FAD00ADFE2E /* WallpaperNotFound.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 5E0700E52A859FAD00ADFE2E /* WallpaperNotFound.mp4 */; };
 		8E6AF5F8F2C04B1A99697546 /* WWLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200E00B6CD024C21B973FB2A /* WWLog.swift */; };
 		AF10B2534B2F4B9BA0E8C6F1 /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7EBE4C46D5421BB52A775C /* ProcessRunner.swift */; };
@@ -229,6 +230,7 @@
 		D2799B323BA1B8CF9D6A0F4D /* WallpaperDirectoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WallpaperDirectoryTests.swift; sourceTree = "<group>"; };
 		04B7981BE9D74BC9B2CDC380 /* SceneFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SceneFallbackTests.swift; sourceTree = "<group>"; };
 		0472924820B04B12BC0AC730 /* SceneTextureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SceneTextureTests.swift; sourceTree = "<group>"; };
+		EB8129CDE80344A780DCAA61 /* ExistingLibraryIndexTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExistingLibraryIndexTests.swift; sourceTree = "<group>"; };
 		EE0000000000000000000002 /* AerialsInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialsInjector.swift; sourceTree = "<group>"; };
 		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
 		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
@@ -620,6 +622,7 @@
 				D2799B323BA1B8CF9D6A0F4D /* WallpaperDirectoryTests.swift */,
 				04B7981BE9D74BC9B2CDC380 /* SceneFallbackTests.swift */,
 				0472924820B04B12BC0AC730 /* SceneTextureTests.swift */,
+				EB8129CDE80344A780DCAA61 /* ExistingLibraryIndexTests.swift */,
 			);
 			name = WallwrightTests;
 			path = WallwrightTests;
@@ -878,6 +881,7 @@
 				4E42DA3B74C81EFDA1AF4100 /* WallpaperDirectoryTests.swift in Sources */,
 				95B759FB57F148CBAD1BFE2C /* SceneFallbackTests.swift in Sources */,
 				856230075E4E4BF397548CED /* SceneTextureTests.swift in Sources */,
+				F3DC8D8A4F6D446D903D7FAD /* ExistingLibraryIndexTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

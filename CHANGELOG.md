@@ -96,6 +96,12 @@ All notable changes to Wallwright are documented here. Format follows
   desktop-picture registration that drives this tint at all, to avoid an earlier conflict with
   the Aerials lock-screen/screensaver registration; now it's updated right after Aerials finishes
   its own registration instead of being skipped outright, so both stay correct.
+- Every browse source's "Added" indicator could show a false positive: a wallpaper that already
+  has its own precise source-ID match would also get folded into the title-based fallback match
+  (meant only for legacy wallpapers downloaded before source-ID tracking existed), so two unrelated
+  wallpapers that merely shared a common title (e.g. "Minecraft Sunset" appearing on several sites)
+  falsely marked each other as already downloaded — including after the actual matching one had
+  been deleted.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
