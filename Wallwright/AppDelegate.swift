@@ -576,7 +576,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// launch should always run it at least once per screen, since nothing guarantees the OS's own
     /// desktop picture still matches what we last set (a macOS update, a reset, another app changing
     /// it).
+    ///
+    /// `setPlacehoderWallpaper`'s "image" case deliberately runs on whatever thread each call site
+    /// dispatches it from (see that case's own comment on why it isn't self-dispatched to main) —
+    /// `didChangeAdjustMenuBarTint`/`didCurrentWallpaperChange` can both legitimately call in from a
+    /// background `.utility` queue at nearly the same moment (confirmed live via crash report
+    /// 2026-10-05: concurrent `Dictionary` mutation from two threads corrupted its storage and
+    /// crashed with `doesNotRecognizeSelector` inside the subscript setter — a plain Swift
+    /// `Dictionary` has no built-in thread safety). This lock protects only this dictionary's own
+    /// read-check-write, not `setDesktopImageURL` itself, so it doesn't reintroduce the ordering bug
+    /// the "no self-dispatch" comment already describes.
     private var lastPlaceholderImageURLs: [String: URL] = [:]
+    private let lastPlaceholderImageURLsLock = NSLock()
 
     /// Alternates the video-frame placeholder between two fixed filenames (`staticWP_A.tiff`/
     /// `staticWP_B.tiff`) instead of always overwriting the exact same one — some of what samples
@@ -692,10 +703,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let screenWallpaper = AppDelegate.shared.wallpaperViewModel.wallpapers[screenId] ?? wallpaper
                 guard screenWallpaper.project.type == "image" else { continue }
                 let url = screenWallpaper.wallpaperDirectory.appending(path: screenWallpaper.project.file)
-                guard url != lastPlaceholderImageURLs[screenId] else { continue }
+                lastPlaceholderImageURLsLock.lock()
+                let alreadySet = url == lastPlaceholderImageURLs[screenId]
+                lastPlaceholderImageURLsLock.unlock()
+                guard !alreadySet else { continue }
                 do {
                     try NSWorkspace.shared.setDesktopImageURL(url, for: screen)
+                    lastPlaceholderImageURLsLock.lock()
                     lastPlaceholderImageURLs[screenId] = url
+                    lastPlaceholderImageURLsLock.unlock()
                 } catch {
                     WWLog.app.error("Failed to set static-image desktop wallpaper for screen: \(error)")
                 }
