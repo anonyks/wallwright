@@ -107,7 +107,7 @@ extension AppDelegate {
                 // unsupported-type check and the title/directory-name fallback this used to do
                 // inline, and `commitImport` posts its own library-changed notification per item.
                 for url in wallpaperURLs {
-                    guard let pending = try? PackageImporter.preparePending(at: url) else { continue }
+                    guard let pending = try? await PackageImporter.preparePending(at: url) else { continue }
                     _ = await PackageImporter.commitImport(pending)
                 }
                 for url in zipURLs {

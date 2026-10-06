@@ -8,7 +8,9 @@
 //  wallpaper instead: first by trying to pull the real background art out of scene.pkg itself via
 //  SceneArtExtractor (direct JPEG/PNG, DXT1/3/5 decode, or a video-frame grab — confirmed live
 //  2026-10-05 against real downloaded scenes), falling back to the small bundled preview image
-//  (every Workshop item ships one regardless) only when nothing in the package is usable.
+//  (every Workshop item ships one regardless) only when nothing in the package is usable. When the
+//  import review sheet offered a choice between multiple candidate textures, the user's pick comes
+//  straight in as `chosenArt` instead of this re-deriving the same first-match automatically.
 //
 
 import Foundation
@@ -30,11 +32,25 @@ enum SceneFallbackError: LocalizedError, Equatable {
 enum SceneFallback {
     /// `directory` is `PackageImporter.commitImport`'s already-copied-into-place `destination`,
     /// never the original source/cache directory (Steam's own Workshop cache is left untouched).
-    static func apply(to project: WEProject, in directory: URL) async throws -> WEProject {
-        if let extracted = await SceneArtExtractor.extract(directory: directory) {
-            return try applyExtractedArt(extracted, to: project, in: directory)
+    /// `chosenArt`: when the import review sheet offered a picker (`PendingPackageImport
+    /// .sceneArtCandidates`) and the user picked one, that candidate is passed straight through
+    /// here instead of re-running extraction and silently taking the first match again.
+    static func apply(to project: WEProject, in directory: URL, chosenArt: SceneArtExtractor.Extracted? = nil) async throws -> WEProject {
+        let extracted = chosenArt == nil ? await SceneArtExtractor.extract(directory: directory) : chosenArt
+        let updated: WEProject
+        if let extracted {
+            updated = try applyExtractedArt(extracted, to: project, in: directory)
+        } else {
+            updated = try applyPreview(to: project, in: directory)
         }
-        return try applyPreview(to: project, in: directory)
+        // Neither outcome above ever reads scene.pkg again — `updated.type` is "image" either way,
+        // and a committed "image" wallpaper's `file`/`preview` always point at the just-written
+        // static artwork, never back into the archive. Left in place, this is real, substantial
+        // wasted disk space: confirmed live (2026-10-05) against a real 246MB scene.pkg sitting
+        // unused in the library after extraction. `try?`: a failed cleanup shouldn't fail an
+        // otherwise-successful import.
+        try? FileManager.default.removeItem(at: directory.appending(path: "scene.pkg"))
+        return updated
     }
 
     /// Writes the real-artwork extraction result as the wallpaper's full-size file, plus a

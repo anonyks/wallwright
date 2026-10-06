@@ -237,6 +237,98 @@ final class SceneTextureTests: XCTestCase {
         XCTAssertEqual(SceneTextureResolver.candidateTexturePaths(in: archive).count, 0)
     }
 
+    // MARK: - SceneArtExtractor.extractCandidates (the import-review picker's data source)
+
+    private func writeSceneArchive(sceneJSON: [String: Any], extraFiles: [String: Data], to directory: URL) {
+        let sceneData = try! JSONSerialization.data(withJSONObject: sceneJSON)
+        var entries: [(String, Data)] = [("scene.json", sceneData)]
+        entries.append(contentsOf: extraFiles.map { ($0.key, $0.value) })
+        try! makePKG(entries: entries).write(to: directory.appending(path: "scene.pkg"))
+    }
+
+    private func makeTempDir() -> URL {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "SceneTextureTests-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private func solidColorRGBA(_ width: Int, _ height: Int, _ rgba: [UInt8]) -> Data {
+        var pixels = Data()
+        for _ in 0..<(width * height) { pixels.append(contentsOf: rgba) }
+        return pixels
+    }
+
+    /// Two distinct, independently-decodable textures (a fullscreen "background" and a smaller
+    /// overlay icon) — the shape a real multi-layer scene has, and exactly what the import review
+    /// sheet's picker needs more than one of to be worth showing at all.
+    func testExtractCandidatesReturnsEachDecodableTextureMostLikelyBackgroundFirst() async {
+        let dir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scene: [String: Any] = [
+            "general": ["orthogonalprojection": ["width": 2, "height": 2]],
+            "objects": [
+                ["image": "models/icon.json"],
+                ["image": "models/background.json"],
+            ],
+        ]
+        writeSceneArchive(sceneJSON: scene, extraFiles: [
+            "models/icon.json": json(["material": "materials/icon.json"]),
+            "materials/icon.json": json(["textures": ["icon_tex"]]),
+            "materials/icon_tex.tex": makeRGBA8888TEX(width: 1, height: 1, pixels: solidColorRGBA(1, 1, [255, 0, 0, 255])),
+            "models/background.json": json(["material": "materials/background.json", "fullscreen": true]),
+            "materials/background.json": json(["textures": ["bg_tex"]]),
+            "materials/bg_tex.tex": makeRGBA8888TEX(width: 2, height: 2, pixels: solidColorRGBA(2, 2, [0, 255, 0, 255])),
+        ], to: dir)
+
+        let candidates = await SceneArtExtractor.extractCandidates(directory: dir)
+
+        XCTAssertEqual(candidates.count, 2)
+        XCTAssertEqual(candidates.first?.isLikelyBackground, true, "the fullscreen layer must sort first, matching the resolver's own ordering")
+        XCTAssertEqual(candidates.first?.extracted.width, 2)
+        XCTAssertEqual(candidates.last?.isLikelyBackground, false)
+        XCTAssertEqual(candidates.last?.extracted.width, 1)
+    }
+
+    func testExtractCandidatesDedupesObjectsSharingTheSameTexture() async {
+        let dir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scene: [String: Any] = [
+            "objects": [
+                ["image": "models/tile_a.json"],
+                ["image": "models/tile_b.json"],
+            ],
+        ]
+        // Two different objects/models, same underlying texture — a legitimate repeated-tiling
+        // pattern in real content, but only one real image to choose between.
+        writeSceneArchive(sceneJSON: scene, extraFiles: [
+            "models/tile_a.json": json(["material": "materials/shared.json"]),
+            "models/tile_b.json": json(["material": "materials/shared.json"]),
+            "materials/shared.json": json(["textures": ["shared_tex"]]),
+            "materials/shared_tex.tex": makeRGBA8888TEX(width: 1, height: 1, pixels: solidColorRGBA(1, 1, [0, 0, 255, 255])),
+        ], to: dir)
+
+        let candidates = await SceneArtExtractor.extractCandidates(directory: dir)
+        XCTAssertEqual(candidates.count, 1, "the same texture path referenced twice must only be offered once")
+    }
+
+    func testExtractReturnsFirstOfExtractCandidates() async {
+        let dir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scene: [String: Any] = [
+            "general": ["orthogonalprojection": ["width": 2, "height": 2]],
+            "objects": [["image": "models/background.json"]],
+        ]
+        writeSceneArchive(sceneJSON: scene, extraFiles: [
+            "models/background.json": json(["material": "materials/background.json", "fullscreen": true]),
+            "materials/background.json": json(["textures": ["bg_tex"]]),
+            "materials/bg_tex.tex": makeRGBA8888TEX(width: 2, height: 2, pixels: solidColorRGBA(2, 2, [10, 20, 30, 255])),
+        ], to: dir)
+
+        let single = await SceneArtExtractor.extract(directory: dir)
+        let all = await SceneArtExtractor.extractCandidates(directory: dir)
+        XCTAssertEqual(single?.jpegData, all.first?.extracted.jpegData)
+    }
+
     // MARK: - SteamWorkshopPreview Types
 
     func testSteamWorkshopPreviewTypeDistinction() {

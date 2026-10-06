@@ -40,7 +40,7 @@ enum ZipImporter {
             // forever meant every future sort/impact-badge render fell back to a live recursive
             // directory walk for it). `preparePending` already handles the unsupported-type check
             // and the title/directory-name fallback this used to do inline.
-            guard let pending = try? PackageImporter.preparePending(at: url) else {
+            guard let pending = try? await PackageImporter.preparePending(at: url) else {
                 WWLog.importing.notice("ZipImporter: skipping \(url.lastPathComponent) — couldn't prepare (unsupported type, missing project.json, or no preview image)")
                 continue
             }

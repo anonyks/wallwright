@@ -22,7 +22,29 @@ enum SceneArtExtractor {
         let height: Int
     }
 
+    /// One successfully-decoded candidate background texture, for `extractCandidates` below.
+    struct Candidate {
+        let extracted: Extracted
+        /// See `SceneTextureCandidate.isLikelyBackground` — carried through so the caller can
+        /// present the most-plausible candidate first without re-deriving the signal.
+        let isLikelyBackground: Bool
+    }
+
+    /// First-successful-decode convenience, used wherever nothing asked the user to choose
+    /// between candidates (the manual-folder-drop and .zip import paths, and as the fallback when
+    /// `extractCandidates` found nothing or a review was skipped). Equivalent to taking the first
+    /// element `extractCandidates` would have returned.
     static func extract(directory: URL) async -> Extracted? {
+        await extractCandidates(directory: directory, limit: 1).first?.extracted
+    }
+
+    /// Decodes every plausible background-art candidate in the scene (not just the first that
+    /// works), most-likely-background first, so a caller can show the user a picker instead of
+    /// silently committing to whichever texture happened to resolve first. `limit` caps how many
+    /// are actually decoded — real scenes can bundle dozens of textures (particle sprites, UI
+    /// chrome, masks), and decoding all of them (DXT block-decompression, LZ4, embedded-video
+    /// frame grabs) for a one-time import review isn't worth the wait past a reasonable choice set.
+    static func extractCandidates(directory: URL, limit: Int = 8) async -> [Candidate] {
         // Always "scene.pkg" on disk, regardless of project.file: that field holds the scene's
         // logical entry point ("scene.json"), which is itself an entry *inside* this archive, not
         // the archive's own filename. Confirmed against every real downloaded scene this session
@@ -30,27 +52,45 @@ enum SceneArtExtractor {
         let pkgURL = directory.appending(path: "scene.pkg")
         guard FileManager.default.fileExists(atPath: pkgURL.path),
               let archive = try? PKGArchive(url: pkgURL)
-        else { return nil }
+        else { return [] }
 
+        var results: [Candidate] = []
+        // Two objects can legitimately reference the same texture file (e.g. a repeated tiling
+        // element) — no point offering the user the same image twice.
+        var seenPaths = Set<String>()
         for candidate in SceneTextureResolver.candidateTexturePaths(in: archive) {
+            guard results.count < limit else { break }
+            guard !seenPaths.contains(candidate.path) else { continue }
+            seenPaths.insert(candidate.path)
             guard let textureData = archive[candidate.path] else { continue }
             do {
-                let texture = try TEXTexture(data: textureData)
-                guard let extracted = cgImage(
-                    fromRGBA: texture.rgba,
-                    width: texture.width,
-                    height: texture.height,
-                    imageWidth: texture.imageWidth,
-                    imageHeight: texture.imageHeight
-                ) else { continue }
-                return extracted
+                // Decoding a DXT/embedded-image texture and converting it to JPEG runs several
+                // CoreGraphics/ImageIO calls that create autoreleased intermediates (CGDataProvider,
+                // NSBitmapImageRep's own representation encode, ...) — without an explicit pool,
+                // those only drain once this whole async function returns, not per loop iteration,
+                // so up to `limit` full-resolution decodes' worth of intermediates can be resident
+                // at once for a scene with many candidate textures.
+                let extracted: Extracted? = try autoreleasepool {
+                    let texture = try TEXTexture(data: textureData)
+                    return cgImage(
+                        fromRGBA: texture.rgba,
+                        width: texture.width,
+                        height: texture.height,
+                        imageWidth: texture.imageWidth,
+                        imageHeight: texture.imageHeight
+                    )
+                }
+                guard let extracted else { continue }
+                results.append(Candidate(extracted: extracted, isLikelyBackground: candidate.isLikelyBackground))
             } catch SceneTextureFormatError.videoPayload(let mp4Data) {
-                if let extracted = await frameFromVideo(mp4Data) { return extracted }
+                if let extracted = await frameFromVideo(mp4Data) {
+                    results.append(Candidate(extracted: extracted, isLikelyBackground: candidate.isLikelyBackground))
+                }
             } catch {
                 continue
             }
         }
-        return nil
+        return results
     }
 
     private static func cgImage(

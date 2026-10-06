@@ -31,6 +31,14 @@ private struct PackageImportReviewContent: View {
     @State private var title: String
     @State private var tags: [String]
     @State private var newTag = ""
+    @State private var selectedSceneArtIndex: Int
+    @State private var mainPreviewImage: NSImage
+    /// Decoded once in `init` at thumbnail size via `ThumbnailDownsampler`'s decode-at-size path,
+    /// not a full decode of `pending.sceneArtCandidates`' own full-resolution JPEG `Data` (often
+    /// 3840x2160+) shrunk down after the fact — up to 8 of those held fully decoded at once (for a
+    /// strip of buttons never shown larger than 64pt) measured ~264MB of transient RAM. This way
+    /// each thumbnail decodes straight at the ~64pt-strip's own target size.
+    private let candidateThumbnails: [NSImage]
 
     init(pending: PendingPackageImport, remaining: Int, viewModel: ContentViewModel) {
         self.pending = pending
@@ -38,6 +46,13 @@ private struct PackageImportReviewContent: View {
         self.viewModel = viewModel
         self._title = State(initialValue: pending.title)
         self._tags = State(initialValue: pending.tags)
+        self._selectedSceneArtIndex = State(initialValue: pending.selectedSceneArtIndex)
+        self.candidateThumbnails = pending.sceneArtCandidates.map {
+            ThumbnailDownsampler.downsampledImage(from: $0.extracted.jpegData, maxDimension: 128) ?? NSImage()
+        }
+        let initialFull = pending.sceneArtCandidates.indices.contains(pending.selectedSceneArtIndex)
+            ? pending.sceneArtCandidates[pending.selectedSceneArtIndex].extracted.jpegData : nil
+        self._mainPreviewImage = State(initialValue: initialFull.flatMap { ThumbnailDownsampler.downsampledImage(from: $0, maxDimension: 900) } ?? NSImage())
     }
 
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -60,14 +75,18 @@ private struct PackageImportReviewContent: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    Image(nsImage: pending.thumbnail)
-                        .resizable()
-                        // No fixed ratio — Steam Workshop preview images vary (square, 16:9,
-                        // 4:3, ...), so this just fits the specific image's own dimensions.
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    if pending.sceneArtCandidates.count > 1 {
+                        sceneArtPicker
+                    } else {
+                        Image(nsImage: pending.thumbnail)
+                            .resizable()
+                            // No fixed ratio — Steam Workshop preview images vary (square, 16:9,
+                            // 4:3, ...), so this just fits the specific image's own dimensions.
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    }
 
                     Label("Steam Workshop · \(pending.type.capitalized) wallpaper", systemImage: "arrow.down.circle")
                         .font(.caption)
@@ -130,12 +149,60 @@ private struct PackageImportReviewContent: View {
                     // Same fix as ImportReviewSheet — flush an unsubmitted "Add a tag" field
                     // before committing, rather than silently dropping it.
                     addTag()
-                    Task { await viewModel.commitCurrentPackageImport(title: trimmedTitle, tags: tags) }
+                    Task { await viewModel.commitCurrentPackageImport(title: trimmedTitle, tags: tags, selectedSceneArtIndex: selectedSceneArtIndex) }
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(trimmedTitle.isEmpty)
             }
             .padding()
+        }
+    }
+
+    /// Shown instead of the plain `pending.thumbnail` when SceneArtExtractor found more than one
+    /// plausible background texture in the scene's own package — a real scene often bundles
+    /// several image layers (background, foreground elements, UI chrome), and silently committing
+    /// to whichever one happened to resolve first produced the wrong picture often enough to be
+    /// worth asking instead of guessing.
+    private var sceneArtPicker: some View {
+        VStack(spacing: 10) {
+            Image(nsImage: mainPreviewImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                .id(selectedSceneArtIndex)  // crossfade-free swap reads as an intentional pick, not a glitch
+
+            Text("This scene has \(candidateThumbnails.count) image layers — choose which one becomes the wallpaper.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(candidateThumbnails.indices, id: \.self) { index in
+                        Button {
+                            selectedSceneArtIndex = index
+                            // The main preview is the one candidate decoded at a larger size — only
+                            // re-decode it when the selection actually changes, not one full decode
+                            // per candidate up front (see `candidateThumbnails`'s own doc comment).
+                            mainPreviewImage = ThumbnailDownsampler.downsampledImage(from: pending.sceneArtCandidates[index].extracted.jpegData, maxDimension: 900) ?? NSImage()
+                        } label: {
+                            Image(nsImage: candidateThumbnails[index])
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 64, height: 64)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(index == selectedSceneArtIndex ? Color.accentColor : .clear, lineWidth: 3)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Use image layer \(index + 1) as the wallpaper")
+                    }
+                }
+            }
         }
     }
 

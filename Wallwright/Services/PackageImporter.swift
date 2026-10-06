@@ -30,6 +30,15 @@ struct PendingPackageImport: Identifiable {
     /// Written to `project.sourceProvider` on commit — `nil` for a package that didn't come from any
     /// tracked source (e.g. a folder dragged straight into the library window from Finder).
     let sourceProvider: String?
+    /// For a scene wallpaper with more than one plausible background-art texture: every candidate
+    /// `SceneArtExtractor` could actually decode, most-likely-background first — lets the review
+    /// sheet show a picker instead of silently committing to whichever one happened to resolve
+    /// first. Empty for non-scene imports, or when extraction found 0 or 1 usable candidates
+    /// (nothing worth choosing between).
+    var sceneArtCandidates: [SceneArtExtractor.Candidate] = []
+    /// Index into `sceneArtCandidates` the user has picked (or the default, index 0 — the
+    /// resolver's own best guess — until they pick something else).
+    var selectedSceneArtIndex: Int = 0
 }
 
 enum PackageImportError: LocalizedError {
@@ -51,8 +60,12 @@ enum PackageImportError: LocalizedError {
 
 enum PackageImporter {
     /// `project`/`directory` are usually already available from the caller (e.g.
-    /// `SteamWorkshopResult`), so this only re-reads from disk for the preview image.
-    static func preparePending(project: WEProject, directory: URL, sourceId: String? = nil, sourceProvider: String? = nil) throws -> PendingPackageImport {
+    /// `SteamWorkshopResult`), so this only re-reads from disk for the preview image. `async`
+    /// because a scene import decodes every plausible background-art candidate here (see
+    /// `sceneArtCandidates`), so the review sheet can offer a picker rather than the old silent
+    /// first-match behavior — real scenes can take a moment for this (DXT/LZ4 decode), but it's a
+    /// one-time cost before the review sheet appears, not a repeating one.
+    static func preparePending(project: WEProject, directory: URL, sourceId: String? = nil, sourceProvider: String? = nil) async throws -> PendingPackageImport {
         guard project.isImportableType else {
             throw PackageImportError.unsupportedType(project.type)
         }
@@ -69,6 +82,12 @@ enum PackageImporter {
         let title = WEProject.fallbackTypes.contains(project.type.lowercased())
             && !baseTitle.localizedCaseInsensitiveContains("scene preview")
             ? "\(baseTitle) (Scene Preview)" : baseTitle
+
+        var candidates: [SceneArtExtractor.Candidate] = []
+        if WEProject.fallbackTypes.contains(project.type.lowercased()) {
+            candidates = await SceneArtExtractor.extractCandidates(directory: directory)
+        }
+
         return PendingPackageImport(
             sourceDirectory: directory,
             title: title,
@@ -76,17 +95,18 @@ enum PackageImporter {
             thumbnail: thumbnail,
             type: project.type,
             sourceId: sourceId,
-            sourceProvider: sourceProvider
+            sourceProvider: sourceProvider,
+            sceneArtCandidates: candidates
         )
     }
 
     /// Reads project.json fresh off disk — used when a caller only has a bare directory (no
     /// already-parsed WEProject on hand).
-    static func preparePending(at directory: URL, sourceId: String? = nil, sourceProvider: String? = nil) throws -> PendingPackageImport {
+    static func preparePending(at directory: URL, sourceId: String? = nil, sourceProvider: String? = nil) async throws -> PendingPackageImport {
         guard let data = try? Data(contentsOf: directory.appending(path: "project.json")),
               let project = try? JSONDecoder().decode(WEProject.self, from: data)
         else { throw PackageImportError.missingProjectFile }
-        return try preparePending(project: project, directory: directory, sourceId: sourceId, sourceProvider: sourceProvider)
+        return try await preparePending(project: project, directory: directory, sourceId: sourceId, sourceProvider: sourceProvider)
     }
 
     /// Copies the package into the wallpapers directory under the (possibly user-edited) title,
@@ -121,7 +141,14 @@ enum PackageImporter {
             // so by the time that check runs for a former scene, it's correctly skipped.
             if WEProject.fallbackTypes.contains(project.type.lowercased()) {
                 do {
-                    project = try await SceneFallback.apply(to: project, in: destination)
+                    // `pending.selectedSceneArtIndex` defaults to 0 (the resolver's own best
+                    // guess) when the user never touched the picker, or when there was nothing to
+                    // pick between — either way this is exactly what SceneFallback would have
+                    // extracted on its own, just not re-decoded a second time here.
+                    let candidates = pending.sceneArtCandidates
+                    let chosenArt = candidates.indices.contains(pending.selectedSceneArtIndex)
+                        ? candidates[pending.selectedSceneArtIndex].extracted : nil
+                    project = try await SceneFallback.apply(to: project, in: destination, chosenArt: chosenArt)
                 } catch {
                     WWLog.importing.error("PackageImporter: scene fallback failed: \(error)")
                     try? fm.removeItem(at: destination)

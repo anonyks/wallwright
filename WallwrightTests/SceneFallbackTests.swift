@@ -108,34 +108,62 @@ final class SceneFallbackTests: XCTestCase {
         }
     }
 
-    func testVideoAndImagePassThroughPreparePendingUnchanged() throws {
+    /// When the import review sheet offered a picker and the user chose a candidate, that choice
+    /// must actually be what gets committed — not silently re-derived via SceneArtExtractor's own
+    /// first-match again. Uses a directory with no scene.pkg at all (which would normally fall all
+    /// the way through to the preview-image fallback) specifically so a pass meaningfully proves
+    /// `chosenArt` was used, not just coincidentally agreed with what extraction would have found.
+    func testSceneFallbackUsesChosenArtInsteadOfReExtracting() async throws {
+        let dir = makeTempDir()
+        writePNG(to: dir.appending(path: "preview.jpg"))
+        // A real (dummy) scene.pkg on disk, specifically so this test can also assert it gets
+        // cleaned up — nothing reads it again once `apply` commits a chosen candidate, and it's
+        // often hundreds of MB in real content (confirmed live 2026-10-05 against a real 246MB
+        // archive), left behind as pure waste otherwise.
+        try Data("dummy scene.pkg bytes".utf8).write(to: dir.appending(path: "scene.pkg"))
+        let project = WEProject(file: "scene.pkg", preview: "preview.jpg", title: "Chosen Art", type: "scene")
+        let chosen = SceneArtExtractor.Extracted(jpegData: Data("not a real jpeg, just a marker".utf8), width: 123, height: 456)
+
+        let updated = try await SceneFallback.apply(to: project, in: dir, chosenArt: chosen)
+
+        XCTAssertEqual(updated.type, "image")
+        XCTAssertEqual(updated.file, "scene-art.jpg")
+        XCTAssertEqual(updated.videoWidth, 123)
+        XCTAssertEqual(updated.videoHeight, 456)
+        let written = try Data(contentsOf: dir.appending(path: "scene-art.jpg"))
+        XCTAssertEqual(written, chosen.jpegData)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appending(path: "scene.pkg").path), "scene.pkg must be deleted once its art has been extracted")
+    }
+
+    func testVideoAndImagePassThroughPreparePendingUnchanged() async throws {
         for type in ["video", "image"] {
             let dir = makeTempDir()
             writePNG(to: dir.appending(path: "preview.jpg"))
             let project = WEProject(file: "main.mp4", preview: "preview.jpg", title: "Untouched \(type)", type: type)
 
-            let pending = try PackageImporter.preparePending(project: project, directory: dir)
+            let pending = try await PackageImporter.preparePending(project: project, directory: dir)
 
             XCTAssertEqual(pending.title, "Untouched \(type)", "a plain \(type) project's title must not get a scene marker")
             XCTAssertEqual(pending.type, type)
         }
     }
 
-    func testUnsupportedWebTypeStillRejected() throws {
+    func testUnsupportedWebTypeStillRejected() async throws {
         let dir = makeTempDir()
         writePNG(to: dir.appending(path: "preview.jpg"))
         let project = WEProject(file: "index.html", preview: "preview.jpg", title: "Web Wallpaper", type: "web")
 
-        XCTAssertThrowsError(try PackageImporter.preparePending(project: project, directory: dir)) {
-            guard case PackageImportError.unsupportedType(let type) = $0 else {
-                return XCTFail("expected .unsupportedType, got \($0)")
-            }
+        do {
+            _ = try await PackageImporter.preparePending(project: project, directory: dir)
+            XCTFail("expected .unsupportedType to be thrown")
+        } catch PackageImportError.unsupportedType(let type) {
             XCTAssertEqual(type, "web")
         }
     }
 
     func testLiveExtractionOnDownloadedScenesIfPresent() async {
-        let baseDir = URL(fileURLWithPath: "/Users/admin/Library/Application Support/Steam/steamapps/workshop/content/431960")
+        let baseDir = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/Steam/steamapps/workshop/content/431960")
         guard FileManager.default.fileExists(atPath: baseDir.path) else { return }
 
         let itemIDs = ["3738629251", "3810092560", "3804459999", "3326873240"]

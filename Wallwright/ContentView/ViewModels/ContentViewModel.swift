@@ -309,9 +309,9 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// (a folder copy + project.json rewrite) rather than `VideoImporter`'s bare-file wrap.
     @Published var pendingPackageImports: [PendingPackageImport] = []
 
-    func enqueuePackageImport(directory: URL, project: WEProject, sourceId: String?) {
+    func enqueuePackageImport(directory: URL, project: WEProject, sourceId: String?) async {
         do {
-            let pending = try PackageImporter.preparePending(project: project, directory: directory, sourceId: sourceId, sourceProvider: "steamworkshop")
+            let pending = try await PackageImporter.preparePending(project: project, directory: directory, sourceId: sourceId, sourceProvider: "steamworkshop")
             pendingPackageImports.append(pending)
         } catch {
             alertImportModal(which: WPImportError(
@@ -329,9 +329,9 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// dropped packages get the same codec-compatibility transcode, metadata probing, and title
     /// sanitization every other package import already gets. `sourceProvider: nil` — unlike a Steam
     /// Workshop download, this didn't come from any tracked source, so it's not attributed to one.
-    func enqueuePackageImport(directory: URL) {
+    func enqueuePackageImport(directory: URL) async {
         do {
-            let pending = try PackageImporter.preparePending(at: directory)
+            let pending = try await PackageImporter.preparePending(at: directory)
             pendingPackageImports.append(pending)
         } catch {
             alertImportModal(which: WPImportError(
@@ -343,12 +343,16 @@ class ContentViewModel: ObservableObject, DropDelegate {
         }
     }
 
+    /// `selectedSceneArtIndex`: which of `pending.sceneArtCandidates` the review sheet's picker
+    /// had selected, when there was more than one to choose between — ignored (and harmless at its
+    /// default) for every non-scene import, and for a scene with 0 or 1 candidates.
     @MainActor
-    func commitCurrentPackageImport(title: String, tags: [String]) async {
+    func commitCurrentPackageImport(title: String, tags: [String], selectedSceneArtIndex: Int = 0) async {
         guard !pendingPackageImports.isEmpty else { return }
         var pending = pendingPackageImports.removeFirst()
         pending.title = title
         pending.tags = tags
+        pending.selectedSceneArtIndex = selectedSceneArtIndex
         if await !PackageImporter.commitImport(pending) {
             alertImportModal(which: .unkown)
         }
@@ -671,7 +675,7 @@ class ContentViewModel: ObservableObject, DropDelegate {
                 // sanitizing `project.json`'s actual title. Routing through the same
                 // `enqueuePackageImport` pending-review queue Steam Workshop downloads already use
                 // fixes all three at once.
-                enqueuePackageImport(directory: url)
+                await enqueuePackageImport(directory: url)
             } else if wallpaper.isRegularFile, url.pathExtension.lowercased() == "zip" {
                 // Off-main — `ZipImporter.importZip` shells out to `ditto` and blocks on
                 // `waitUntilExit()`, which can take a long time for a large archive. Running that

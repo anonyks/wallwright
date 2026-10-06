@@ -6,6 +6,12 @@ All notable changes to Wallwright are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- Steam Workshop Scene wallpapers are now imported instead of rejected: the real background
+  artwork is extracted from the scene's own package (direct image decode, DXT1/3/5 texture
+  decompression, or a frame grabbed from an embedded video) and set as a static image wallpaper,
+  rather than discarding the download or falling back to the tiny preview thumbnail. When a scene
+  bundles more than one plausible background image, the import review sheet shows a picker so you
+  choose which one becomes the wallpaper instead of Wallwright silently guessing.
 - Single-instance guard: a second launch of Wallwright now exits instead of running alongside the first.
 - Low-power conditions auto-pause (thermal pressure and battery), modeled on Phosphene's PowerMonitor.
 - Auto Trim for imported video wallpapers.
