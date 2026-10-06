@@ -916,16 +916,30 @@ class GlobalSettingsViewModel: ObservableObject {
         guard newValue.project != .invalid else { return }
 
         if newValue.project.type == "video" {
-            // AerialsInjector's system registration already governs the desktop picture (and
-            // lock/idle screen) for this wallpaper. Also calling setPlacehoderWallpaper here
-            // would set a *second*, competing NSWorkspace desktop-image choice — WallpaperAgent
-            // then favors that static image over the aerial, so the aerial extension launches
-            // and receives Play but never actually decodes a frame (confirmed via log: extension
-            // active, Play called, 0 frames enqueued for the full locked session). LivePaper's
-            // own code hit this exact conflict and explicitly works around it the same way.
+            // `AerialsInjector.inject()` governs the desktop picture (and lock/idle screen) for a
+            // video wallpaper via its own "aerials" choice in WallpaperAgent's Store plist, always
+            // followed by a `killall WallpaperAgent` restart. `NSWorkspace`'s own separate
+            // `desktopImageURL` registration — what actually drives the menu bar's translucent tint
+            // — is a different channel entirely, but that restart unconditionally clears whatever
+            // it was pointing at, REGARDLESS of whether `setDesktopImageURL` was called before or
+            // after `inject()` started (confirmed live 2026-10-06 by testing both orders directly:
+            // calling it first, the tint still reverted to macOS's own default after the restart;
+            // calling it manually well after the restart had already settled, it stuck and the menu
+            // bar correctly reflected the video's own colors). So this has to run strictly AFTER
+            // `inject()` returns, not before — the exact reverse of this method's own non-video
+            // branch below, where the ordering requirement runs the other way (there,
+            // `AerialsInjector.remove()`'s restart has to settle before the desktop image write, so
+            // that write isn't the thing getting reverted).
+            //
+            // Before this, nothing ever called `setPlacehoderWallpaper` for a video wallpaper at
+            // all, so the tint was left pointing at whatever the last *non-video* wallpaper set (or
+            // macOS's own default if none ever has this session) for as long as the video wallpaper
+            // stayed active — confirmed live as a soft gradient from Apple's own default aerial
+            // bleeding through the menu bar while a completely unrelated video played.
             DispatchQueue.global(qos: .utility).async {
                 let videoURL = newValue.wallpaperDirectory.appending(path: newValue.project.file)
                 AerialsInjector.shared.inject(videoURL: videoURL, name: newValue.project.title)
+                AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
             }
         } else {
             // Reverted: registering a synthetic looping video (built from the wallpaper's own

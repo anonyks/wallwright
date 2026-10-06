@@ -208,8 +208,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // reactive path also fires.
             let wallpaper = wallpaperViewModel.currentWallpaper
             DispatchQueue.global(qos: .utility).async {
+                // Same ordering as `didCurrentWallpaperChange`'s video branch, and for the same
+                // reason (see its own doc comment) — `inject()` first, including the WallpaperAgent
+                // restart it always ends with, THEN `setPlacehoderWallpaper` so its
+                // `setDesktopImageURL` call is the last thing that happens and isn't wiped out by
+                // that restart.
                 let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
                 AerialsInjector.shared.inject(videoURL: videoURL, name: wallpaper.project.title)
+                AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
             }
         }
         registerBundledClockFonts()
@@ -616,10 +622,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // uncompressed TIFF on every single wallpaper switch for zero visible benefit.
             imageGenerator.maximumSize = CGSize(width: 1920, height: 1080)
 
+            // Blocks the calling thread until `setDesktopImageURL` below has actually been called —
+            // every caller of this case already runs on a background queue (see this method's own
+            // doc comment), so blocking here is safe, and `didCurrentWallpaperChange`'s video branch
+            // needs this write to land and fully finish *before* it calls `AerialsInjector.inject()`
+            // (see that call site's own comment for why the ordering matters: whichever of the two
+            // writes to WallpaperAgent's Store plist happens last is the one that sticks).
+            let semaphore = DispatchSemaphore(value: 0)
             let time = CMTimeMake(value: 1, timescale: 1) // 第一帧的时间
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, cgImage, _, _, error in
                 if let error = error {
                     WWLog.app.error("Failed to generate placeholder thumbnail frame: \(error)")
+                    semaphore.signal()
                 } else if let cgImage = cgImage {
                     // Build the TIFF data directly from the CGImage via NSBitmapImageRep, not by
                     // wrapping it in a zero-sized NSImage first and asking for .tiffRepresentation
@@ -662,13 +676,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                         WWLog.app.error("Failed to set placeholder desktop image for screen: \(error)")
                                     }
                                 }
+                                semaphore.signal()
                             }
                         } catch {
                             WWLog.app.error("Failed to write placeholder thumbnail to disk: \(error)")
+                            semaphore.signal()
                         }
+                    } else {
+                        semaphore.signal()
                     }
+                } else {
+                    semaphore.signal()
                 }
             }
+            // See the semaphore's own doc comment just above: callers that need this write to have
+            // actually landed before doing anything else (`didCurrentWallpaperChange`'s video
+            // branch) rely on this method not returning until it has.
+            semaphore.wait()
         case "image":
             // Already a directly-settable desktop picture — no frame-grab, no TIFF re-encode,
             // no intermediate cache file needed (unlike video, which has to be decoded into a

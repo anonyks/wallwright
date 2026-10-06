@@ -90,6 +90,12 @@ All notable changes to Wallwright are documented here. Format follows
 - Toggling pin on the wallpaper actually assigned to a screen only updated the library grid's
   copy, never the separate per-screen assignment dictionary, so a second toggle (e.g. via the
   pipe interface's "pin" command) kept reading back the same stale value instead of flipping it.
+- The menu bar's translucent tint going stale for as long as any video wallpaper was active,
+  showing whatever the last non-video wallpaper set (or macOS's own default gradient if none ever
+  had been) instead of the actual video's colors. A video wallpaper never updated the system
+  desktop-picture registration that drives this tint at all, to avoid an earlier conflict with
+  the Aerials lock-screen/screensaver registration; now it's updated right after Aerials finishes
+  its own registration instead of being skipped outright, so both stay correct.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
