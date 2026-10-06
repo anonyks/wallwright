@@ -166,6 +166,10 @@ enum PackageImporter {
             // here, unlike VideoImporter's `false`, since this copy is already ours to manage, not
             // the user's own original file living somewhere else.
             if project.isSupportedType, project.type.lowercased() == "video" {
+                // Captured before `project.preview` is overwritten below, so the source package's
+                // own now-unused preview file can be cleaned up afterward — see "keeping things we
+                // need only" at that cleanup's own call site.
+                let originalPreviewFilename = project.preview
                 let videoURL = destination.appending(path: project.file)
                 // `try?` used to swallow a real transcode failure (ffmpeg missing, a timeout, a
                 // corrupt bitstream) — VideoImporter's own `prepareImport` treats the exact same
@@ -196,6 +200,31 @@ enum PackageImporter {
                 project.videoHeight = metadata.height
                 project.hasAudio = metadata.hasAudio
                 project.videoDuration = metadata.duration
+
+                // Replaces whatever preview image the source package itself shipped with a real
+                // frame grabbed from the actual video — confirmed live (2026-10-05) that a Steam
+                // Workshop item can ship a preview that doesn't represent its video at all (one
+                // real item's own preview was a square, visually-corrupted-looking static/noise
+                // image; its real video content looked nothing like that). `VideoImporter
+                // .prepareImport`'s exact same recipe (second 1, preferred-track-transform applied,
+                // bounded by `ThumbnailDownsampler.maxDimension`) — every video wallpaper in this
+                // app gets its thumbnail this same way regardless of where it was imported from.
+                // `try?`: a failed grab (e.g. a truly black first second) falls back to the
+                // package's own preview rather than failing an otherwise-successful import.
+                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: transcodedURL))
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: ThumbnailDownsampler.maxDimension, height: ThumbnailDownsampler.maxDimension)
+                if let cgImage = try? await generator.image(at: CMTimeMake(value: 1, timescale: 1)).image,
+                   let thumbnailData = NSImage(cgImage: cgImage, size: .zero).jpegData {
+                    try? thumbnailData.write(to: destination.appending(path: "preview.jpg"), options: .atomic)
+                    project.preview = "preview.jpg"
+                    // The old preview is only real clutter if it was a genuinely separate file —
+                    // same name (already overwritten above) or the video file itself (some
+                    // packages point `preview` at their own video) are both left alone.
+                    if originalPreviewFilename != "preview.jpg", originalPreviewFilename != project.file {
+                        try? fm.removeItem(at: destination.appending(path: originalPreviewFilename))
+                    }
+                }
             }
 
             project.packageSizeBytes = (try? destination.directoryTotalAllocatedSize(includingSubfolders: true)).map(Int64.init)
