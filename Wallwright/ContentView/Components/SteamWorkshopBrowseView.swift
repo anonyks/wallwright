@@ -54,6 +54,14 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
             }
         }
         .onAppear {
+            // Re-applied on every single (re-)visit, not just the first — see its own doc comment:
+            // a manual override (e.g. unchecking "- Anime" to see something specific) is only meant
+            // to last for the current visit, not become a silent standing exception every time this
+            // tab is revisited. Compared before/after so a revert that actually changes something
+            // forces the re-search below even when neither of its own two existing triggers fires.
+            let genresBeforeSync = steamVM.excludedGenreTags
+            steamVM.syncGenreDefaultsToSafeMode()
+            let genreDefaultsReverted = steamVM.excludedGenreTags != genresBeforeSync
             // Locked, not a default — WEVideo shows Video only, WEScene shows Scene only, full
             // stop, with no in-tab control to change it (confirmed live 2026-10-05: a visible,
             // changeable Type picker here was genuinely the wrong call, not just a rough edge —
@@ -65,7 +73,7 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
             if steamVM.searchQuery.isEmpty, steamVM.searchQuery != viewModel.lastBrowseSearchText {
                 steamVM.searchQuery = viewModel.lastBrowseSearchText
             }
-            if typeChanged || steamVM.searchResults.isEmpty {
+            if typeChanged || genreDefaultsReverted || steamVM.searchResults.isEmpty {
                 Task { await steamVM.search() }
             }
         }
@@ -73,6 +81,7 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
         // already-populated tab left stale results on screen — `.onAppear` above only re-searches
         // on a type change or empty results, neither of which a Safe Mode flip causes by itself.
         .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in
+            steamVM.syncGenreDefaultsToSafeMode()
             Task { await steamVM.search() }
         }
     }
@@ -132,10 +141,45 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
                 .padding(.horizontal, 10)
                 .frame(height: 30)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 9))
+                timeFramePicker
             }
             .controlSize(.regular)
         }
         .padding(10)
+    }
+
+    /// The "Most Popular" sort's time window — own row item, not a `tagPicker` chip, since it's a
+    /// single mutually-exclusive choice (one active value, not a three-state include/exclude) and
+    /// conceptually belongs with the search bar's own controls rather than the Genre/Miscellaneous
+    /// filter row below it.
+    private var timeFramePicker: some View {
+        Menu {
+            ForEach(WorkshopTimeFrame.allCases) { timeFrame in
+                Button {
+                    steamVM.timeFrame = timeFrame
+                    Task { await steamVM.search() }
+                } label: {
+                    if timeFrame == steamVM.timeFrame {
+                        Label(timeFrame.label, systemImage: "checkmark")
+                    } else {
+                        Text(timeFrame.label)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                Text(steamVM.timeFrame.label)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 9))
+        .fixedSize()
+        .help("Time Frame")
     }
 
     /// Genre and Miscellaneous, Steam's own two facet names — tap cycles + (must have) → - (must
@@ -150,7 +194,10 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: 6) {
                 HStack(spacing: 6) {
-                    ForEach(WorkshopTag.genreTags, id: \.self) { tag in
+                    // `steamVM.visibleGenreTags`, not the raw `WorkshopTag.genreTags` — Safe Mode
+                    // hides Girls/Guys from this row entirely (see its own doc comment), not just
+                    // defaults them to excluded.
+                    ForEach(steamVM.visibleGenreTags, id: \.self) { tag in
                         tagChip(tag, isIncluded: steamVM.includedGenreTags.contains(tag), isExcluded: steamVM.excludedGenreTags.contains(tag)) {
                             steamVM.cycleGenreTag(tag)
                             Task { await steamVM.search() }

@@ -243,6 +243,24 @@ struct SteamWorkshopImportSheet: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
+            // The "Most Popular" sort's time window — `.menu`, not `.segmented` like Type above:
+            // six options is too many to fit as segments in this small popup. See
+            // `WorkshopTimeFrame`'s own doc comment for the confirmed-live values.
+            HStack {
+                Text("Time Frame")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("Time Frame", selection: $model.timeFrame) {
+                    ForEach(WorkshopTimeFrame.allCases) { timeFrame in
+                        Text(timeFrame.label).tag(timeFrame)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            }
+            .onChange(of: model.timeFrame) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+
             // Genre and Miscellaneous, Steam's own two facet names, as one combined scrollable row
             // rather than two stacked ones — still two separate underlying filters (separate
             // include/exclude sets, separate `requiredtags[]` values), just not worth two full
@@ -253,7 +271,10 @@ struct SteamWorkshopImportSheet: View {
             // comments), not a per-search choice.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(WorkshopTag.genreTags, id: \.self) { tag in
+                    // `model.visibleGenreTags`, not the raw `WorkshopTag.genreTags` — Safe Mode
+                    // hides Girls/Guys from this row entirely (see its own doc comment), not just
+                    // defaults them to excluded.
+                    ForEach(model.visibleGenreTags, id: \.self) { tag in
                         genreChip(tag, isIncluded: model.includedGenreTags.contains(tag), isExcluded: model.excludedGenreTags.contains(tag)) {
                             model.cycleGenreTag(tag)
                         }
@@ -274,7 +295,10 @@ struct SteamWorkshopImportSheet: View {
             .onChange(of: model.excludedMiscTags) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
             // Same reactivity as the full-tab browse views — flipping Safe Mode in Settings while
             // this popup already has results showing shouldn't leave them stale.
-            .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } } }
+            .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in
+                model.syncGenreDefaultsToSafeMode()
+                if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } }
+            }
 
             if let searchErrorMessage = model.searchErrorMessage {
                 Text(searchErrorMessage)

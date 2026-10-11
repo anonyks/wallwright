@@ -24,6 +24,12 @@ final class SteamWorkshopImportViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     @Published var searchQuery = ""
+    /// The "Most Popular" sort's time window — see `WorkshopTimeFrame`'s own doc comment for the
+    /// confirmed-live `days` values and why "All Time" isn't offered. Unlike the Genre defaults
+    /// (which deliberately revert on every tab revisit — see `syncGenreDefaultsToSafeMode`'s own
+    /// doc comment), this is a plain preference, not a Safe Mode concern, so it stays wherever the
+    /// user leaves it for the rest of the session, same as `typeFilter`/`searchQuery` already do.
+    @Published var timeFrame: WorkshopTimeFrame = .sixMonths
     /// `nil` = no type filter ("All"). A non-nil value is the Steam tag ("Video"/"Scene") sent as
     /// `requiredtags[]` — the search-side equivalent of picking Video Sources vs Image Sources
     /// elsewhere in this app, since a "Scene" result commits as a static image the same way those
@@ -60,6 +66,7 @@ final class SteamWorkshopImportViewModel: ObservableObject {
         downloadResult = nil
         errorMessage = nil
         searchQuery = ""
+        timeFrame = .sixMonths
         typeFilter = nil
         includedGenreTags = []
         excludedGenreTags = []
@@ -70,18 +77,70 @@ final class SteamWorkshopImportViewModel: ObservableObject {
         searchErrorMessage = nil
         searchPage = 1
         hasMoreSearchResults = true
+        syncGenreDefaultsToSafeMode()
+    }
+
+    /// Keeps `WorkshopTag.safeModeDefaultExcludedGenres` (Game/Anime) in sync with Safe Mode —
+    /// unlike `WorkshopTag.safeModeExcludedGenres` (Girls/Guys/Memes), which are hidden entirely and
+    /// never touch `excludedGenreTags` at all, these stay as real, ordinary, visible chips — Safe
+    /// Mode just seeds them into `excludedGenreTags` as a default, same as if the user had tapped
+    /// them once themselves, free to cycle away from afterward exactly like any other genre within
+    /// that one visit. Deliberately unconditional, called every time a browse surface appears, not
+    /// just once per session (confirmed live 2026-10-11: a one-time-only version was tried first,
+    /// so an override would persist across revisits — the user explicitly wants the opposite,
+    /// a manual override to only last for the current visit and revert back to excluded the next
+    /// time they come back, same spirit as Safe Mode reasserting itself rather than a one-off
+    /// exception quietly becoming the new standing behavior). Call from every browse surface's own
+    /// `.onAppear`/Safe Mode `.onChange` handler, and from `reset()` for the small popup.
+    func syncGenreDefaultsToSafeMode() {
+        if AppDelegate.shared.globalSettingsViewModel.settings.steamWorkshopSafeMode {
+            excludedGenreTags.formUnion(WorkshopTag.safeModeDefaultExcludedGenres)
+        } else {
+            excludedGenreTags.subtract(WorkshopTag.safeModeDefaultExcludedGenres)
+        }
     }
 
     /// `WorkshopTag.requiredCategoryTag`/`.requiredAgeRatingTag` are always included here, not
     /// user-togglable — see their own doc comments for why (excludes Preset/Asset results and
     /// anything outside "Everyone", unconditionally, on every search this view model ever runs).
+    /// `includedGenreTags` is filtered against `WorkshopTag.safeModeExcludedGenres` while Safe Mode
+    /// is on, same reasoning as `activeExcludedTags`'s own doc comment — the chip to include Girls/
+    /// Guys isn't shown under Safe Mode, so the only way this set could contain either is a stale
+    /// value from before Safe Mode was turned on, which must not reach Steam as a `requiredtags[]`
+    /// directly contradicting `activeExcludedTags`'s own unconditional exclusion of the same genre.
     private var activeRequiredTags: [String] {
-        let safeModeTags = AppDelegate.shared.globalSettingsViewModel.settings.steamWorkshopSafeMode
-            ? [WorkshopTag.requiredCategoryTag, WorkshopTag.requiredAgeRatingTag] : []
-        return (typeFilter.map { [$0] } ?? []) + safeModeTags + Array(includedGenreTags) + Array(includedMiscTags)
+        let safeModeOn = AppDelegate.shared.globalSettingsViewModel.settings.steamWorkshopSafeMode
+        let safeModeTags = safeModeOn ? [WorkshopTag.requiredCategoryTag, WorkshopTag.requiredAgeRatingTag] : []
+        let genreTags = safeModeOn ? includedGenreTags.subtracting(WorkshopTag.safeModeExcludedGenres) : includedGenreTags
+        return (typeFilter.map { [$0] } ?? []) + safeModeTags + Array(genreTags) + Array(includedMiscTags)
     }
 
-    private var activeExcludedTags: [String] { Array(excludedGenreTags) + Array(excludedMiscTags) }
+    /// `WorkshopTag.genreTags` with `WorkshopTag.safeModeExcludedGenres` removed whenever Safe Mode
+    /// is on — Girls/Guys don't just default to excluded, they're not offered as a choice at all
+    /// under Safe Mode, the same way Age Rating/Category never get their own chips either (see
+    /// `tagPicker`'s own doc comment). Confirmed live 2026-10-10: showing them as a toggleable
+    /// "- Girls" / "- Guys" chip the user could tap back to neutral or "+" undercut what Safe Mode
+    /// is supposed to mean. Turning Safe Mode off brings both back as plain, neutral genre chips,
+    /// same as any other.
+    var visibleGenreTags: [String] {
+        AppDelegate.shared.globalSettingsViewModel.settings.steamWorkshopSafeMode
+            ? WorkshopTag.genreTags.filter { !WorkshopTag.safeModeExcludedGenres.contains($0) }
+            : WorkshopTag.genreTags
+    }
+
+    /// `excludedGenreTags` plus `WorkshopTag.safeModeExcludedGenres` whenever Safe Mode is on — the
+    /// actual search request still has to exclude Girls/Guys itself; `visibleGenreTags` only
+    /// controls whether the chip is shown, not whether Steam is actually asked to exclude them.
+    /// Unconditional (not `.subtracting(includedGenreTags)` the way an earlier version of this did)
+    /// — with the chip hidden under Safe Mode, there's no live way to have explicitly included
+    /// either genre in the first place, so the only way `includedGenreTags` could contain one is a
+    /// stale value from before Safe Mode was turned on, which shouldn't silently keep it included
+    /// now that the chip explaining why is gone.
+    private var activeExcludedTags: [String] {
+        let safeModeExclusions = AppDelegate.shared.globalSettingsViewModel.settings.steamWorkshopSafeMode
+            ? WorkshopTag.safeModeExcludedGenres : []
+        return Array(excludedGenreTags.union(safeModeExclusions)) + Array(excludedMiscTags)
+    }
 
     private func cycleTag(_ tag: String, included: inout Set<String>, excluded: inout Set<String>) {
         if included.contains(tag) {
@@ -145,7 +204,7 @@ final class SteamWorkshopImportViewModel: ObservableObject {
         // running).
         defer { if generation == searchGeneration { isSearching = false } }
         do {
-            let results = try await SteamWorkshopService.searchItems(query: trimmed, page: searchPage, requiredTags: activeRequiredTags, excludedTags: activeExcludedTags)
+            let results = try await SteamWorkshopService.searchItems(query: trimmed, page: searchPage, days: timeFrame.rawValue, requiredTags: activeRequiredTags, excludedTags: activeExcludedTags)
             guard generation == searchGeneration else { return }
             searchResults = results
         } catch {
@@ -168,7 +227,7 @@ final class SteamWorkshopImportViewModel: ObservableObject {
         // clears the spinner.
         defer { if generation == searchGeneration { isSearching = false } }
         do {
-            let next = try await SteamWorkshopService.searchItems(query: trimmed, page: searchPage + 1, requiredTags: activeRequiredTags, excludedTags: activeExcludedTags)
+            let next = try await SteamWorkshopService.searchItems(query: trimmed, page: searchPage + 1, days: timeFrame.rawValue, requiredTags: activeRequiredTags, excludedTags: activeExcludedTags)
             // A fresh `search()` superseding this one already bumped the generation — its own
             // fresh page-1 results own `searchResults`/`searchPage` now, so appending this stale
             // page-2 response on top would corrupt state the new search already reset.

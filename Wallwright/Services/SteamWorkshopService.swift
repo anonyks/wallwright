@@ -58,6 +58,36 @@ struct SteamWorkshopSearchResult: Identifiable, Equatable {
     let thumbnailURL: URL?
 }
 
+/// Steam's own Time Frame dropdown, paired with the "Most Popular" sort this app always uses (see
+/// `SteamWorkshopService.searchItems`'s own doc comment) — every `rawValue` is the exact `days`
+/// query value confirmed live (2026-10-11) by actually selecting each option on
+/// steamcommunity.com's own sort dropdown and reading the resulting URL, not guessed. "All Time"
+/// is deliberately not a case here: on Steam's own site, pairing "Most Popular" with "All Time"
+/// isn't a real, independently selectable combination — picking it there auto-switches Sort Order
+/// to "Top Rated All Time" instead, a genuinely different sort. Since this app locks sort to
+/// "Most Popular" always, only the six time frames that actually pair with it are offered.
+enum WorkshopTimeFrame: Int, CaseIterable, Identifiable {
+    case today = 1
+    case oneWeek = 7
+    case thirtyDays = 30
+    case threeMonths = 90
+    case sixMonths = 180
+    case oneYear = 365
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .today: return "Today"
+        case .oneWeek: return "One Week"
+        case .thirtyDays: return "Thirty Days"
+        case .threeMonths: return "Three Months"
+        case .sixMonths: return "Six Months"
+        case .oneYear: return "One Year"
+        }
+    }
+}
+
 /// Steam's own `requiredtags[]` filter values this app offers in the search UI — see
 /// `SteamWorkshopService.searchItems`'s own doc comment for how/why this list is scoped to only
 /// what's confirmed to actually work, not Workshop's full (unpublished) tag taxonomy.
@@ -89,6 +119,29 @@ enum WorkshopTag {
     /// "Mature"; Safe Mode scopes every search to "Everyone" only. Turning Safe Mode off stops
     /// sending this, the same way any other optional filter here would be left off.
     static let requiredAgeRatingTag = "Everyone"
+
+    /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on, same as the two required tags
+    /// above — Steam's own "Everyone" age rating doesn't actually screen out suggestive anime/furry
+    /// character art, which is overwhelmingly tagged Genre "Girls" or "Guys" by uploaders rather
+    /// than "Anime" (confirmed live 2026-10-10: multiple real "Everyone"-rated, explicitly
+    /// cheesecake-style items tagged Girls, not Anime — excluding "Anime" alone caught none of
+    /// them). "Memes" excluded alongside them per the same reasoning: low-signal, rarely what
+    /// anyone's actually browsing for. "Unspecified" deliberately left OUT of this set — genuinely
+    /// untagged items aren't inherently a content-safety concern the way Girls/Guys/Memes are, and
+    /// hiding them turned out too strict (2026-10-11). Unconditional while Safe Mode is on, and not
+    /// offered as a choice at all — see `SteamWorkshopImportViewModel.visibleGenreTags`'s own doc
+    /// comment for why these specifically don't even get a chip, unlike `safeModeDefaultExcludedGenres`
+    /// just below.
+    static let safeModeExcludedGenres: Set<String> = ["Girls", "Guys", "Memes"]
+
+    /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on, but unlike
+    /// `safeModeExcludedGenres` just above, these stay as ordinary, visible, freely-cyclable Genre
+    /// chips — Safe Mode only seeds them into the excluded state as a starting default (see
+    /// `SteamWorkshopImportViewModel.syncGenreDefaultsToSafeMode`'s own doc comment), not a
+    /// permanent, hidden restriction. Confirmed live 2026-10-10: the user wants Game/Anime results
+    /// toned down by default, same spirit as the hidden set above, but without losing the ability
+    /// to un-exclude either one for a specific search the way Girls/Guys/Unspecified/Memes can't be.
+    static let safeModeDefaultExcludedGenres: Set<String> = ["Game", "Anime"]
 
     /// The sidebar's "Genre" facet, verbatim — every value it actually lists, alphabetical
     /// ordering preserved as shown there. "Unspecified" is real (untagged items) but surfaced
@@ -223,25 +276,28 @@ enum SteamWorkshopService {
     /// `excludedTags`: Steam's own `excludedtags[]` — confirmed live (2026-10-05) to genuinely
     /// remove matching items (zero ID overlap between a tag's own `requiredtags[]` result set and
     /// the same search's `excludedtags[]` result set), not just a no-op query param.
-    static func searchItems(query: String, page: Int = 1, requiredTags: [String] = [], excludedTags: [String] = []) async throws -> [SteamWorkshopSearchResult] {
+    static func searchItems(query: String, page: Int = 1, days: Int = WorkshopTimeFrame.sixMonths.rawValue, requiredTags: [String] = [], excludedTags: [String] = []) async throws -> [SteamWorkshopSearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         var components = URLComponents(string: "https://steamcommunity.com/workshop/browse/")!
         var queryItems = [
             URLQueryItem(name: "appid", value: wallpaperEngineAppId),
             URLQueryItem(name: "p", value: String(max(1, page))),
         ]
-        if trimmed.isEmpty {
-            // "Most Popular (Six Months)" — same default Steam's own Workshop browse page used
-            // before any filter was touched. "Most Popular" is `browsesort=trend`; the time frame
-            // is a separate param (`days=180` for Six Months) — confirmed live (2026-10-06) by
-            // actually selecting both in Steam's own sort dropdown and reading the resulting URL,
-            // not guessed. Mandatory, matching how every other browse source's own default sort
-            // isn't user-configurable either (MotionBgs opens on "Trending", not a saved choice).
-            queryItems.append(URLQueryItem(name: "browsesort", value: "trend"))
-            queryItems.append(URLQueryItem(name: "days", value: "180"))
-        } else {
+        // "Most Popular" — same default Steam's own Workshop browse page used before any filter
+        // was touched. "Most Popular" is `browsesort=trend`; the time frame is a separate `days`
+        // param, user-adjustable via `WorkshopTimeFrame` (own doc comment has the confirmed-live
+        // values) — defaults to Six Months, Steam's own default. The SORT ITSELF is mandatory,
+        // matching how every other browse source's own default sort isn't user-configurable either
+        // (MotionBgs opens on "Trending", not a saved choice); only the time window is a choice.
+        // Applied even with a search term typed in — Steam's own `browsesort=textsearch`
+        // (relevance ranking) would otherwise kick in once `searchtext` is set, but confirmed live
+        // (2026-10-11) that Steam's own endpoint accepts `searchtext` alongside `trend`/`days` just
+        // fine, still returning real, correctly-matching results, just popularity-ranked instead of
+        // by relevance — the one sort this app ever uses, regardless of whether you're searching.
+        queryItems.append(URLQueryItem(name: "browsesort", value: "trend"))
+        queryItems.append(URLQueryItem(name: "days", value: String(days)))
+        if !trimmed.isEmpty {
             queryItems.append(URLQueryItem(name: "searchtext", value: trimmed))
-            queryItems.append(URLQueryItem(name: "browsesort", value: "textsearch"))
         }
         queryItems += requiredTags.map { URLQueryItem(name: "requiredtags[]", value: $0) }
         queryItems += excludedTags.map { URLQueryItem(name: "excludedtags[]", value: $0) }
