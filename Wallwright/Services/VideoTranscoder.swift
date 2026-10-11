@@ -97,21 +97,37 @@ enum VideoTranscoder {
 
         let isNativeContainer = nativeContainerExtensions.contains(source.pathExtension.lowercased())
         let isCompatibleCodec = compatibleCodecs.contains(sourceInfo.codec.lowercased())
-        guard !(isNativeContainer && isCompatibleCodec) else { return (source, nil) }
+        // A source already past `maxWidth`/`maxHeight` was previously passed through completely
+        // untouched here whenever its codec/container were already fine — the resolution cap below
+        // only ever applied to a source that needed a codec re-encode anyway. Confirmed live
+        // (2026-10-11) via Apple's own documentation that `AVPlayerItem.preferredMaximumResolution`
+        // (what `VideoWallpaperViewModel.applyBatteryMode` relies on to cap *playback* decode
+        // resolution) "only applies to HTTP Live Streaming assets" — it silently does nothing for
+        // the plain local MP4/MOV files every wallpaper here actually is, so an oversized source's
+        // real resolution was never actually being capped anywhere, at import or at playback. This
+        // is the only place that can actually work: forcing the same scale-down `convert(reencode:
+        // true)` already does for an incompatible codec, even when the codec itself is already
+        // fine.
+        let exceedsMaxResolution = sourceInfo.width > maxWidth || sourceInfo.height > maxHeight
+        guard !(isNativeContainer && isCompatibleCodec && !exceedsMaxResolution) else { return (source, nil) }
 
         DispatchQueue.main.async { onConversionStart(!isCompatibleCodec) }
 
         let output: URL
         if isCompatibleCodec {
-            do {
-                // Already H.264/HEVC, just wrong container — a stream copy just repackages it
-                // into mp4 (near-instant, lossless) instead of a full re-encode.
-                output = try await convert(source, reencode: false, outputDirectory: outputDirectory, deleteSourceOnSuccess: deleteSourceOnSuccess)
-            } catch {
-                // Stream copy can fail on a container holding a codec mp4 simply can't hold (e.g.
-                // DTS/FLAC audio in some .mkv rips) even though the video stream itself is fine —
-                // fall back to a full re-encode, which is guaranteed compatible either way.
+            if exceedsMaxResolution {
                 output = try await convert(source, reencode: true, outputDirectory: outputDirectory, deleteSourceOnSuccess: deleteSourceOnSuccess)
+            } else {
+                do {
+                    // Already H.264/HEVC, just wrong container — a stream copy just repackages it
+                    // into mp4 (near-instant, lossless) instead of a full re-encode.
+                    output = try await convert(source, reencode: false, outputDirectory: outputDirectory, deleteSourceOnSuccess: deleteSourceOnSuccess)
+                } catch {
+                    // Stream copy can fail on a container holding a codec mp4 simply can't hold
+                    // (e.g. DTS/FLAC audio in some .mkv rips) even though the video stream itself
+                    // is fine — fall back to a full re-encode, which is guaranteed compatible either way.
+                    output = try await convert(source, reencode: true, outputDirectory: outputDirectory, deleteSourceOnSuccess: deleteSourceOnSuccess)
+                }
             }
         } else {
             output = try await convert(source, reencode: true, outputDirectory: outputDirectory, deleteSourceOnSuccess: deleteSourceOnSuccess)

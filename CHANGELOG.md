@@ -135,6 +135,13 @@ All notable changes to Wallwright are documented here. Format follows
   "Most Popular", search term or not — confirmed live that Steam's own endpoint accepts a search
   term alongside that sort just fine, still returning real, correctly-matching results, just
   popularity-ranked instead of by relevance.
+- Video wallpapers' on-battery/screen-matched resolution cap was silently doing nothing: it relied
+  on `AVPlayerItem.preferredMaximumResolution`, which Apple's own documentation confirms "only
+  applies to HTTP Live Streaming assets" — every wallpaper here is a plain local file, so decode
+  resolution was never actually being capped anywhere, battery or not. The only place this can
+  really be enforced is at import: an oversized source (confirmed live against a real synthetic
+  7680×4320 file) is now downscaled to 3840×2160 during the existing codec-compatibility transcode
+  step, even when its codec was already fine and previously passed through completely untouched.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
