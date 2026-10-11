@@ -102,6 +102,14 @@ All notable changes to Wallwright are documented here. Format follows
   wallpapers that merely shared a common title (e.g. "Minecraft Sunset" appearing on several sites)
   falsely marked each other as already downloaded — including after the actual matching one had
   been deleted.
+- A completed Steam Workshop import permanently duplicated the full download on disk: steamcmd's
+  own Workshop cache copy was deliberately kept around (to skip re-downloading on a later
+  re-import of the same item), on top of the copy Wallwright made in its own library — commonly
+  50-500MB+ per item, wasted. Declining a review (Skip) now also fixed: it unconditionally deleted
+  whatever was in `sourceDirectory`, which for a manually dragged-in folder is the user's own
+  original file wherever they dragged it from, not a cache copy — it was deleting that file
+  outright. Both are now scoped correctly: only ever deletes the download for a declined or
+  committed Steam Workshop item, never for a manual drag-in.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.

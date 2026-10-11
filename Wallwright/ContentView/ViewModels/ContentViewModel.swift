@@ -356,17 +356,36 @@ class ContentViewModel: ObservableObject, DropDelegate {
         if await !PackageImporter.commitImport(pending) {
             alertImportModal(which: .unkown)
         }
+        // `commitImport` only ever copies `pending.sourceDirectory` into the library, never deletes
+        // it (see its own doc comment). For a Steam Workshop download, that's steamcmd's own
+        // Workshop cache (`~/Library/Application Support/Steam/steamapps/workshop/content/431960/
+        // <id>/`), which Wallwright now has its own full copy of — previously left in place
+        // deliberately, to skip re-downloading on a later re-import of the same item, but confirmed
+        // live (2026-10-10) this isn't worth the tradeoff: every Workshop item is a full video
+        // wallpaper (commonly 50-500MB+), permanently duplicated on disk for a re-download that's
+        // already fast (steamcmd's own depot cache handles that). Strictly scoped to
+        // "steamworkshop": the only other possible value here is `nil`, from a manual drag-in of an
+        // already-unpacked folder (`enqueuePackageImport(directory:)`), where `sourceDirectory` is
+        // the user's own original folder wherever they dragged it from — never safe to delete.
+        if pending.sourceProvider == "steamworkshop" {
+            try? FileManager.default.removeItem(at: pending.sourceDirectory)
+        }
     }
 
     func skipCurrentPackageImport() {
         guard !pendingPackageImports.isEmpty else { return }
         let pending = pendingPackageImports.removeFirst()
-        // Unlike `commitImport` (which deliberately leaves Steam's own Workshop cache alone, in
-        // case the user re-imports the same item later), skipping means the user explicitly
-        // declined this one — there's no reason left to keep its full download around. Confirmed
-        // live: this was previously the single largest storage leak in the app, since every
-        // Workshop item is a full video wallpaper (commonly 50-500MB+) and this path did nothing.
-        try? FileManager.default.removeItem(at: pending.sourceDirectory)
+        // Same reasoning and the same "steamworkshop" scoping as `commitCurrentPackageImport`'s own
+        // cleanup above — skipping a Steam Workshop download means the user explicitly declined it,
+        // so there's no reason left to keep its full download in steamcmd's own cache (previously
+        // the single largest storage leak in the app, since every Workshop item is a full video
+        // wallpaper and this path did nothing). This was unconditional before 2026-10-10, which was
+        // a real, separate bug: skipping a manually dragged-in folder deleted the user's own
+        // original file from wherever they dragged it from (Desktop, Downloads, anywhere) — found
+        // while fixing the Steam-cache cleanup above, not something that was ever safe.
+        if pending.sourceProvider == "steamworkshop" {
+            try? FileManager.default.removeItem(at: pending.sourceDirectory)
+        }
     }
 
     func skipCurrentImport() {
