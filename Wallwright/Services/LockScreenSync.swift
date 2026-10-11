@@ -35,6 +35,17 @@ final class LockScreenSync {
     /// reliable WindowServer occlusion tracking the way a normal window is.
     static let screenDidUnlockNotification = Notification.Name("Wallwright.LockScreenSync.screenDidUnlock")
 
+    /// Posted whenever `screenIsLocked` fires, same reliable Darwin-notification ground truth as
+    /// `screenDidUnlockNotification`. `VideoWallpaperViewModel` pauses on this — without it, the
+    /// desktop `AVPlayer` kept actively decoding full-rate video behind the opaque lock screen for
+    /// as long as this file's own `assertionTimeout` (2 minutes, AC power) kept the display from
+    /// reaching real sleep, since the only existing pause trigger was `screensDidSleepNotification`
+    /// itself, which this file's whole purpose is to delay. Confirmed live (2026-10-11): on top of
+    /// that waste, when `AerialsInjector` has a video registered, the system's own lock-screen
+    /// aerial is *also* actively decoding the same content at the same time — two concurrent
+    /// hardware decode sessions for something nobody can see.
+    static let screenDidLockNotification = Notification.Name("Wallwright.LockScreenSync.screenDidLock")
+
     private var assertionID: IOPMAssertionID = 0
     private var started = false
 
@@ -106,6 +117,12 @@ final class LockScreenSync {
 
     private func screenLocked() {
         WWLog.playback.notice("GROUND TRUTH: screenIsLocked received")
+        // Posted unconditionally, before the assertion guard below — on battery (where no
+        // assertion is created and the display reaches real sleep on its own in ~30s) this just
+        // means playback pauses immediately on lock instead of up to ~30s later; on AC power,
+        // where the assertion actively prevents that natural sleep for up to `assertionTimeout`,
+        // this is the only thing that pauses it at all for that whole window.
+        NotificationCenter.default.post(name: Self.screenDidLockNotification, object: nil)
         guard assertionID == 0, !BatteryMonitor.checkOnBattery() else { return }
         IOPMAssertionCreateWithName(
             kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,

@@ -47,7 +47,7 @@ class VideoWallpaperViewModel: ObservableObject {
         // Confirmed live (2026-08-08): dragging Playback Rate to its max then immediately picking a
         // new wallpaper applied a stale intermediate rate instead of the one actually set.
         applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)
-        self.audioPlayer.volume = self.playVolume
+        self.audioPlayer.volume = self.effectiveVolume
         applyBatteryMode()
     }
 
@@ -88,7 +88,9 @@ class VideoWallpaperViewModel: ObservableObject {
             seedInitialFrameIfStartingPaused(project: currentWallpaper.project, item: newItem)
             seedTrimStartIfNeeded(project: currentWallpaper.project, item: newItem)
             NotificationCenter.default.addObserver(self, selector: #selector(playerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: newItem)
-            self.audioPlayer.replaceCurrentItem(with: newAudioItem)
+            // `nil`, not `newAudioItem`, for a non-driving screen — see `isDrivingScreen`'s own doc
+            // comment for why attaching-then-muting isn't enough to actually avoid the decode cost.
+            self.audioPlayer.replaceCurrentItem(with: isDrivingScreen ? newAudioItem : nil)
             observeForPlaybackFailure(item: newItem)
             builtItem = newItem
         }
@@ -182,7 +184,7 @@ class VideoWallpaperViewModel: ObservableObject {
     private func retryAfterPlaybackFailure() {
         swapInFreshItems()
         applyRateToPlayers(playRate)
-        self.audioPlayer.volume = self.playVolume
+        self.audioPlayer.volume = self.effectiveVolume
     }
 
     /// `.rate = 0` alone doesn't cancel AVPlayer's internal "waiting to minimize stalling" state —
@@ -444,11 +446,35 @@ class VideoWallpaperViewModel: ObservableObject {
         didSet { applyRateToPlayers(playRate) }
     }
 
+    /// `playVolume` is a single global value every screen's `VideoWallpaperViewModel` receives
+    /// identically from `WallpaperViewModel.$playVolume` (see its own subscription below) — on a
+    /// multi-monitor setup, every screen's own independent `audioPlayer` was applying that same
+    /// nonzero volume and actually producing audible sound simultaneously, not just wastefully
+    /// decoding. Confirmed live (2026-10-11): two screens playing the same audio-enabled wallpaper
+    /// produced real phasing/echo, not just redundant CoreAudio work. Only the one "driving" screen
+    /// (`PlaylistViewModel.drivingScreenId` — same designation that already decides which screen's
+    /// `playerDidFinishPlaying` gets to advance a global playlist) is ever audible; every other
+    /// screen's own `audioPlayer` is always treated as volume 0. `rate = 0` alone (what the
+    /// zero-volume handling just below does) does NOT release the underlying audio decode session
+    /// — same lesson already confirmed live elsewhere in this file for `player`'s own video decoder
+    /// (see `teardownForStop`'s doc comment: only `replaceCurrentItem(with: nil)` actually
+    /// invalidates it, confirmed via `footprint`). So a non-driving screen's `audioPlayer` never
+    /// gets a real `AVPlayerItem` attached in the first place — see every `audioPlayer
+    /// .replaceCurrentItem`/`AVPlayer(playerItem:)` call site, all gated on `isDrivingScreen` now —
+    /// rather than attaching one and relying on `rate`/`volume` to silence it after the fact.
+    private var isDrivingScreen: Bool {
+        screenId == AppDelegate.shared.playlistViewModel.drivingScreenId
+    }
+
+    private var effectiveVolume: Float {
+        isDrivingScreen ? playVolume : 0
+    }
+
     var playVolume: Float = 0 {
         didSet {
-            self.audioPlayer.volume = playVolume
+            self.audioPlayer.volume = effectiveVolume
             guard playVolume != oldValue else { return }
-            if playVolume == 0 {
+            if effectiveVolume == 0 {
                 // Actually stops decode, not just silences output — every rate-reassertion call
                 // site now routes through `applyRateToPlayers`, which already skips `audioPlayer`
                 // whenever muted, but this covers the direct "just muted" transition too, since
@@ -476,7 +502,7 @@ class VideoWallpaperViewModel: ObservableObject {
     /// restart, sleep/wake, or occlusion-change event that has nothing to do with volume.
     private func applyRateToPlayers(_ rate: Float) {
         Self.apply(rate: rate, to: player)
-        Self.apply(rate: playVolume > 0 ? rate : 0, to: audioPlayer)
+        Self.apply(rate: effectiveVolume > 0 ? rate : 0, to: audioPlayer)
     }
 
     /// Muted always — this player exists purely for visual rendering now. See `audioPlayer`.
@@ -539,7 +565,10 @@ class VideoWallpaperViewModel: ObservableObject {
         Self.capForwardBuffering(initialItem, initialAudioItem)
         self.player = AVPlayer(playerItem: initialItem)
         self.player.isMuted = true
-        self.audioPlayer = AVPlayer(playerItem: initialAudioItem)
+        // `nil`, not `initialAudioItem`, for a non-driving screen — see `isDrivingScreen`'s own doc
+        // comment. `screenId` is already set (just above, at the top of this initializer) by the
+        // time this reads it.
+        self.audioPlayer = AVPlayer(playerItem: isDrivingScreen ? initialAudioItem : nil)
         if let item = self.player.currentItem {
             if let audioItem = self.audioPlayer.currentItem {
                 Self.applyTrimEnd(project: currentWallpaper.project, to: item, audioItem)
@@ -584,6 +613,12 @@ class VideoWallpaperViewModel: ObservableObject {
         // Primary, reliable trigger for the reattach fix — see `LockScreenSync.screenDidUnlockNotification`'s
         // doc comment for why `NSWindow.occlusionState` alone isn't trustworthy for this window.
         NotificationCenter.default.addObserver(self, selector: #selector(screenDidUnlock), name: LockScreenSync.screenDidUnlockNotification, object: nil)
+        // See `LockScreenSync.screenDidLockNotification`'s own doc comment — without this, the
+        // desktop decoder kept running behind the opaque lock screen for as long as that file's
+        // own display-sleep-prevention assertion holds. No explicit resume needed on unlock:
+        // `screenDidUnlock` above already calls `reattachPlayerLayer()`, which ends with
+        // `applyRateToPlayers(AppDelegate.shared.wallpaperViewModel.playRate)`.
+        NotificationCenter.default.addObserver(self, selector: #selector(screenDidLock), name: LockScreenSync.screenDidLockNotification, object: nil)
 
         isOnBattery = BatteryMonitor.shared.isOnBattery
         applyBatteryMode()
@@ -640,7 +675,7 @@ class VideoWallpaperViewModel: ObservableObject {
         guard player.currentItem == nil else { return }
         swapInFreshItems()
         applyRateToPlayers(playRate)
-        self.audioPlayer.volume = self.playVolume
+        self.audioPlayer.volume = self.effectiveVolume
         applyBatteryMode()
     }
 
@@ -717,6 +752,15 @@ class VideoWallpaperViewModel: ObservableObject {
 
     @objc func systemWillSleep(_ notification: Notification) {
         WWLog.playback.notice("[\(self.screenId, privacy: .public)] systemWillSleep (screensDidSleep) fired")
+        applyRateToPlayers(0)
+    }
+
+    /// See `LockScreenSync.screenDidLockNotification`'s own doc comment. Same shape as
+    /// `systemWillSleep` just above — this is specifically the case that one doesn't cover: a real
+    /// lock on AC power, where `LockScreenSync`'s own display-sleep-prevention assertion means
+    /// `screensDidSleepNotification` won't fire for up to its `assertionTimeout`.
+    @objc func screenDidLock(_ notification: Notification) {
+        WWLog.playback.notice("[\(self.screenId, privacy: .public)] screenDidLock fired")
         applyRateToPlayers(0)
     }
 

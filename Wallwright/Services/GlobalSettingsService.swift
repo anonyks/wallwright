@@ -381,6 +381,7 @@ class GlobalSettingsViewModel: ObservableObject {
     var didChangeShowClockOverlayCancellable: Cancellable?
     var didOtherAudioChangeCancellable: Cancellable?
     var otherAudioPolicyCancellable: Cancellable?
+    var otherAudioVolumeCancellable: Cancellable?
     var didBatteryStatusChangeCancellable: Cancellable?
     var didPowerConditionChangeCancellable: Cancellable?
     var didFullscreenChangeCancellable: Cancellable?
@@ -443,6 +444,7 @@ class GlobalSettingsViewModel: ObservableObject {
         didChangeShowClockOverlayCancellable?.cancel()
         didOtherAudioChangeCancellable?.cancel()
         otherAudioPolicyCancellable?.cancel()
+        otherAudioVolumeCancellable?.cancel()
         didBatteryStatusChangeCancellable?.cancel()
         didPowerConditionChangeCancellable?.cancel()
         didFullscreenChangeCancellable?.cancel()
@@ -550,10 +552,19 @@ class GlobalSettingsViewModel: ObservableObject {
         // `.keepRunning` (the default — most users never touch this picker) means nothing ever
         // consumes `OtherAudioMonitor.isOtherAppPlaying`, so there's no reason to run its 2s
         // CoreAudio/AppleScript poll at all in that case. Started/stopped here in response to the
-        // policy's actual value, not unconditionally at launch.
+        // policy's actual value, not unconditionally at launch. Also stopped while the global
+        // wallpaper volume is silenced (0): confirmed live (2026-10-11) that even with a "pause"/
+        // "mute" policy active, this polled every 2s regardless of whether there's any audible
+        // wallpaper sound for that policy to actually protect — a muted user got the exact same
+        // CoreAudio/AppleScript cost as an unmuted one for nothing.
         updateOtherAudioMonitoring()
         self.otherAudioPolicyCancellable = $settings
             .map(\.otherApplicationPlayingAudio)
+            .removeDuplicates()
+            .dropFirst() // updateOtherAudioMonitoring() above already covers the initial value
+            .sink { [weak self] _ in self?.updateOtherAudioMonitoring() }
+        self.otherAudioVolumeCancellable = AppDelegate.shared.wallpaperViewModel.$playVolume
+            .map { $0 > 0 }
             .removeDuplicates()
             .dropFirst() // updateOtherAudioMonitoring() above already covers the initial value
             .sink { [weak self] _ in self?.updateOtherAudioMonitoring() }
@@ -724,9 +735,12 @@ class GlobalSettingsViewModel: ObservableObject {
     /// Starts/stops `OtherAudioMonitor`'s poll to match whether the policy actually needs it —
     /// `.keepRunning` never consumes `isOtherAppPlaying` at all (see the two switches above), so
     /// polling then would just be wasted CoreAudio/AppleScript work with nothing acting on the
-    /// result.
+    /// result. Same reasoning extends to the wallpaper volume itself: a "pause"/"mute" policy only
+    /// ever has something to protect when the wallpaper's own audio could actually be heard — at
+    /// `playVolume == 0`, there's no audible wallpaper sound either policy value could meaningfully
+    /// act on, so the poll is just as wasted as under `.keepRunning`.
     private func updateOtherAudioMonitoring() {
-        if settings.otherApplicationPlayingAudio == .keepRunning {
+        if settings.otherApplicationPlayingAudio == .keepRunning || AppDelegate.shared.wallpaperViewModel.playVolume == 0 {
             OtherAudioMonitor.shared.stop()
         } else {
             OtherAudioMonitor.shared.startIfNeeded()

@@ -167,6 +167,20 @@ final class ClockOverlayView: NSView {
             .dropFirst() // the constructor's own restartTimer() call above already covers the initial value
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.restartTimer() }
+
+        // Without this, the clock's own timer (every 1s with seconds enabled, every minute
+        // otherwise) kept firing and waking the CPU the whole time the display was asleep or the
+        // screen was locked — a redraw nobody could see, on a window that's invisible either way.
+        // Invalidated rather than left running-but-ignored: a live `Timer` on `RunLoop.main`
+        // itself prevents deep CPU idle (App Nap / C-state), regardless of whether anything
+        // visible comes of each fire. `screenDidLock`/`screensDidSleep` both invalidate (the lock
+        // notification covers the AC-power gap `LockScreenSync`'s own display-sleep-prevention
+        // assertion leaves — see its own doc comment); `screenDidUnlock`/`screensDidWake` both
+        // restart, matching whichever one actually fires for the real event.
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(stopTimer), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(restartTimerFromNotification), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(stopTimer), name: LockScreenSync.screenDidLockNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(restartTimerFromNotification), name: LockScreenSync.screenDidUnlockNotification, object: nil)
     }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
@@ -174,7 +188,16 @@ final class ClockOverlayView: NSView {
         timer?.invalidate()
         settingsCancellable?.cancel()
         clockShowSecondsCancellable?.cancel()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
     }
+
+    @objc private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    @objc private func restartTimerFromNotification() { restartTimer() }
 
     /// Seconds need a 1s refresh; otherwise the displayed string only actually changes once a
     /// minute, so the timer is aligned to the next real minute boundary rather than firing every

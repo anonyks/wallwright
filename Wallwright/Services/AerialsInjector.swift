@@ -765,14 +765,14 @@ final class AerialsInjector {
         task.waitUntilExit()
     }
 
+    /// `healthCheckTimer` calls this every 5 minutes for as long as any video wallpaper has ever
+    /// run this session — was forking `/usr/bin/pgrep` via `Process` every time (real, if small,
+    /// process-spawn overhead on a timer that otherwise does nothing). `NSRunningApplication`
+    /// answers the same question from already-in-process OS state, no fork/exec at all. Bundle ID
+    /// confirmed live (2026-10-11) via `osascript`'s own "bundle identifier of process" query
+    /// against the real running agent — `com.apple.wallpaper.agent`, not the more obvious-looking
+    /// `com.apple.wallpaper.WallpaperAgent` guess.
     private func isWallpaperAgentRunning() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", "WallpaperAgent"]
-        task.standardOutput = FileHandle.nullDevice
-        task.standardError = FileHandle.nullDevice
-        try? task.run()
-        task.waitUntilExit()
-        return task.terminationStatus == 0
+        !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.wallpaper.agent").isEmpty
     }
 }

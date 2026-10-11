@@ -142,6 +142,31 @@ All notable changes to Wallwright are documented here. Format follows
   really be enforced is at import: an oversized source (confirmed live against a real synthetic
   7680×4320 file) is now downscaled to 3840×2160 during the existing codec-compatibility transcode
   step, even when its codec was already fine and previously passed through completely untouched.
+- The desktop video player kept actively decoding full-rate behind the opaque lock screen for as
+  long as `LockScreenSync`'s own display-sleep-prevention assertion holds (up to 2 minutes on AC
+  power) — the only existing pause trigger was real display sleep, which that assertion exists
+  specifically to delay. Also likely running a second, redundant hardware decode session
+  concurrently whenever the system's own lock-screen Aerial is active for the same video. Now
+  pauses immediately on lock.
+- Multi-monitor audio was actually audible on every screen simultaneously, not just wastefully
+  decoded: each screen's independent audio player received the same global volume, so two
+  displays showing the same audio-enabled wallpaper produced real phasing/echo. Only the
+  "driving" screen's audio player ever gets a real item attached now; every other screen's stays
+  empty — muting it after attaching wasn't enough to avoid the decode cost, same lesson already
+  established elsewhere in this exact file for the video decoder itself (only
+  `replaceCurrentItem(with: nil)` actually releases the underlying session, confirmed live via
+  `footprint`).
+- `ClockOverlay`'s refresh timer (every 1s with seconds shown, every minute otherwise) kept firing
+  the whole time the display was asleep or the screen was locked, for a redraw nobody could see on
+  a window that was invisible either way — a continuous CPU wakeup a plain `Timer` on `RunLoop.main`
+  causes regardless of whether anything visible comes of each fire. Now pauses on sleep/lock and
+  resumes on wake/unlock.
+- `AerialsInjector`'s 5-minute health check forked `/usr/bin/pgrep` via `Process` to check whether
+  WallpaperAgent was running; now reads the same answer from already-in-process `NSRunningApplication`
+  state, no process spawning at all.
+- `OtherAudioMonitor` polled every 2s (real CoreAudio work, occasionally an AppleScript round-trip
+  to Spotify/Music) whenever its policy was active, even with the wallpaper's own volume muted to
+  0 — nothing for that policy to protect at that point. Now also stops while muted.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
