@@ -55,13 +55,13 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
         }
         .onAppear {
             // Re-applied on every single (re-)visit, not just the first — see its own doc comment:
-            // a manual override (e.g. unchecking "- Anime" to see something specific) is only meant
-            // to last for the current visit, not become a silent standing exception every time this
+            // a manual override (e.g. unchecking "Approved" to see everything) is only meant to
+            // last for the current visit, not become a silent standing exception every time this
             // tab is revisited. Compared before/after so a revert that actually changes something
             // forces the re-search below even when neither of its own two existing triggers fires.
-            let genresBeforeSync = steamVM.excludedGenreTags
-            steamVM.syncGenreDefaultsToSafeMode()
-            let genreDefaultsReverted = steamVM.excludedGenreTags != genresBeforeSync
+            let approvedBeforeSync = (steamVM.includedMiscTags, steamVM.excludedMiscTags)
+            steamVM.syncApprovedDefault()
+            let approvedDefaultReverted = (steamVM.includedMiscTags, steamVM.excludedMiscTags) != approvedBeforeSync
             // Locked, not a default — WEVideo shows Video only, WEScene shows Scene only, full
             // stop, with no in-tab control to change it (confirmed live 2026-10-05: a visible,
             // changeable Type picker here was genuinely the wrong call, not just a rough edge —
@@ -73,7 +73,7 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
             if steamVM.searchQuery.isEmpty, steamVM.searchQuery != viewModel.lastBrowseSearchText {
                 steamVM.searchQuery = viewModel.lastBrowseSearchText
             }
-            if typeChanged || genreDefaultsReverted || steamVM.searchResults.isEmpty {
+            if typeChanged || approvedDefaultReverted || steamVM.searchResults.isEmpty {
                 Task { await steamVM.search() }
             }
         }
@@ -81,7 +81,6 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
         // already-populated tab left stale results on screen — `.onAppear` above only re-searches
         // on a type change or empty results, neither of which a Safe Mode flip causes by itself.
         .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in
-            steamVM.syncGenreDefaultsToSafeMode()
             Task { await steamVM.search() }
         }
     }
@@ -194,18 +193,14 @@ struct SteamWorkshopBrowseView: SubviewOfContentView {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: 6) {
                 HStack(spacing: 6) {
-                    // `steamVM.visibleGenreTags`, not the raw `WorkshopTag.genreTags` — Safe Mode
-                    // hides Girls/Guys from this row entirely (see its own doc comment), not just
-                    // defaults them to excluded.
-                    ForEach(steamVM.visibleGenreTags, id: \.self) { tag in
-                        tagChip(tag, isIncluded: steamVM.includedGenreTags.contains(tag), isExcluded: steamVM.excludedGenreTags.contains(tag)) {
-                            steamVM.cycleGenreTag(tag)
-                            Task { await steamVM.search() }
-                        }
-                    }
-                    ForEach(WorkshopTag.miscellaneousTags, id: \.self) { tag in
-                        tagChip(tag, isIncluded: steamVM.includedMiscTags.contains(tag), isExcluded: steamVM.excludedMiscTags.contains(tag)) {
-                            steamVM.cycleMiscTag(tag)
+                    // `steamVM.orderedTagChips` — one merged Genre+Miscellaneous list with
+                    // "Approved" and "Unspecified" pinned first (confirmed live 2026-10-13), rather
+                    // than two separate Genre-then-Misc loops. `isTagIncluded`/`isTagExcluded`/
+                    // `cycleTag` dispatch each entry to the right underlying set regardless of
+                    // which facet it actually belongs to.
+                    ForEach(steamVM.orderedTagChips, id: \.self) { tag in
+                        tagChip(tag, isIncluded: steamVM.isTagIncluded(tag), isExcluded: steamVM.isTagExcluded(tag)) {
+                            steamVM.cycleTag(tag)
                             Task { await steamVM.search() }
                         }
                     }

@@ -65,10 +65,10 @@ struct SteamWorkshopSearchResult: Identifiable, Equatable {
 /// is deliberately not a case here: on Steam's own site, pairing "Most Popular" with "All Time"
 /// isn't a real, independently selectable combination — picking it there auto-switches Sort Order
 /// to "Top Rated All Time" instead, a genuinely different sort. Since this app locks sort to
-/// "Most Popular" always, only the six time frames that actually pair with it are offered.
+/// "Most Popular" always, only the time frames that actually pair with it are offered. "Today" and
+/// "One Week" were dropped (2026-10-13) — too narrow a window to turn up meaningfully different
+/// "Most Popular" results, not worth the extra picker entries.
 enum WorkshopTimeFrame: Int, CaseIterable, Identifiable {
-    case today = 1
-    case oneWeek = 7
     case thirtyDays = 30
     case threeMonths = 90
     case sixMonths = 180
@@ -78,8 +78,6 @@ enum WorkshopTimeFrame: Int, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .today: return "Today"
-        case .oneWeek: return "One Week"
         case .thirtyDays: return "Thirty Days"
         case .threeMonths: return "Three Months"
         case .sixMonths: return "Six Months"
@@ -120,6 +118,14 @@ enum WorkshopTag {
     /// sending this, the same way any other optional filter here would be left off.
     static let requiredAgeRatingTag = "Everyone"
 
+    /// "Approved" is Steam's own curation signal for this Workshop (a human reviewer has actually
+    /// looked at the item), independent of content safety. A normal, visible Miscellaneous chip
+    /// like any other — cyclable to excluded or neutral — but seeded into the included state by
+    /// default, regardless of Safe Mode, so browsing starts curated without silently forcing it:
+    /// see `SteamWorkshopImportViewModel.syncApprovedDefault`'s own doc comment. Pinned first in
+    /// the combined chip row alongside `Unspecified` (confirmed live 2026-10-13).
+    static let requiredApprovedTag = "Approved"
+
     /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on, same as the two required tags
     /// above — Steam's own "Everyone" age rating doesn't actually screen out suggestive anime/furry
     /// character art, which is overwhelmingly tagged Genre "Girls" or "Guys" by uploaders rather
@@ -128,20 +134,13 @@ enum WorkshopTag {
     /// them). "Memes" excluded alongside them per the same reasoning: low-signal, rarely what
     /// anyone's actually browsing for. "Unspecified" deliberately left OUT of this set — genuinely
     /// untagged items aren't inherently a content-safety concern the way Girls/Guys/Memes are, and
-    /// hiding them turned out too strict (2026-10-11). Unconditional while Safe Mode is on, and not
-    /// offered as a choice at all — see `SteamWorkshopImportViewModel.visibleGenreTags`'s own doc
-    /// comment for why these specifically don't even get a chip, unlike `safeModeDefaultExcludedGenres`
-    /// just below.
+    /// hiding them turned out too strict (2026-10-11). Game/Anime/Abstract previously had a lighter,
+    /// visible-but-default-excluded tier here too; removed 2026-10-13 back to plain, neutral,
+    /// unrestricted chips — this unconditional hidden set is the only genre restriction Safe Mode
+    /// still applies. Unconditional while Safe Mode is on, and not offered as a choice at all — see
+    /// `SteamWorkshopImportViewModel.visibleGenreTags`'s own doc comment for why these specifically
+    /// don't even get a chip.
     static let safeModeExcludedGenres: Set<String> = ["Girls", "Guys", "Memes"]
-
-    /// Applied whenever `GlobalSettings.steamWorkshopSafeMode` is on, but unlike
-    /// `safeModeExcludedGenres` just above, these stay as ordinary, visible, freely-cyclable Genre
-    /// chips — Safe Mode only seeds them into the excluded state as a starting default (see
-    /// `SteamWorkshopImportViewModel.syncGenreDefaultsToSafeMode`'s own doc comment), not a
-    /// permanent, hidden restriction. Confirmed live 2026-10-10: the user wants Game/Anime results
-    /// toned down by default, same spirit as the hidden set above, but without losing the ability
-    /// to un-exclude either one for a specific search the way Girls/Guys/Unspecified/Memes can't be.
-    static let safeModeDefaultExcludedGenres: Set<String> = ["Game", "Anime"]
 
     /// The sidebar's "Genre" facet, verbatim — every value it actually lists, alphabetical
     /// ordering preserved as shown there. "Unspecified" is real (untagged items) but surfaced

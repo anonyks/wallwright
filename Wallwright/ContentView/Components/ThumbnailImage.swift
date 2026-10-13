@@ -57,6 +57,17 @@ struct ThumbnailImage: NSViewRepresentable {
         thumbnailImageCache.removeAllObjects()
     }
 
+    /// Evicts just the one cached decoded thumbnail for `url`, if present — call with a
+    /// wallpaper's own preview file right before actually deleting it, so no decoded copy of it
+    /// outlives the file in this process's memory. Must be called BEFORE the file is removed:
+    /// the cache key includes the file's own modification date (see `currentKey()`), which this
+    /// has to read while the file still exists. A no-op if nothing was cached for it.
+    static func evictCache(for url: URL) {
+        let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        let key = "\(url.path)|\(mtime?.timeIntervalSince1970 ?? 0)"
+        thumbnailImageCache.removeObject(forKey: key as NSString)
+    }
+
     var url: URL
 
     var isResizable: Bool = false

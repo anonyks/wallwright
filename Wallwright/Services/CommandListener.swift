@@ -10,6 +10,7 @@
 //    echo "next"       > /tmp/wallwright-501.pipe
 //    echo "prev"       > /tmp/wallwright-501.pipe
 //    echo "pin"        > /tmp/wallwright-501.pipe
+//    echo "clearcache" > /tmp/wallwright-501.pipe
 //    echo "quit"       > /tmp/wallwright-501.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
@@ -129,6 +130,12 @@ final class CommandListener {
             // The main screen's wallpaper is the only sensible target without one.
             let mainId = WallpaperViewModel.mainScreenId()
             AppDelegate.shared.contentViewModel.togglePinned(AppDelegate.shared.wallpaperViewModel.wallpaper(for: mainId))
+        case "clearcache":
+            // Same eviction `MainWindowController.windowWillClose` already calls automatically —
+            // exposed here too so it can be triggered (and its effect measured) without actually
+            // opening/closing the library window, e.g. from a script or while diagnosing memory
+            // footprint live.
+            ThumbnailImage.clearCache()
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()

@@ -271,17 +271,14 @@ struct SteamWorkshopImportSheet: View {
             // comments), not a per-search choice.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    // `model.visibleGenreTags`, not the raw `WorkshopTag.genreTags` — Safe Mode
-                    // hides Girls/Guys from this row entirely (see its own doc comment), not just
-                    // defaults them to excluded.
-                    ForEach(model.visibleGenreTags, id: \.self) { tag in
-                        genreChip(tag, isIncluded: model.includedGenreTags.contains(tag), isExcluded: model.excludedGenreTags.contains(tag)) {
-                            model.cycleGenreTag(tag)
-                        }
-                    }
-                    ForEach(WorkshopTag.miscellaneousTags, id: \.self) { tag in
-                        genreChip(tag, isIncluded: model.includedMiscTags.contains(tag), isExcluded: model.excludedMiscTags.contains(tag)) {
-                            model.cycleMiscTag(tag)
+                    // `model.orderedTagChips` — one merged Genre+Miscellaneous list with "Approved"
+                    // and "Unspecified" pinned first (confirmed live 2026-10-13), rather than two
+                    // separate Genre-then-Misc loops. `isTagIncluded`/`isTagExcluded`/`cycleTag`
+                    // dispatch each entry to the right underlying set regardless of which facet it
+                    // actually belongs to.
+                    ForEach(model.orderedTagChips, id: \.self) { tag in
+                        genreChip(tag, isIncluded: model.isTagIncluded(tag), isExcluded: model.isTagExcluded(tag)) {
+                            model.cycleTag(tag)
                         }
                     }
                 }
@@ -296,7 +293,6 @@ struct SteamWorkshopImportSheet: View {
             // Same reactivity as the full-tab browse views — flipping Safe Mode in Settings while
             // this popup already has results showing shouldn't leave them stale.
             .onChange(of: globalSettingsViewModel.settings.steamWorkshopSafeMode) { _, _ in
-                model.syncGenreDefaultsToSafeMode()
                 if !model.searchResults.isEmpty || model.searchErrorMessage != nil { Task { await model.search() } }
             }
 

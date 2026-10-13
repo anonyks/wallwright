@@ -190,9 +190,11 @@ class WallpaperViewModel: ObservableObject {
     }
 
     /// Cleans up every reference to a wallpaper after it's been deleted: clears it from any
-    /// screen it was assigned to, drops it from Recent Wallpapers, and forgets any trust
-    /// decision recorded for it — otherwise these all keep pointing at a directory that no
-    /// longer exists.
+    /// screen it was assigned to and drops it from Recent Wallpapers — otherwise both keep
+    /// pointing at a directory that no longer exists. (No separate "trust decision" state exists
+    /// to clean up here — `isPinned` lives on the wallpaper's own `project.json`, so it's gone
+    /// the moment the directory is, and there's nothing else outside this method's own two
+    /// writes that remembers a wallpaper by path.)
     ///
     /// Screens that had this wallpaper fall back to `replacement` (e.g. another wallpaper still
     /// in the library) when one's available, rather than always dropping to the "Wallpaper Not

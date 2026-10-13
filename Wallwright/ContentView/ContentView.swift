@@ -365,6 +365,12 @@ struct ContentView: View {
                     !$0.wallpaperDirectory.isSameWallpaperDirectory(as: url)
                 }
                 Button("Delete Immediately", role: .destructive) {
+                    // Read before the delete below, not after — eviction needs the file's own
+                    // modification date, which only still exists before `removeItem` runs (see
+                    // `ThumbnailImage.evictCache`'s own doc comment for why).
+                    if let preview = viewModel.hoveredWallpaper?.project.preview {
+                        ThumbnailImage.evictCache(for: url.appending(path: preview))
+                    }
                     try? FileManager.default.removeItem(at: url)
                     wallpaperViewModel.removeWallpaperFromAllScreens(directory: url, replacement: replacement)
                     AppDelegate.shared.playlistViewModel.removeWallpaperFromPlaylist(directory: url)
@@ -373,6 +379,9 @@ struct ContentView: View {
                     viewModel.refresh()
                 }
                 Button("Move to Trash") {
+                    if let preview = viewModel.hoveredWallpaper?.project.preview {
+                        ThumbnailImage.evictCache(for: url.appending(path: preview))
+                    }
                     try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
                     wallpaperViewModel.removeWallpaperFromAllScreens(directory: url, replacement: replacement)
                     AppDelegate.shared.playlistViewModel.removeWallpaperFromPlaylist(directory: url)
@@ -393,7 +402,12 @@ struct ContentView: View {
                 let replacement = viewModel.autoRefreshWallpapers.first {
                     !viewModel.selectedWallpapers.contains($0.wallpaperDirectory)
                 }
-                for url in viewModel.selectedWallpapers {
+                // `selectedWallpaperItems()`, not the bare `selectedWallpapers` URL set — need
+                // each item's own `project.preview` filename to evict its thumbnail cache entry
+                // before deleting it (see the single-delete button's identical comment).
+                for item in viewModel.selectedWallpaperItems() {
+                    let url = item.wallpaperDirectory
+                    ThumbnailImage.evictCache(for: url.appending(path: item.project.preview))
                     try? FileManager.default.removeItem(at: url)
                     wallpaperViewModel.removeWallpaperFromAllScreens(directory: url, replacement: replacement)
                     AppDelegate.shared.playlistViewModel.removeWallpaperFromPlaylist(directory: url)
@@ -405,7 +419,9 @@ struct ContentView: View {
                 let replacement = viewModel.autoRefreshWallpapers.first {
                     !viewModel.selectedWallpapers.contains($0.wallpaperDirectory)
                 }
-                for url in viewModel.selectedWallpapers {
+                for item in viewModel.selectedWallpaperItems() {
+                    let url = item.wallpaperDirectory
+                    ThumbnailImage.evictCache(for: url.appending(path: item.project.preview))
                     try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
                     wallpaperViewModel.removeWallpaperFromAllScreens(directory: url, replacement: replacement)
                     AppDelegate.shared.playlistViewModel.removeWallpaperFromPlaylist(directory: url)

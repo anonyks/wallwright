@@ -38,13 +38,18 @@ All notable changes to Wallwright are documented here. Format follows
   UserDefaults/FileTimestamp API usage.
 - A GitHub Actions CI workflow (build and test on push/PR to main).
 - `PinningTests` and `ProcessRunnerTests` unit test suites.
-- A time frame picker (Today/One Week/Thirty Days/Three Months/Six Months/One Year) for Steam
-  Workshop's "Most Popular" sort — a compact menu next to the search bar in the full browse tabs,
-  a small picker row in the Link/Search popup. Sort itself stays locked to "Most Popular" always
-  (see the Fixed entry above); this only controls the time window, defaulting to Six Months, same
-  as Steam's own default. "All Time" isn't offered: confirmed live that it isn't actually a real,
-  independently selectable combination with "Most Popular" on Steam's own site either — picking it
-  there auto-switches to a different sort ("Top Rated All Time") entirely.
+- A time frame picker (Thirty Days/Three Months/Six Months/One Year) for Steam Workshop's "Most
+  Popular" sort — a compact menu next to the search bar in the full browse tabs, a small picker
+  row in the Link/Search popup. Sort itself stays locked to "Most Popular" always (see the Fixed
+  entry above); this only controls the time window, defaulting to Six Months, same as Steam's own
+  default. "Today"/"One Week" aren't offered — too narrow a window to turn up meaningfully
+  different results, not worth the extra picker entries. "All Time" isn't offered either:
+  confirmed live that it isn't actually a real, independently selectable combination with "Most
+  Popular" on Steam's own site either — picking it there auto-switches to a different sort ("Top
+  Rated All Time") entirely.
+- `clearcache` command on the named-pipe interface (`echo "clearcache" > /tmp/wallwright-$(id
+  -u).pipe`) — evicts the thumbnail cache on demand, the same eviction that already happens
+  automatically when the library window closes, without needing to actually open/close it.
 
 ### Changed
 - Replaced manual "Load More" buttons and pagination with continuous auto-load-on-scroll in browse tabs.
@@ -122,13 +127,8 @@ All notable changes to Wallwright are documented here. Format follows
   confirmed live against multiple real "Everyone"-rated items. Safe Mode now excludes Girls, Guys,
   and Memes unconditionally, and doesn't offer any of them as a choice at all in the Genre chip
   row (same as Age Rating/Category already aren't), rather than showing a togglable "- Girls" chip
-  the user could tap back to neutral or "+". Game and Anime get a lighter touch: Safe Mode starts
-  both pre-excluded by default, but their chips stay visible and freely cyclable, so either can
-  still be opted back in for a specific search — but only for the current visit: navigating away
-  from a browse tab and back reverts Game/Anime to excluded again, so a one-off override doesn't
-  silently become a standing exception every future visit. "Unspecified" (genuinely untagged
-  items) was initially included in the hidden set too, but that was too strict — it's not a
-  content-safety concern the way the others are, so it's back to a plain, unrestricted genre chip.
+  the user could tap back to neutral or "+". Game, Anime, Abstract, and Unspecified stay as plain,
+  neutral, freely cyclable Genre chips, not defaulted to excluded by Safe Mode at all.
 - Steam Workshop search silently switched sort order the moment you typed anything: an empty
   search sorted by "Most Popular", but typing a query switched to Steam's own text-relevance
   ranking instead, with no indication the sort had changed underneath you. Now always
@@ -167,6 +167,19 @@ All notable changes to Wallwright are documented here. Format follows
 - `OtherAudioMonitor` polled every 2s (real CoreAudio work, occasionally an AppleScript round-trip
   to Spotify/Music) whenever its policy was active, even with the wallpaper's own volume muted to
   0 — nothing for that policy to protect at that point. Now also stops while muted.
+- Deleting a wallpaper ("Delete Immediately") left its decoded thumbnail sitting in the in-memory
+  thumbnail cache until the main window next closed or the process restarted — now evicted at the
+  moment of deletion instead. Audited every other place a deleted wallpaper's identity could
+  persist (Recent Wallpapers, per-screen assignment, playlist membership, pinning, the Steam
+  Workshop cache) — all already correctly cleaned up at every existing delete path; only the
+  thumbnail cache had a real gap.
+- Steam Workshop search now defaults to requiring "Approved" (Steam's own curation signal — a
+  human reviewer has looked at the item), independent of Safe Mode entirely. A real, visible
+  Miscellaneous chip rather than a hidden, unconditional requirement — seeded into the included
+  state by default so browsing starts curated, but freely cyclable to neutral or excluded for a
+  specific search, same "override only lasts for the current visit" behavior the Genre chips
+  already use. Pinned first in the combined Genre/Miscellaneous chip row alongside "Unspecified",
+  rather than wherever alphabetical order would otherwise land them.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
