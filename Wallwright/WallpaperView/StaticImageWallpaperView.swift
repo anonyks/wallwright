@@ -98,16 +98,26 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         /// that already landed. See `updateWallpaper`'s own comment for why this decode is async at all.
         var loadGeneration = 0
 
+        // The timer's own parameters, kept as instance state (not just captured in the timer's
+        // closure) so the sleep/lock pause-and-resume below can restart it later without needing
+        // `startCycling` to be called again from outside.
+        private weak var cyclingView: NSView?
+        private var cyclingURL: URL?
+        private var cyclingMaxPixelSize: CGFloat?
+        private var sleepObserver: NSObjectProtocol?
+        private var wakeObserver: NSObjectProtocol?
+        private var lockObserver: NSObjectProtocol?
+        private var unlockObserver: NSObjectProtocol?
+
         /// Draws the correct frame for right now, then checks again every 5 minutes — plenty
         /// granular for a 16-frame day (roughly one change per 1.5 hours) without re-decoding the
         /// file on every SwiftUI update the way a naive per-render check would.
         func startCycling(url: URL, view: NSView, maxPixelSize: CGFloat?) {
+            cyclingURL = url
+            cyclingView = view
+            cyclingMaxPixelSize = maxPixelSize
             applyFrame(url: url, view: view, maxPixelSize: maxPixelSize)
-            timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self, weak view] _ in
-                guard let self, let view else { return }
-                self.applyFrame(url: url, view: view, maxPixelSize: maxPixelSize)
-            }
-            timer?.tolerance = 30
+            startTimer()
             // A 2-frame Dynamic Desktop is Apple's Light/Dark appearance toggle (see
             // DynamicDesktopHEIC.currentFrameIndex's own doc comment) — without this, switching
             // system appearance (Control Center, a scheduled sunset, Night Shift) left the desktop
@@ -119,13 +129,58 @@ struct StaticImageWallpaperView: NSViewRepresentable {
                 guard let self, let view else { return }
                 self.applyFrame(url: url, view: view, maxPixelSize: maxPixelSize)
             }
+            // Every other long-running timer in this app (ClockOverlay's clock tick, the "driving
+            // screen" video playback) pauses while nobody can see the result — see ClockOverlay's
+            // own screensDidSleep/Wake + screenDidLock/Unlock doc comment. This one didn't: it kept
+            // firing every 5 minutes through sleep and lock alike, only ever stopping when the
+            // wallpaper itself changed. `applyFrame`'s own `lastFrameIndex` guard already makes a
+            // tick that lands on an unchanged frame cheap (a cache hit, confirmed live — see
+            // `DynamicDesktopHEIC.frameCount`'s own memoization), so this was never a meaningful
+            // CPU/battery cost by itself — just an unnecessary RunLoop wakeup with no visible result,
+            // and an inconsistency with the pause-when-not-visible pattern used everywhere else.
+            sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.pauseTimer() }
+            wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.resumeTimer() }
+            lockObserver = NotificationCenter.default.addObserver(forName: LockScreenSync.screenDidLockNotification, object: nil, queue: .main) { [weak self] _ in self?.pauseTimer() }
+            unlockObserver = NotificationCenter.default.addObserver(forName: LockScreenSync.screenDidUnlockNotification, object: nil, queue: .main) { [weak self] _ in self?.resumeTimer() }
+        }
+
+        private func startTimer() {
+            timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+                guard let self, let url = self.cyclingURL, let view = self.cyclingView else { return }
+                self.applyFrame(url: url, view: view, maxPixelSize: self.cyclingMaxPixelSize)
+            }
+            timer?.tolerance = 30
+        }
+
+        private func pauseTimer() {
+            timer?.invalidate()
+            timer = nil
+        }
+
+        /// Also re-applies the current frame immediately, in case it should have changed while
+        /// asleep/locked and paused — the same catch-up the appearance KVO above already does for
+        /// an immediate Light/Dark switch, just for the time-based case instead.
+        private func resumeTimer() {
+            guard timer == nil, let url = cyclingURL, let view = cyclingView else { return }
+            applyFrame(url: url, view: view, maxPixelSize: cyclingMaxPixelSize)
+            startTimer()
         }
 
         func stopCycling() {
-            timer?.invalidate()
-            timer = nil
+            pauseTimer()
             appearanceObservation = nil
             lastFrameIndex = nil
+            if let sleepObserver { NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver) }
+            if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+            if let lockObserver { NotificationCenter.default.removeObserver(lockObserver) }
+            if let unlockObserver { NotificationCenter.default.removeObserver(unlockObserver) }
+            sleepObserver = nil
+            wakeObserver = nil
+            lockObserver = nil
+            unlockObserver = nil
+            cyclingURL = nil
+            cyclingView = nil
+            cyclingMaxPixelSize = nil
         }
 
         private func applyFrame(url: URL, view: NSView, maxPixelSize: CGFloat?) {
@@ -160,6 +215,10 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         deinit {
             timer?.invalidate()
             appearanceObservation = nil
+            if let sleepObserver { NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver) }
+            if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+            if let lockObserver { NotificationCenter.default.removeObserver(lockObserver) }
+            if let unlockObserver { NotificationCenter.default.removeObserver(unlockObserver) }
         }
     }
 }

@@ -188,6 +188,20 @@ All notable changes to Wallwright are documented here. Format follows
 - Trimmed video loop-restart overhead.
 - Declared `NSSupportsAutomaticGraphicsSwitching` so dual-GPU Intel Macs aren't forced onto the
   discrete GPU just to render the wallpaper.
+- The Library grid re-ran its full filter/sort pass over every installed wallpaper, and re-rendered
+  every visible grid card, on UI changes that had nothing to do with the library's actual contents:
+  every keystroke in the search box (ahead of its own 300ms debounce), both halves of the "Applied"
+  toast shown on every wallpaper pick, selecting/hovering a card, and opening any settings sheet —
+  because the grid observes the whole content view model object, which re-renders on any of its
+  published changes, not just the ones the grid actually reads. The filtered/sorted list is now
+  cached and only recomputed when something that could actually change it does (the library itself,
+  the search text, a tag/audio/static filter, or the sort option) — real, repeated, avoidable CPU
+  work for anyone with a sizable library actively typing in search or picking wallpapers from the
+  grid.
+- A Dynamic Desktop wallpaper's 5-minute frame-recheck timer kept firing through screen sleep and
+  lock, the only long-running timer in the app that didn't already pause for that — now stops and
+  resumes with the same screensDidSleep/Wake and screenDidLock/Unlock pairing every other timer here
+  uses, re-checking the frame immediately on resume in case it should have changed while paused.
 
 ### Internal
 - Centralized logging into `WWLog`, replacing 8 scattered `Logger` instances and 29 `print()` calls.

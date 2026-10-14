@@ -42,24 +42,37 @@ class ContentViewModel: ObservableObject, DropDelegate {
         refresh()
     }
 
-    @AppStorage("SortingBy") var sortingBy: WEWallpaperSortingMethod = .name
-    @AppStorage("SortingSequence") var sortingSequence: WEWallpaperSortingSequence = .increase
-    
+    @AppStorage("SortingBy") var sortingBy: WEWallpaperSortingMethod = .name {
+        didSet { recomputeAutoRefreshWallpapers() }
+    }
+    @AppStorage("SortingSequence") var sortingSequence: WEWallpaperSortingSequence = .increase {
+        didSet { recomputeAutoRefreshWallpapers() }
+    }
+
     /// Tags currently checked in the Filter sidebar — populated dynamically from whatever tags
     /// exist across the installed library, not a fixed set. Empty means no filter (show everything).
     @Published var selectedTagFilters: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "SelectedTagFilters") ?? []) {
-        didSet { UserDefaults.standard.set(Array(selectedTagFilters), forKey: "SelectedTagFilters") }
+        didSet {
+            UserDefaults.standard.set(Array(selectedTagFilters), forKey: "SelectedTagFilters")
+            recomputeAutoRefreshWallpapers()
+        }
     }
 
     /// When true, only wallpapers with `project.hasAudio == true` show in the grid.
     @Published var audioOnlyFilter: Bool = UserDefaults.standard.bool(forKey: "AudioOnlyFilter") {
-        didSet { UserDefaults.standard.set(audioOnlyFilter, forKey: "AudioOnlyFilter") }
+        didSet {
+            UserDefaults.standard.set(audioOnlyFilter, forKey: "AudioOnlyFilter")
+            recomputeAutoRefreshWallpapers()
+        }
     }
 
     /// When true, only wallpapers with `project.type == "image"` show in the grid — the static
     /// counterpart to `audioOnlyFilter`, same idea, opposite media kind.
     @Published var staticOnlyFilter: Bool = UserDefaults.standard.bool(forKey: "StaticOnlyFilter") {
-        didSet { UserDefaults.standard.set(staticOnlyFilter, forKey: "StaticOnlyFilter") }
+        didSet {
+            UserDefaults.standard.set(staticOnlyFilter, forKey: "StaticOnlyFilter")
+            recomputeAutoRefreshWallpapers()
+        }
     }
 
     @Published var topTabBarSelection: Int = 0
@@ -129,7 +142,10 @@ class ContentViewModel: ObservableObject, DropDelegate {
         // Recomputes `availableTags` only when `wallpapers` itself actually changes, not on every
         // access — see that property's own doc comment for why a plain computed property there was
         // real, wasted churn.
-        didSet { availableTags = Set(wallpapers.compactMap(\.project.tags).flatMap { $0 }).sorted() }
+        didSet {
+            availableTags = Set(wallpapers.compactMap(\.project.tags).flatMap { $0 }).sorted()
+            recomputeAutoRefreshWallpapers()
+        }
     }
 
 
@@ -142,7 +158,9 @@ class ContentViewModel: ObservableObject, DropDelegate {
 
     @Published var searchText = ""
     /// What `searchedWallpapers` actually filters on — see `init`'s debounce pipeline.
-    @Published private var debouncedSearchText = ""
+    @Published private var debouncedSearchText = "" {
+        didSet { recomputeAutoRefreshWallpapers() }
+    }
 
     /// The last text typed into any *browse source's* search bar (AlphaCoders, MoeWalls, etc — not
     /// the library search above) — carried over so switching from one source to another pre-fills
@@ -585,8 +603,21 @@ class ContentViewModel: ObservableObject, DropDelegate {
     /// actually on screen, so slicing the list into numbered pages bought nothing but a numbered-
     /// page-button UI that isn't how any native macOS library browser (Photos, Music, Finder)
     /// presents a local collection — continuous scrolling through the full filtered/sorted list.
-    public var autoRefreshWallpapers: [WEWallpaper] {
-        sortedWallpapers
+    ///
+    /// A cached stored value, not a plain computed property — `WallpaperExplorer`/`ExplorerItem`
+    /// read this via `@ObservedObject viewModel: ContentViewModel`, which re-renders on ANY
+    /// `@Published` change on the whole object (same reasoning as `ExplorerItem`'s own doc comment
+    /// on why it dropped `@ObservedObject` for `WallpaperViewModel`). This object has several
+    /// `@Published` fields that mutate far more often than the library's actual contents do —
+    /// `searchText` every keystroke, `toastMessage` twice per wallpaper pick, `selectedWallpapers`,
+    /// `hoveredWallpaper`, and the various sheet-reveal flags — none of which should re-run the
+    /// filter/sort pipeline over the whole library. Recomputed only by the `didSet` on each real
+    /// input (`wallpapers`, `debouncedSearchText`, the tag/audio/static filters, `sortingBy`/
+    /// `sortingSequence`), same pattern already established for `availableTags` above.
+    public private(set) var autoRefreshWallpapers: [WEWallpaper] = []
+
+    private func recomputeAutoRefreshWallpapers() {
+        autoRefreshWallpapers = sortedWallpapers
     }
 
     /// Total wallpapers matching the current search/filters — independent of pagination, so it
