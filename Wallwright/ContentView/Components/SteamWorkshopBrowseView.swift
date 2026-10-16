@@ -368,6 +368,10 @@ private struct SteamWorkshopResultCard: View {
             Label("Ready to Review", systemImage: "checkmark.circle.fill")
                 .font(.caption)
                 .foregroundStyle(.green)
+        case .alreadyInLibrary:
+            Label("Added", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
         case .failed(let message):
             HStack(spacing: 6) {
                 Label(message, systemImage: "xmark.circle")

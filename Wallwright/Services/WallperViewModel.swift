@@ -101,12 +101,19 @@ final class WallperViewModel: ObservableObject {
         visibleCount += Self.pageSize
     }
 
-    private func markAlreadyDownloaded() {
+    /// Not `private` — see `MotionBgsViewModel.markAlreadyDownloaded()`'s doc comment for why
+    /// `ContentViewModel` needs to call this on every library change, not just load/search.
+    func markAlreadyDownloaded() {
         // Reads the already-in-memory library instead of re-scanning disk — see
         // `MotionBgsViewModel.markAlreadyDownloaded()`'s identical fix and doc comment.
         let index = WallperService.existingLibraryIndex(wallpapers: AppDelegate.shared.contentViewModel.wallpapers)
-        for item in allItems where index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
-            downloadState[item.id] = .completed
+        for item in allItems {
+            let matches = index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased())
+            if matches {
+                if downloadState[item.id] == nil { downloadState[item.id] = .completed }
+            } else if downloadState[item.id] == .completed {
+                downloadState[item.id] = nil
+            }
         }
     }
 

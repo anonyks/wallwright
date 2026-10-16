@@ -50,6 +50,10 @@ All notable changes to Wallwright are documented here. Format follows
 - `clearcache` command on the named-pipe interface (`echo "clearcache" > /tmp/wallwright-$(id
   -u).pipe`) — evicts the thumbnail cache on demand, the same eviction that already happens
   automatically when the library window closes, without needing to actually open/close it.
+- Steam Workshop's browse grid now marks an item "Added" if it's already in your library, the same
+  treatment every other browse source (MotionBgs, AlphaCoders, MoeWalls, UHDPaper, DesktopHut,
+  Wallper) already gives a duplicate — Steam's own grid never had this and just silently showed
+  "Download" again for something you'd already downloaded.
 
 ### Changed
 - Replaced manual "Load More" buttons and pagination with continuous auto-load-on-scroll in browse tabs.
@@ -180,6 +184,11 @@ All notable changes to Wallwright are documented here. Format follows
   specific search, same "override only lasts for the current visit" behavior the Genre chips
   already use. Pinned first in the combined Genre/Miscellaneous chip row alongside "Unspecified",
   rather than wherever alphabetical order would otherwise land them.
+- Clicking Download on two different Steam Workshop browse-grid cards launched two `steamcmd`
+  processes concurrently against the same cached login — steamcmd doesn't handle that cleanly, and
+  the second one reliably failed with a "Download failed" error rather than queueing or completing
+  normally. Confirmed live (2026-10-16). Downloads are now serialized app-wide: a second click
+  while one is already in flight waits its turn instead of racing it.
 
 ### Performance
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.

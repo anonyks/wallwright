@@ -154,8 +154,12 @@ final class MotionBgsViewModel: ObservableObject {
     /// Marks items already present in the library as `.completed` so the grid shows "Added"
     /// instead of "Download" for them, and `download(item:)` is never invoked for a duplicate.
     /// Matches by source ID when available, falling back to title for wallpapers downloaded
-    /// before source-ID tracking existed.
-    private func markAlreadyDownloaded() {
+    /// before source-ID tracking existed. Not `private` — `ContentViewModel`'s own `$wallpapers`
+    /// subscription calls this on every library change, not just this file's own load/search
+    /// call sites, so a card correctly flips back to "Download" the moment its wallpaper is
+    /// deleted rather than staying stuck on "Added" until this source's results are reloaded from
+    /// scratch (confirmed live 2026-10-16 as a real gap, not just theoretical).
+    func markAlreadyDownloaded() {
         // `existingLibraryIndex()` used to re-scan `wallpapersDirectory` and re-decode every
         // wallpaper's `project.json` from disk, synchronously on the main thread, after every
         // single page load, category switch, and search (`load()`/`loadNextPage()` above both call
@@ -163,8 +167,15 @@ final class MotionBgsViewModel: ObservableObject {
         // `ContentViewModel.wallpapers` — already decoded, already in RAM — so this is cheap enough
         // to run inline on the main actor with no dispatch at all.
         let index = MotionBgsService.existingLibraryIndex(wallpapers: AppDelegate.shared.contentViewModel.wallpapers)
-        for item in items where index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased()) {
-            downloadState[item.id] = .completed
+        for item in items {
+            let matches = index.sourceIds.contains(item.id) || index.titles.contains(item.title.lowercased())
+            if matches {
+                if downloadState[item.id] == nil { downloadState[item.id] = .completed }
+            } else if downloadState[item.id] == .completed {
+                // No longer in the library (deleted) — revert to the plain "Download" state
+                // instead of leaving a stale "Added" badge up.
+                downloadState[item.id] = nil
+            }
         }
     }
 

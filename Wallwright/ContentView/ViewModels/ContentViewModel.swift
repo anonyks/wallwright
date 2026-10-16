@@ -39,7 +39,45 @@ class ContentViewModel: ObservableObject, DropDelegate {
             .sink { [weak self] text in self?.debouncedSearchText = text }
             .store(in: &cancellables)
 
+        // Re-evaluates every browse source's own "Added" marking whenever the library itself
+        // changes — an import OR a delete. Without this, each source only ever checked once, at
+        // whatever moment its own results first loaded: deleting a wallpaper afterward left its
+        // browse-grid card stuck showing "Added" until that source's results were reloaded from
+        // scratch (confirmed live 2026-10-16 across every source, Steam Workshop included). Hooked
+        // directly to `$wallpapers` rather than `VideoImporter.wallpaperLibraryDidChangeNotification`
+        // — this is the actual source of truth each source's own index is built from, so it can't
+        // go stale relative to whatever triggered the change.
+        //
+        // Dispatched via `DispatchQueue.main.async`, NOT called inline — `$wallpapers.sink(...)`
+        // delivers `@Published`'s CURRENT value synchronously the instant you subscribe (standard
+        // Combine behavior, independent of `refresh()` below), so this fired immediately, inline,
+        // as part of `ContentViewModel.init()` itself. That crashed hard on every launch: each
+        // `markAlreadyDownloaded()` reads `AppDelegate.shared.contentViewModel.wallpapers`, and
+        // `AppDelegate.shared` was still mid-construction at that exact point — `ContentViewModel()`
+        // is created from inside `AppDelegate.init()`, itself still running inside the `dispatch_once`
+        // that produces `AppDelegate.shared` in the first place. Re-entering that same `dispatch_once`
+        // recursively isn't a deadlock, it's an immediate "BUG IN CLIENT OF LIBDISPATCH: trying to
+        // lock recursively" crash (confirmed live via two real crash reports, 2026-10-16). Deferring
+        // to the next run loop turn guarantees `AppDelegate.init()` has already returned — and
+        // `AppDelegate.shared` is safe to touch — before this ever runs, on the very first firing and
+        // every later one alike.
+        $wallpapers
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.refreshBrowseSourceAddedMarks() }
+            }
+            .store(in: &cancellables)
+
         refresh()
+    }
+
+    private func refreshBrowseSourceAddedMarks() {
+        motionBgsViewModel.markAlreadyDownloaded()
+        alphaCodersViewModel.markAlreadyDownloaded()
+        moeWallsViewModel.markAlreadyDownloaded()
+        uhdPaperViewModel.markAlreadyDownloaded()
+        desktopHutViewModel.markAlreadyDownloaded()
+        wallperViewModel.markAlreadyDownloaded()
+        steamWorkshopImportViewModel.markAlreadyDownloaded()
     }
 
     @AppStorage("SortingBy") var sortingBy: WEWallpaperSortingMethod = .name {

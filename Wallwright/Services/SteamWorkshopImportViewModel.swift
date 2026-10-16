@@ -237,6 +237,7 @@ final class SteamWorkshopImportViewModel: ObservableObject {
             let results = try await SteamWorkshopService.searchItems(query: trimmed, page: searchPage, days: timeFrame.rawValue, requiredTags: activeRequiredTags, excludedTags: activeExcludedTags)
             guard generation == searchGeneration else { return }
             searchResults = results
+            markAlreadyDownloaded()
         } catch {
             guard generation == searchGeneration else { return }
             searchResults = []
@@ -267,6 +268,7 @@ final class SteamWorkshopImportViewModel: ObservableObject {
             } else {
                 searchPage += 1
                 searchResults.append(contentsOf: next)
+                markAlreadyDownloaded()
             }
         } catch {
             guard generation == searchGeneration else { return }
@@ -289,15 +291,44 @@ final class SteamWorkshopImportViewModel: ObservableObject {
         /// Handed off to `ContentViewModel.pendingPackageImports` — the review sheet (title/tags,
         /// and a scene-art picker when there's more than one candidate) takes over from here, the
         /// same already-built flow the Link/Search popup's own "Continue to Title & Tags" step
-        /// uses. Not the same thing as "added to the library" the way MotionBgs's `.completed`
+        /// uses. Not the same thing as "added to the library" the way `.alreadyInLibrary` below
         /// is — Steam's own project.json needs that review step first, same as it always has.
         case queuedForReview
+        /// This item was already downloaded in a past session, detected via
+        /// `SteamWorkshopService.existingLibraryIndex` — same "Added" treatment every other browse
+        /// source's own `.completed` state already gets, just named differently here since
+        /// `queuedForReview` above already means "downloaded, but not committed to the library yet"
+        /// for a Steam item specifically.
+        case alreadyInLibrary
         case failed(String)
     }
     /// Keyed by Workshop item id, for the full-tab browse views' own grid cards — separate from
     /// `isDownloading`/`downloadResult` above, which track the small Link/Search popup's single
     /// in-flight item instead of a whole grid of independently-downloadable cards.
     @Published var cardDownloadState: [String: CardDownloadState] = [:]
+
+    /// Marks items already present in the library as `.alreadyInLibrary` so the grid shows "Added"
+    /// instead of "Download" for them — same purpose and matching logic as every other browse
+    /// source's own `markAlreadyDownloaded()`, including reverting a stale "Added" back to the
+    /// plain "Download" state when the matching wallpaper is deleted (see
+    /// `MotionBgsViewModel.markAlreadyDownloaded()`'s doc comment for the full reasoning). Not
+    /// `private`, and takes no arguments (reads `searchResults` directly, the full current list —
+    /// not just whatever page was just fetched) — `ContentViewModel`'s own `$wallpapers`
+    /// subscription calls this on every library change, not just this file's own `search()`/
+    /// `loadMoreSearchResults()`. Never touches `.downloading`/`.importing`/`.queuedForReview`/
+    /// `.failed` — those only ever come from an in-flight or just-finished download this session,
+    /// never from the index.
+    func markAlreadyDownloaded() {
+        let index = SteamWorkshopService.existingLibraryIndex(wallpapers: AppDelegate.shared.contentViewModel.wallpapers)
+        for result in searchResults {
+            let matches = index.sourceIds.contains(result.id) || index.titles.contains(result.title.lowercased())
+            if matches {
+                if cardDownloadState[result.id] == nil { cardDownloadState[result.id] = .alreadyInLibrary }
+            } else if cardDownloadState[result.id] == .alreadyInLibrary {
+                cardDownloadState[result.id] = nil
+            }
+        }
+    }
 
     /// One-click "download, then hand to the review queue" for a browse-view grid card — the full-
     /// tab equivalent of the popup's fetchPreview-then-Download two-step, collapsed into one

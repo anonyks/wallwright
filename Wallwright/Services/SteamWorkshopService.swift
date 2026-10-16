@@ -325,6 +325,42 @@ enum SteamWorkshopService {
         return results
     }
 
+    /// Index of what's already in the local library, used to detect "you already have this" before
+    /// re-downloading from Steam Workshop — same shape as `MotionBgsService.ExistingLibraryIndex`
+    /// and every other direct source's own copy of it (see that one's doc comment for the full
+    /// reasoning). This one was missing entirely until now (confirmed live 2026-10-16): every other
+    /// browse source already marks its grid cards "Added" for a duplicate, but Steam's own grid
+    /// never did, so a previously-downloaded item just silently showed "Download" again.
+    struct ExistingLibraryIndex {
+        /// Source item IDs recorded via `sourceProvider`/`sourceId` — the precise match. Steam's own
+        /// IDs are already strings (unlike MotionBgs/UhdPaper/etc.'s numeric ones), so no `Int(...)`
+        /// conversion is needed here.
+        let sourceIds: Set<String>
+        /// Lowercased titles of wallpapers with no `sourceId` at all — a fallback match for items
+        /// downloaded before source-ID tracking existed. Only populated from untracked items
+        /// specifically, same false-positive reasoning as every other source's identical field.
+        let titles: Set<String>
+    }
+
+    /// Builds both matching signals from the already-in-memory library
+    /// (`ContentViewModel.wallpapers`), same as every other source's own `existingLibraryIndex` —
+    /// no disk re-scan, this data is already decoded and held in RAM.
+    static func existingLibraryIndex(wallpapers: [WEWallpaper]) -> ExistingLibraryIndex {
+        var sourceIds = Set<String>()
+        var titles = Set<String>()
+        for wallpaper in wallpapers {
+            let project = wallpaper.project
+            if project.sourceId == nil {
+                titles.insert(project.title.lowercased())
+            }
+
+            if project.sourceProvider == "steamworkshop", let sourceId = project.sourceId {
+                sourceIds.insert(sourceId)
+            }
+        }
+        return ExistingLibraryIndex(sourceIds: sourceIds, titles: titles)
+    }
+
     /// The browse page's own `<img>` thumbnails force `letterbox=true` at a fixed 322×322 square —
     /// every non-square source image gets padded with visible black bars to fill that square,
     /// confirmed live (2026-10-05) by comparing both against a handful of real results. The exact
@@ -385,14 +421,53 @@ enum SteamWorkshopService {
         }
     }
 
+    /// Serializes every `steamcmd` invocation this app makes — the browse grid's cards each have
+    /// their own independent Download button with no shared "is a download already running" check
+    /// (`SteamWorkshopImportViewModel.cardDownloadState` only guards re-clicking the SAME card), so
+    /// clicking Download on two different cards back to back used to launch two `steamcmd`
+    /// processes concurrently against the same cached login. steamcmd doesn't handle that cleanly —
+    /// confirmed live (2026-10-16): a second concurrent invocation reliably fails the
+    /// `workshop_download_item` step rather than queueing or running alongside the first, surfacing
+    /// as `.downloadFailed` with no "Downloaded item ... to ..." marker ever printed. A plain
+    /// `actor` alone wouldn't fix this — actors are reentrant, so a second `await` into one while
+    /// the first call is suspended (which this is, for the whole multi-minute subprocess run) is
+    /// still allowed to proceed concurrently. This uses an explicit continuation queue instead: only
+    /// one caller ever holds the "running" slot at a time, everyone else genuinely waits.
+    private actor DownloadQueue {
+        private var isRunning = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        func acquire() async {
+            if !isRunning {
+                isRunning = true
+                return
+            }
+            await withCheckedContinuation { waiters.append($0) }
+        }
+
+        func release() {
+            if waiters.isEmpty {
+                isRunning = false
+            } else {
+                waiters.removeFirst().resume()
+            }
+        }
+    }
+    private static let downloadQueue = DownloadQueue()
+
     /// Downloads `itemId` and returns its content folder plus the already-parsed `project.json` —
     /// callers hand that straight to `PackageImporter` for the title/tags review step. `onProgress`
     /// is called with each non-empty line steamcmd prints, as it prints it — actual wall-clock time
     /// varies wildly run to run (confirmed live: 7s one attempt, 2m11s the next, same account/item —
     /// Steam's own connection speed, not anything controllable here), so surfacing real status
     /// instead of a static spinner is the only thing that actually helps a slow run not look stuck.
+    /// Queued behind `downloadQueue` — see its own doc comment for why concurrent calls can't just
+    /// run side by side.
     static func download(itemId: String, username: String, onProgress: @escaping (String) -> Void = { _ in }) async throws -> SteamWorkshopResult {
         guard let steamcmd = steamcmdPath else { throw SteamWorkshopError.notInstalled }
+
+        await downloadQueue.acquire()
+        defer { Task { await downloadQueue.release() } }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: steamcmd)
