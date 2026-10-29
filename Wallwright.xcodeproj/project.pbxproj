@@ -82,6 +82,15 @@
 		EE0000000000000000000013 /* Hotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000014 /* Hotkey.swift */; };
 		EE0000000000000000000015 /* ReservedShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000016 /* ReservedShortcuts.swift */; };
 		EE0000000000000000000017 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000018 /* GlobalHotkeyManager.swift */; };
+		AE000000000000000000000B /* LockScreenExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000007 /* LockScreenExchange.swift */; };
+		AE000000000000000000000A /* LockScreenExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000007 /* LockScreenExchange.swift */; };
+		AE0000000000000000000008 /* WallpaperPrivateRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000005 /* WallpaperPrivateRuntime.swift */; };
+		AE0000000000000000000009 /* LockScreenExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000006 /* LockScreenExtension.swift */; };
+		AE000000000000000000000C /* WallwrightLockScreenExtension.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000001 /* WallwrightLockScreenExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AE0000000000000000000019 /* LockScreenSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000000000000000000018 /* LockScreenSurface.swift */; };
+		AE000000000000000000001B /* LockScreenExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE000000000000000000001A /* LockScreenExtensionBridge.swift */; };
+		AE000000000000000000001C /* LockScreenSettingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE000000000000000000001D /* LockScreenSettingsProvider.swift */; };
+		AE000000000000000000001E /* preview.jpg in Resources */ = {isa = PBXBuildFile; fileRef = AE000000000000000000001F /* preview.jpg */; };
 		EE0000000000000000000019 /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001A /* HotkeyRecorderView.swift */; };
 		EE000000000000000000001B /* HotkeysPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001C /* HotkeysPage.swift */; };
 		EE000000000000000000001D /* ClockColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001E /* ClockColorPicker.swift */; };
@@ -157,7 +166,28 @@
 			remoteGlobalIDString = 5EC47E752A2DB2E600120CCC;
 			remoteInfo = Wallwright;
 		};
+		AE0000000000000000000012 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5EC47E6E2A2DB2E600120CCC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AE0000000000000000000014;
+			remoteInfo = WallwrightLockScreenExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AE0000000000000000000011 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				AE000000000000000000000C /* WallwrightLockScreenExtension.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2F2E51FBB128F2B70D417CFA /* WallwrightTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WallwrightTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -234,6 +264,17 @@
 		EB8129CDE80344A780DCAA61 /* ExistingLibraryIndexTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExistingLibraryIndexTests.swift; sourceTree = "<group>"; };
 		58E62FCAF3FE4D749DC142E7 /* VideoTranscoderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoTranscoderTests.swift; sourceTree = "<group>"; };
 		EE0000000000000000000002 /* AerialsInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialsInjector.swift; sourceTree = "<group>"; };
+		AE0000000000000000000001 /* WallwrightLockScreenExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = WallwrightLockScreenExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE0000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AE0000000000000000000003 /* LockScreenExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockScreenExtension.entitlements; sourceTree = "<group>"; };
+		AE0000000000000000000004 /* LockScreenExtensionBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LockScreenExtensionBridge.h; sourceTree = "<group>"; };
+		AE0000000000000000000005 /* WallpaperPrivateRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperPrivateRuntime.swift; sourceTree = "<group>"; };
+		AE0000000000000000000006 /* LockScreenExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenExtension.swift; sourceTree = "<group>"; };
+		AE0000000000000000000007 /* LockScreenExchange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenExchange.swift; sourceTree = "<group>"; };
+		AE0000000000000000000018 /* LockScreenSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSurface.swift; sourceTree = "<group>"; };
+		AE000000000000000000001A /* LockScreenExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenExtensionBridge.swift; sourceTree = "<group>"; };
+		AE000000000000000000001D /* LockScreenSettingsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSettingsProvider.swift; sourceTree = "<group>"; };
+		AE000000000000000000001F /* preview.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = Resources/preview.jpg; sourceTree = "<group>"; };
 		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
 		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
 		EE0000000000000000000008 /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
@@ -316,6 +357,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AE000000000000000000000F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		38914C9CD86C94D960046E2C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -450,6 +498,8 @@
 				CC0000000000000000000018 /* SystemUsageMonitor.swift */,
 				EE0000000000000000000002 /* AerialsInjector.swift */,
 				EE0000000000000000000004 /* LockScreenSync.swift */,
+				AE0000000000000000000007 /* LockScreenExchange.swift */,
+				AE000000000000000000001A /* LockScreenExtensionBridge.swift */,
 				EE0000000000000000000006 /* CommandListener.swift */,
 				EE0000000000000000000008 /* BatteryMonitor.swift */,
 				EE0000000000000000000090 /* PowerConditionMonitor.swift */,
@@ -526,6 +576,7 @@
 				5EF4C24C2A4C98FA009831E5 /* README.md */,
 				5EEE8D5D2A7501C800DCE41A /* resources */,
 				5EC47E782A2DB2E600120CCC /* Wallwright */,
+				AE000000000000000000000D /* WallwrightLockScreenExtension */,
 				5EC47E772A2DB2E600120CCC /* Products */,
 				AA1B2C3D4E5F600100ABCD05 /* SpriteKit.framework */,
 				F864E5A94E91E7521A771767 /* Frameworks */,
@@ -538,8 +589,24 @@
 			children = (
 				5EC47E762A2DB2E600120CCC /* Wallwright.app */,
 				2F2E51FBB128F2B70D417CFA /* WallwrightTests.xctest */,
+				AE0000000000000000000001 /* WallwrightLockScreenExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AE000000000000000000000D /* WallwrightLockScreenExtension */ = {
+			isa = PBXGroup;
+			children = (
+				AE0000000000000000000006 /* LockScreenExtension.swift */,
+				AE0000000000000000000005 /* WallpaperPrivateRuntime.swift */,
+				AE0000000000000000000018 /* LockScreenSurface.swift */,
+				AE000000000000000000001D /* LockScreenSettingsProvider.swift */,
+				AE000000000000000000001F /* preview.jpg */,
+				AE0000000000000000000004 /* LockScreenExtensionBridge.h */,
+				AE0000000000000000000002 /* Info.plist */,
+				AE0000000000000000000003 /* LockScreenExtension.entitlements */,
+			);
+			path = WallwrightLockScreenExtension;
 			sourceTree = "<group>";
 		};
 		5EC47E782A2DB2E600120CCC /* Wallwright */ = {
@@ -675,15 +742,34 @@
 				5EC47E722A2DB2E600120CCC /* Sources */,
 				5EC47E732A2DB2E600120CCC /* Frameworks */,
 				5EC47E742A2DB2E600120CCC /* Resources */,
+				AE0000000000000000000011 /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AE0000000000000000000013 /* PBXTargetDependency */,
 			);
 			name = Wallwright;
 			productName = Wallwright;
 			productReference = 5EC47E762A2DB2E600120CCC /* Wallwright.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AE0000000000000000000014 /* WallwrightLockScreenExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE0000000000000000000017 /* Build configuration list for PBXNativeTarget "WallwrightLockScreenExtension" */;
+			buildPhases = (
+				AE000000000000000000000E /* Sources */,
+				AE000000000000000000000F /* Frameworks */,
+				AE0000000000000000000010 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WallwrightLockScreenExtension;
+			productName = WallwrightLockScreenExtension;
+			productReference = AE0000000000000000000001 /* WallwrightLockScreenExtension.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -697,6 +783,9 @@
 				TargetAttributes = {
 					5EC47E752A2DB2E600120CCC = {
 						CreatedOnToolsVersion = 14.3.1;
+					};
+					AE0000000000000000000014 = {
+						CreatedOnToolsVersion = 16.0;
 					};
 				};
 			};
@@ -715,11 +804,20 @@
 			targets = (
 				5EC47E752A2DB2E600120CCC /* Wallwright */,
 				24370AAB22B074D31270E44C /* WallwrightTests */,
+				AE0000000000000000000014 /* WallwrightLockScreenExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AE0000000000000000000010 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE000000000000000000001E /* preview.jpg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		105C9A918B5C36817A2316C4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -747,6 +845,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE000000000000000000000B /* LockScreenExchange.swift in Sources */,
+				AE000000000000000000001B /* LockScreenExtensionBridge.swift in Sources */,
 				5E8C82032A9E15D0009E291B /* ExplorerItemMenu.swift in Sources */,
 				EE000000000000000000003D /* EditWallpaperSheet.swift in Sources */,
 				EE0000000000000000000053 /* VideoFrameScrubberView.swift in Sources */,
@@ -889,6 +989,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE000000000000000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE0000000000000000000008 /* WallpaperPrivateRuntime.swift in Sources */,
+				AE0000000000000000000009 /* LockScreenExtension.swift in Sources */,
+				AE0000000000000000000019 /* LockScreenSurface.swift in Sources */,
+				AE000000000000000000001C /* LockScreenSettingsProvider.swift in Sources */,
+				AE000000000000000000000A /* LockScreenExchange.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -897,6 +1009,12 @@
 			name = Wallwright;
 			target = 5EC47E752A2DB2E600120CCC /* Wallwright */;
 			targetProxy = 2CAC903C568AF452E3BACAA8 /* PBXContainerItemProxy */;
+		};
+		AE0000000000000000000013 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = WallwrightLockScreenExtension;
+			target = AE0000000000000000000014 /* WallwrightLockScreenExtension */;
+			targetProxy = AE0000000000000000000012 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1140,6 +1258,60 @@
 			};
 			name = Debug;
 		};
+		AE0000000000000000000015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WallwrightLockScreenExtension/LockScreenExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9W6YX8M37;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WallwrightLockScreenExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Wallwright Lock Screen";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wallwright.Wallwright.LockScreenExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = WallwrightLockScreenExtension/LockScreenExtensionBridge.h;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AE0000000000000000000016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WallwrightLockScreenExtension/LockScreenExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9W6YX8M37;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WallwrightLockScreenExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Wallwright Lock Screen";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wallwright.Wallwright.LockScreenExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = WallwrightLockScreenExtension/LockScreenExtensionBridge.h;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1166,6 +1338,15 @@
 			buildConfigurations = (
 				5EC47EA12A2DB2E700120CCC /* Debug */,
 				5EC47EA22A2DB2E700120CCC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AE0000000000000000000017 /* Build configuration list for PBXNativeTarget "WallwrightLockScreenExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE0000000000000000000015 /* Debug */,
+				AE0000000000000000000016 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

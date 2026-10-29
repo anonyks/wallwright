@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Narrow, home-relative read-write exception — just the one directory the main
+	     app (unsandboxed) publishes the current wallpaper's exchange data into, not
+	     the user's whole wallpaper library. Matches the private sandbox-exception key
+	     confirmed in reference/WallpaperMachine/Extension/WallpaperExtension.entitlements,
+	     the only mechanism found that lets a sandboxed wallpaper extension read a
+	     directory outside its own container. Upgraded from read-only (2026-10-28): this
+	     extension's own NSLog output never once appeared in Console captures across many
+	     live tests despite confirmed-successful XPC calls, so `WallpaperPrivateRuntime.log`'s
+	     own extension.log file write — previously a silent no-op under read-only — is the
+	     actual diagnostic path now. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array>
+		<string>/Library/Application Support/com.wallwright.Wallwright/LockScreenExchange/</string>
+	</array>
+</dict>
+</plist>

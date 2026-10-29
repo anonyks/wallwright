@@ -106,7 +106,14 @@ final class LockScreenSync {
 
     @objc private func screensaverDidDeactivate() {
         WWLog.playback.notice("GROUND TRUTH: com.apple.screensaver.didStop received")
-        AerialsInjector.shared.prewarmForNextActivation()
+        // No longer also calls `AerialsInjector.shared.prewarmForNextActivation()` — confirmed
+        // live (2026-10-29) that the two mechanisms racing to restart WallpaperAgent over the same
+        // Store/Index.plist slots was the actual cause of the lock screen looking stuck/static, not
+        // a delivery failure. `republishCurrent()` self-debounces (skips the restart when already
+        // correctly selected), so no delay is needed now that nothing competes with it here.
+        DispatchQueue.global(qos: .utility).async {
+            LockScreenExtensionBridge.shared.republishCurrent()
+        }
     }
 
     @objc private func powerSourceDidChange() {
@@ -150,11 +157,18 @@ final class LockScreenSync {
         NotificationCenter.default.post(name: Self.screenDidUnlockNotification, object: nil)
         releaseAssertion()
 
-        // Pre-warm for the *next* activation right here, while back on the normal desktop, rather
-        // than at the moment of the next lock/screensaver — a WallpaperAgent restart takes real
-        // time, and doing it exactly when the screen is trying to show the aerial produces a
-        // visible black gap before the video appears. Doing it now instead means the restart is
-        // already settled by the time anything needs to actually display it.
-        AerialsInjector.shared.prewarmForNextActivation()
+        // Re-assert our selection right here, while back on the normal desktop, rather than at the
+        // moment of the next lock/screensaver — a WallpaperAgent restart takes real time, and doing
+        // it exactly when the screen is trying to show the wallpaper produces a visible black gap
+        // before the video appears. Doing it now instead means it's already settled by the time
+        // anything needs to actually display it. No longer also calls
+        // `AerialsInjector.shared.prewarmForNextActivation()` — confirmed live (2026-10-29) that
+        // the two mechanisms racing to restart WallpaperAgent over the same Store/Index.plist slots
+        // was the actual cause of the lock screen looking stuck/static, not a delivery failure.
+        // `republishCurrent()` self-debounces (skips the restart when already correctly selected),
+        // so no delay is needed now that nothing competes with it here.
+        DispatchQueue.global(qos: .utility).async {
+            LockScreenExtensionBridge.shared.republishCurrent()
+        }
     }
 }

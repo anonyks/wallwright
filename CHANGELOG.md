@@ -6,6 +6,12 @@ All notable changes to Wallwright are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- Video wallpapers now play live on the lock screen and screen saver through a real macOS
+  ExtensionKit wallpaper provider, not just the desktop. The old aerials catalog hack
+  (`AerialsInjector`) stays in place as an automatic fallback for everything else it already
+  does, and the new provider force-selects itself on top of it. Decoding pauses automatically
+  whenever the screen is unlocked, so there's no background CPU cost outside the moments the
+  video is actually visible.
 - Steam Workshop import can now search by keyword, not just paste a link/ID. The Steam icon's own
   popup gained a Link/Search toggle for a quick one-off paste-and-go (with its own freely-
   changeable Video/Scene/All Type picker); "WEVideo" (Video Sources popover) and "WEScene" (Image
@@ -69,6 +75,9 @@ All notable changes to Wallwright are documented here. Format follows
   macOS ordering.
 
 ### Fixed
+- DesktopHut browse tab returning zero results: the site reverted its thumbnail URL scheme back
+  to its original `/images/...` path, which silently dropped every parsed item. Now matches both
+  that path and the newer `/img/{WxH}/...` one it had switched to.
 - Path traversal and other unsafe destination handling across all importers (video, image, package, YouTube).
 - Multi-monitor sync bugs and reduced memory/CPU overhead.
 - Duplicate-import and duplicate-download races; hardened window dragging; cut library-tab remount cost.

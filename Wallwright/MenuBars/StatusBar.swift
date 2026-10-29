@@ -106,7 +106,15 @@ extension AppDelegate {
     /// `WallpaperAgent`, the same recovery the 5-minute automatic health check already does, just
     /// available on demand instead of waiting.
     @objc func refreshVideoWallpaper() {
-        AerialsInjector.shared.prewarmForNextActivation()
+        // No longer also calls `AerialsInjector.shared.prewarmForNextActivation()` (confirmed live
+        // 2026-10-29: the two fighting over the same Store/Index.plist slots, each restarting
+        // WallpaperAgent, was the actual cause of the lock screen looking "stuck"/static — not a
+        // delivery failure, just never-ending churn). `republishCurrent()` now self-debounces
+        // (skips the restart entirely when already correctly selected), so this is cheap to call
+        // directly with no delay.
+        DispatchQueue.global(qos: .utility).async {
+            LockScreenExtensionBridge.shared.republishCurrent()
+        }
     }
 
     @objc func openDisplaySettingsFromMenu() {

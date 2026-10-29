@@ -572,6 +572,10 @@ final class AerialsInjector {
                     "preferredOrder": 0,
                     "previewImage": thumbFileURL,
                     "representativeAssetID": assetID,
+                    // Present on every one of Apple's own subcategories, missing from ours until
+                    // now — same diff-against-a-real-entry discovery as the asset-level `variant`/
+                    // `videoGravity` fields above.
+                    "combineVariants": true,
                 ]
             ],
         ]
@@ -601,6 +605,19 @@ final class AerialsInjector {
             "url-4K-SDR-240FPS": videoFileURL,
             "previewImage": thumbFileURL,
             "pointsOfInterest": ["0": "\(shotID)_0"],
+            // Both missing entirely until now (confirmed live 2026-10-28, diffed byte-for-byte
+            // against one of Apple's own real dynamic-aerials entries in this same file) — every
+            // one of Apple's own asset entries has both. `updateWallpaperStore` below selects this
+            // asset directly by its UUID, not by matching `variant`, so the actual values don't need
+            // to track the real system appearance/orientation. Worth keeping for schema fidelity —
+            // matching Apple's own format removes one more way this could silently go stale on a
+            // future OS update — but confirmed live this alone does NOT fix a real
+            // `WallpaperAerialsExtensionError` seen on macOS 26B123: that one traces to
+            // `mediaanalysisd` itself ("[VCPMADMLEnhancementTask] No model registered for target"),
+            // an on-device ML model the OS hasn't finished provisioning, outside anything this file
+            // (or any app) can fix directly.
+            "variant": ["appearance": "light", "orientation": "landscape"],
+            "videoGravity": "resize",
         ]
 
         assets.removeAll { asset in

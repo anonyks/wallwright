@@ -215,6 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 // that restart.
                 let videoURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
                 AerialsInjector.shared.inject(videoURL: videoURL, name: wallpaper.project.title)
+                LockScreenExtensionBridge.shared.publish(wallpaper: wallpaper)
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
             }
         }
@@ -289,6 +290,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // `AerialsInjector`'s other call sites): this needs to fully finish before the process
         // actually exits, which an async dispatch can't guarantee.
         AerialsInjector.shared.remove()
+        LockScreenExtensionBridge.shared.remove()
 
         if let wallpaper = UserDefaults.standard.url(forKey: "OSWallpaper") {
             for screen in NSScreen.screens {

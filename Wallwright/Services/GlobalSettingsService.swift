@@ -953,6 +953,7 @@ class GlobalSettingsViewModel: ObservableObject {
             DispatchQueue.global(qos: .utility).async {
                 let videoURL = newValue.wallpaperDirectory.appending(path: newValue.project.file)
                 AerialsInjector.shared.inject(videoURL: videoURL, name: newValue.project.title)
+                LockScreenExtensionBridge.shared.publish(wallpaper: newValue)
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
             }
         } else {
@@ -978,6 +979,7 @@ class GlobalSettingsViewModel: ObservableObject {
             // we write the desktop image, so that write is always the last thing that happens.
             DispatchQueue.global(qos: .utility).async {
                 AerialsInjector.shared.remove()
+                LockScreenExtensionBridge.shared.remove()
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
             }
         }

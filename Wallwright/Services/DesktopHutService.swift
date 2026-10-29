@@ -155,8 +155,16 @@ final class DesktopHutService {
         // `class="wallpaper-card"` with nothing else inside the quotes and only `/images/*.webp`,
         // so every single card silently failed to parse on every category, not just Anime.
         // Confirmed live (2026-10-03) against the real HTML for both Trending and a category page.
+        //
+        // Confirmed live again (2026-10-29): the site flip-flopped back — thumbnails are once more
+        // served from plain `/images/*.webp`, not `/img/{WxH}/*`, breaking every card's image match
+        // (and therefore dropping every single item, since `parseItems` requires one) the same way
+        // the original `/images/`-only pattern broke when the site first moved to `/img/{WxH}/`.
+        // Matching both path shapes this time, so another reversal doesn't need a third fix.
         guard let anchorRegex = try? NSRegularExpression(pattern: #"<a href="(/[a-z0-9-]+)" class="wallpaper-card"#),
-              let imgRegex = try? NSRegularExpression(pattern: #"<img src="(https://www\.desktophut\.com/img/[^"]+\.(?:webp|jpe?g|png))""#),
+              let imgRegex = try? NSRegularExpression(
+                  pattern: #"<img src="(https://www\.desktophut\.com/(?:img/[^/"]+/|images/)[^"]+\.(?:webp|jpe?g|png))""#
+              ),
               let titleRegex = try? NSRegularExpression(pattern: #"card-title">([^<]+)<"#),
               let previewRegex = try? NSRegularExpression(pattern: #"card-preview-video[^>]*data-src="(https://www\.desktophut\.com/previews/[^"]+\.mp4)""#)
         else { return [] }
