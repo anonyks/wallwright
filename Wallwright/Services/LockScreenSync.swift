@@ -55,6 +55,19 @@ final class LockScreenSync {
     private static let assertionTimeout: TimeInterval = 2 * 60
     private var assertionExpiryTimer: Timer?
 
+    /// Re-asserts `LockScreenExtensionBridge`'s selection every couple of minutes for as long as
+    /// the screen stays locked. Exists because `republishCurrent()` was previously only called
+    /// reactively (on unlock/screensaver-stop) — fine for a short lock, but confirmed live
+    /// (2026-10-29) that a long lock session (~26 minutes) came back with the screensaver reverted
+    /// to Apple's default, with the Store/screensaver-module selection both back to correct
+    /// moments after unlock. The likely cause: `AerialsInjector`'s own private 5-minute
+    /// health-check timer keeps running on the main app process (unaffected by screen lock state)
+    /// and can re-assert its own screensaver-module override mid-session, with nothing correcting
+    /// it again until the next unlock. `republishCurrent()` already self-debounces (a no-op restart
+    /// when already correctly selected), so polling this often is cheap.
+    private static let selfHealInterval: TimeInterval = 2 * 60
+    private var selfHealTimer: Timer?
+
     private init() {}
 
     func start() {
@@ -141,6 +154,15 @@ final class LockScreenSync {
         assertionExpiryTimer = Timer.scheduledTimer(withTimeInterval: Self.assertionTimeout, repeats: false) { [weak self] _ in
             self?.releaseAssertion()
         }
+
+        selfHealTimer?.invalidate()
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.selfHealInterval, repeats: true) { _ in
+            DispatchQueue.global(qos: .utility).async {
+                LockScreenExtensionBridge.shared.republishCurrent()
+            }
+        }
+        timer.tolerance = 15
+        selfHealTimer = timer
     }
 
     private func releaseAssertion() {
@@ -156,6 +178,8 @@ final class LockScreenSync {
         WWLog.playback.notice("GROUND TRUTH: screenIsUnlocked received")
         NotificationCenter.default.post(name: Self.screenDidUnlockNotification, object: nil)
         releaseAssertion()
+        selfHealTimer?.invalidate()
+        selfHealTimer = nil
 
         // Re-assert our selection right here, while back on the normal desktop, rather than at the
         // moment of the next lock/screensaver — a WallpaperAgent restart takes real time, and doing

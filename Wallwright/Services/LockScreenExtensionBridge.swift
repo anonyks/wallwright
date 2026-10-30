@@ -27,6 +27,9 @@ final class LockScreenExtensionBridge {
     static let shared = LockScreenExtensionBridge()
 
     private let providerID = "com.wallwright.Wallwright.LockScreenExtension"
+    /// Must match `LockScreenSettingsProvider`'s `WallpaperChoiceIdentity.descriptor.configuration`
+    /// (`Data("current".utf8)`) byte for byte — see `updateWallpaperStore()`'s own doc comment.
+    private let choiceConfiguration = Data("current".utf8)
     private let storePath = NSString(
         string: "~/Library/Application Support/com.apple.wallpaper/Store/Index.plist"
     ).expandingTildeInPath
@@ -156,13 +159,10 @@ final class LockScreenExtensionBridge {
         let fm = FileManager.default
         do {
             try fm.createDirectory(at: exchangeDir, withIntermediateDirectories: true)
-            let destImageURL = exchangeDir.appendingPathComponent(imageFileName)
-            if fm.fileExists(atPath: destImageURL.path) { try fm.removeItem(at: destImageURL) }
-            try fm.copyItem(at: imageURL, to: destImageURL)
-
-            let destVideoURL = exchangeDir.appendingPathComponent(videoFileName)
-            if fm.fileExists(atPath: destVideoURL.path) { try fm.removeItem(at: destVideoURL) }
-            if let videoURL { try fm.copyItem(at: videoURL, to: destVideoURL) }
+            try Self.atomicCopy(from: imageURL, to: exchangeDir.appendingPathComponent(imageFileName))
+            if let videoURL {
+                try Self.atomicCopy(from: videoURL, to: exchangeDir.appendingPathComponent(videoFileName))
+            }
         } catch {
             WWLog.aerial.error("LockScreenExtensionBridge: failed to copy lock-screen asset: \(error)")
             return
@@ -195,6 +195,26 @@ final class LockScreenExtensionBridge {
         configureScreensaverForWallwright()
         WWLog.aerial.notice("LockScreenExtensionBridge: published revision=\(config.revision), selecting extension")
         restartWallpaperAgent()
+    }
+
+    /// Copies `source` to `destination` atomically, tolerating a destination that already exists
+    /// (replaces it in one step) instead of a separate exists-check/remove/copy sequence. Confirmed
+    /// live (2026-10-29): that older sequence raced when more than one `publish()` call landed close
+    /// together (e.g. overlapping app launches during an install/relaunch cycle) — one call's
+    /// `removeItem` and another's `copyItem` could interleave, leaving the second `copyItem` failing
+    /// with "item with the same name already exists" even though the file had just been removed.
+    /// Copying to a temp file first and using `replaceItemAt` closes that window.
+    private static func atomicCopy(from source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        let tempURL = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
+        try fm.copyItem(at: source, to: tempURL)
+        defer { try? fm.removeItem(at: tempURL) }
+        if fm.fileExists(atPath: destination.path) {
+            _ = try fm.replaceItemAt(destination, withItemAt: tempURL)
+        } else {
+            try fm.moveItem(at: tempURL, to: destination)
+        }
     }
 
     /// `AerialsInjector.inject()` (still called first at the two real wallpaper-change call sites,
@@ -244,8 +264,21 @@ final class LockScreenExtensionBridge {
     /// it (it reads `configuration.json` from the shared exchange directory instead) — confirmed
     /// live (2026-10-28): omitting the key entirely makes WallpaperAgent's own plist decoder throw
     /// `DecodingError.keyNotFound` on the WHOLE Index.plist, which makes it silently fall back to
-    /// whatever was selected before rather than erroring loudly. An empty serialized dict
-    /// satisfies the decoder.
+    /// whatever was selected before rather than erroring loudly.
+    ///
+    /// The bytes themselves also matter, which an empty dict got wrong — confirmed live
+    /// (2026-10-29) via direct Store/Index.plist patching + log inspection across several real
+    /// auto-idle-triggered lock cycles: `WallpaperAgent`'s `assetManager` decides "is screen saver
+    /// supported for this choice" by matching this exact `(Provider, Configuration)` pair against
+    /// `LockScreenSettingsProvider`'s cached screenSaver view model, whose
+    /// `WallpaperChoiceIdentity.descriptor.configuration` is literally `Data("current".utf8)`. An
+    /// empty dict never matches that, so the match silently failed on every single lock — not just
+    /// the ones that happened to also hit a stale cache — and `WallpaperAgent` fell back to Apple's
+    /// own `com.apple.wallpaper.choice.aerials` as the actual screen-saver content every time,
+    /// which is what was showing up as "it reverts to the default wallpaper." Matching these bytes
+    /// exactly (`Self.choiceConfigurationBytes` below) is what fixed it; confirmed clean across a
+    /// genuinely untouched auto-idle lock (no `assetManager`/fallback log lines at all, vs. the
+    /// previous "Screen saver is not supported... falling back to system default" on every one).
     /// Cheap existing-state check `publish(imageURL:videoURL:)` uses to decide whether a restart
     /// is actually necessary — reads `SystemDefault` only (every slot this bridge writes is set to
     /// the same value in one call, so checking one is representative of all of them).
@@ -279,12 +312,9 @@ final class LockScreenExtensionBridge {
             store = [:]
         }
 
-        guard
-            let emptyConfig = try? PropertyListSerialization.data(
-                fromPropertyList: [String: Any](), format: .binary, options: 0
-            )
-        else { return false }
-        let choice: [String: Any] = ["Provider": providerID, "Files": [] as [Any], "Configuration": emptyConfig]
+        let choice: [String: Any] = [
+            "Provider": providerID, "Files": [] as [Any], "Configuration": choiceConfiguration,
+        ]
         let content: [String: Any] = ["Choices": [choice]]
         let linked: [String: Any] = ["Content": content, "LastSet": Date(), "LastUse": Date()]
         let entry: [String: Any] = ["Type": "linked", "Linked": linked]
