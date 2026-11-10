@@ -7,6 +7,7 @@ Video wallpapers on your desktop, lock screen, and screensaver, all in sync, all
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)](#build--run)
+[![CI](https://github.com/anonyks/wallwright/actions/workflows/ci.yml/badge.svg)](https://github.com/anonyks/wallwright/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/anonyks/wallwright)](https://github.com/anonyks/wallwright/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/anonyks/wallwright?style=flat&color=yellow)](https://github.com/anonyks/wallwright/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/anonyks/wallwright?style=flat)](https://github.com/anonyks/wallwright/fork)
@@ -15,10 +16,12 @@ Video wallpapers on your desktop, lock screen, and screensaver, all in sync, all
 
 ---
 
-Wallwright turns any video into a live desktop background, synced across your desktop, the
-lock screen, and the screensaver at once, not just one of the three. It ships with a full
-library manager, playlist rotation, a drag-anywhere clock overlay, and built-in browsers for
-several free wallpaper sites, so you never have to leave the app to find something new.
+Wallwright turns any video into a live wallpaper everywhere macOS shows one, not just the
+desktop: a real native `com.apple.wallpaper` extension keeps it decoding and playing behind the
+lock screen and screensaver too, not a frozen poster frame standing in for it. It ships with a
+full library manager, playlist rotation, Steam Workshop import, a drag-anywhere clock overlay, a
+Spotlight-style command palette, and built-in browsers for several free wallpaper sites, so you
+never have to leave the app to find something new.
 
 Written for people who wanted [Wallpaper Engine](https://www.wallpaperengine.io) on Steam
 but run macOS.
@@ -47,11 +50,15 @@ not just in the demo.
 
 ## Features
 
-- Video wallpapers synced across desktop, lock screen, and screensaver
+- Video wallpapers playing live on desktop, lock screen, and screensaver at once
 - Multi-display support with a per-screen wallpaper picker
-- Playlist rotation, pinning, and a recent-wallpapers menu
+- Playlist rotation, pinning (right-click, or float pinned wallpapers to the top), and a
+  recent-wallpapers menu
 - Drag-repositionable clock overlay with custom formats and gradients
-- Battery- and thermal-aware playback with configurable triggers
+- Auto-pause on thermal pressure, low battery, fullscreen apps, or the display asleep, each its
+  own configurable trigger
+- Spotlight-style command palette for every action, and a named-pipe interface for scripting
+  (`echo "next" > /tmp/wallwright-$(id -u).pipe`)
 - Menu bar controls for playback, volume, and system usage
 - Trim and crop editing, including auto-detection of black bars baked into a video
 - Tag, audio, and media-type filtering in the library grid
@@ -60,7 +67,8 @@ not just in the demo.
 
 - Folder, `.zip`, or a bare video file, via File > Import or drag-and-drop
 - Any site yt-dlp supports, by URL, not just YouTube
-- Steam Workshop, by item URL or ID
+- Steam Workshop, by item URL/ID or full keyword search with Genre/category filters, Safe Mode
+  on by default
 - Inbox: share a link from your phone over ntfy.sh, it shows up in-app ready to import
 - Manually, by placing wallpaper folders in `~/Library/Application Support/Wallwright/`
 
