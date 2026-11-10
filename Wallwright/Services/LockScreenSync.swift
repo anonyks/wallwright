@@ -55,17 +55,21 @@ final class LockScreenSync {
     private static let assertionTimeout: TimeInterval = 2 * 60
     private var assertionExpiryTimer: Timer?
 
-    /// Re-asserts `LockScreenExtensionBridge`'s selection every couple of minutes for as long as
-    /// the screen stays locked. Exists because `republishCurrent()` was previously only called
-    /// reactively (on unlock/screensaver-stop) — fine for a short lock, but confirmed live
-    /// (2026-10-29) that a long lock session (~26 minutes) came back with the screensaver reverted
-    /// to Apple's default, with the Store/screensaver-module selection both back to correct
-    /// moments after unlock. The likely cause: `AerialsInjector`'s own private 5-minute
-    /// health-check timer keeps running on the main app process (unaffected by screen lock state)
-    /// and can re-assert its own screensaver-module override mid-session, with nothing correcting
-    /// it again until the next unlock. `republishCurrent()` already self-debounces (a no-op restart
-    /// when already correctly selected), so polling this often is cheap.
-    private static let selfHealInterval: TimeInterval = 2 * 60
+    /// Re-asserts `LockScreenExtensionBridge`'s selection periodically for as long as the screen
+    /// stays locked, as a cheap safety net against drift from anything else that might touch
+    /// `Store/Index.plist` mid-session (e.g. `AerialsInjector`'s own health-check timer, unaffected
+    /// by screen lock state). `republishCurrent()` already self-debounces (a no-op restart when
+    /// already correctly selected), so this costs one small plist read per tick, not a restart.
+    ///
+    /// Originally 2 minutes, set while the real cause of the 2026-10-29 screensaver-reverting bug
+    /// (`LockScreenExtensionBridge`'s `Configuration` bytes not matching what `WallpaperAgent`
+    /// checked screen-saver support against — see that file's own doc comment) was still unknown,
+    /// to bound how long any drift could persist. With that root cause fixed and confirmed live,
+    /// this is now purely a cosmetic-drift safety net, the same category `AerialsInjector`'s own
+    /// health check already treats as fine at 5 minutes ("a few extra minutes before self-healing
+    /// is imperceptible") — matching that cadence instead of polling disk twice as often for no
+    /// benefit.
+    private static let selfHealInterval: TimeInterval = 5 * 60
     private var selfHealTimer: Timer?
 
     private init() {}

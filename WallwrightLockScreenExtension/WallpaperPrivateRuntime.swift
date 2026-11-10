@@ -216,21 +216,31 @@ enum WallpaperPrivateRuntime {
         return url
     }
 
+    /// Serial so lines land in the order `log()` was called, same as if the write were still
+    /// synchronous — only the blocking disk I/O moves off whichever thread called `log()` (often
+    /// `RunLoop.main`, e.g. from `acquire`/frame delivery).
+    private static let logQueue = DispatchQueue(label: "com.wallwright.LockScreenExtension.log")
+
     static func log(_ message: String) {
         NSLog("[Wallwright LockScreen] %@", message)
-        let file = exchange.appendingPathComponent("extension.log")
-        try? FileManager.default.createDirectory(at: exchange, withIntermediateDirectories: true)
-        if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 512 * 1024 {
-            try? FileManager.default.removeItem(at: file)
+        // Captured here, not inside the dispatched block, so the timestamp reflects when `log()`
+        // was actually called even if the queue is momentarily behind.
+        let line = "\(Date()) \(message)\n"
+        logQueue.async {
+            let file = exchange.appendingPathComponent("extension.log")
+            try? FileManager.default.createDirectory(at: exchange, withIntermediateDirectories: true)
+            if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 512 * 1024 {
+                try? FileManager.default.removeItem(at: file)
+            }
+            let data = Data(line.utf8)
+            if !FileManager.default.fileExists(atPath: file.path) {
+                try? data.write(to: file)
+                return
+            }
+            guard let handle = try? FileHandle(forWritingTo: file) else { return }
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
         }
-        let data = Data("\(Date()) \(message)\n".utf8)
-        if !FileManager.default.fileExists(atPath: file.path) {
-            try? data.write(to: file)
-            return
-        }
-        guard let handle = try? FileHandle(forWritingTo: file) else { return }
-        defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: data)
     }
 }

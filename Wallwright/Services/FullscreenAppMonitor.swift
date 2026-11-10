@@ -50,9 +50,14 @@ final class FullscreenAppMonitor {
 
     private func startSafetyNetTimer() {
         guard safetyNetTimer == nil else { return }
-        safetyNetTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             self?.recompute()
         }
+        // Lets launchd/powerd coalesce this tick with other system wakeups instead of waking the
+        // CPU for an uncoalesced one-off every 3s — the "bounded to a handful of seconds" contract
+        // above tolerates slipping by up to a second either way.
+        timer.tolerance = 1.0
+        safetyNetTimer = timer
     }
 
     private func stopSafetyNetTimer() {
