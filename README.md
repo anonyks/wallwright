@@ -10,11 +10,10 @@ Video wallpapers on your desktop, lock screen, and screensaver, all in sync, all
 [![CI](https://github.com/anonyks/wallwright/actions/workflows/ci.yml/badge.svg)](https://github.com/anonyks/wallwright/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/anonyks/wallwright)](https://github.com/anonyks/wallwright/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/anonyks/wallwright?style=flat&color=yellow)](https://github.com/anonyks/wallwright/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/anonyks/wallwright?style=flat)](https://github.com/anonyks/wallwright/fork)
 
 ![Wallwright: a video wallpaper playing live behind the library, with the clock overlay and per-wallpaper detail panel visible](docs/assets/wallwright-hero.gif)
 
-*[Watch the full demo in 1080p](docs/assets/wallwright-showcase-1080p.mp4)*
+*[Watch the full demo in 4K](docs/assets/wallwright-showcase-4k.mp4)*
 
 </div>
 
