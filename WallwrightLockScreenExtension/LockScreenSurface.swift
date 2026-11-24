@@ -85,7 +85,11 @@ final class LockScreenSurface {
 
         let videoURL = try WallpaperPrivateRuntime.asset(relativeVideoName)
         WallpaperPrivateRuntime.log("applyVideo: starting for \(relativeVideoName) at \(videoURL.path)")
-        let item = AVPlayerItem(url: videoURL)
+        let item = Self.videoOnlyItem(url: videoURL)
+        // Same cap `VideoWallpaperViewModel` already applies to the desktop player — without it,
+        // AVFoundation falls back to its network-streaming heuristic and buffers several seconds
+        // of decoded frames ahead, which is pure wasted RAM for a local file nobody is pre-seeking.
+        item.preferredForwardBufferDuration = 1.0
         let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferIOSurfacePropertiesKey as String: [:],
@@ -96,6 +100,18 @@ final class LockScreenSurface {
         let player = AVPlayer(playerItem: item)
         player.isMuted = true
         player.actionAtItemEnd = .none
+        // Local file playback shouldn't wait to buffer ahead before starting — same reasoning
+        // `VideoWallpaperViewModel` already applies to the desktop player (see its own doc
+        // comment): waiting is what produces a one-frame black flash at a loop boundary.
+        player.automaticallyWaitsToMinimizeStalling = false
+        // Defaults to true on macOS, which independently asserts "don't let the display sleep"
+        // for as long as this player is actively playing — completely separate from, and able to
+        // silently override, `LockScreenSync`'s own deliberately bounded 2-minute assertion (see
+        // that file's own header comment on the 2h32m incident this exact mechanism caused once
+        // already, there via `IOPMAssertionCreateWithName` instead of this property). Left at the
+        // default here, a looping muted video would keep reasserting it for as long as the screen
+        // stayed locked, defeating that bound through a different path than the one already fixed.
+        player.preventsDisplaySleepDuringVideoPlayback = false
         self.player = player
 
         loopObserver = NotificationCenter.default.addObserver(
@@ -162,6 +178,37 @@ final class LockScreenSurface {
         CATransaction.setDisableActions(true)
         root.contents = surface
         CATransaction.commit()
+    }
+
+    /// Strips any audio track before handing the item to `AVPlayer`, same pattern (and same
+    /// synchronous, deprecated-but-fine `tracks(withMediaType:)` API) as
+    /// `VideoWallpaperViewModel.videoOnlyItem(asset:)` — `player.isMuted = true` above silences
+    /// output, not decode, so a wallpaper with an audio track would otherwise still spin up a
+    /// CoreAudio/AudioToolbox decode pipeline here for sound nobody can hear behind the lock
+    /// screen. Falls back to the plain URL item on any failure, never fails the whole surface over
+    /// a missing optimization.
+    private static func videoOnlyItem(url: URL) -> AVPlayerItem {
+        let asset = AVURLAsset(url: url)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first,
+            !asset.tracks(withMediaType: .audio).isEmpty
+        else {
+            return AVPlayerItem(url: url)
+        }
+        let composition = AVMutableComposition()
+        guard
+            let compositionTrack = composition.addMutableTrack(
+                withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else {
+            return AVPlayerItem(url: url)
+        }
+        do {
+            try compositionTrack.insertTimeRange(
+                CMTimeRange(start: .zero, duration: asset.duration), of: videoTrack, at: .zero)
+        } catch {
+            return AVPlayerItem(url: url)
+        }
+        compositionTrack.preferredTransform = videoTrack.preferredTransform
+        return AVPlayerItem(asset: composition)
     }
 
     /// Point-in-time lock-state check, used only at `applyVideo`'s own startup decision — ongoing

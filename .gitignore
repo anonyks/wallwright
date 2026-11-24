@@ -57,3 +57,6 @@ references/dmgs/
 ## a flat structure — separate from the "references/*/repo/" convention above). Disposable,
 ## easily re-cloned, not project source.
 reference/
+
+## Personal/local planning doc, not meant to be published in the repo.
+docs/ROADMAP.md
