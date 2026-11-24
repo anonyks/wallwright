@@ -25,8 +25,10 @@ struct VideoWallpaperView: NSViewRepresentable {
 
         view.player = viewModel.player
 
-        // make the video boundary extends to fit the full screen without black background border
-        view.videoGravity = .resizeAspectFill
+        // Read once, here, not threaded through `updateNSView` — changing this setting triggers a
+        // full `rebuildWallpaperWindows()` instead (see `GlobalSettingsViewModel`'s own
+        // `didChangeVideoFitCancellable`), which recreates this view fresh with the new value.
+        view.videoGravity = AppDelegate.shared.globalSettingsViewModel.settings.videoFit.videoGravity
 
         // Backstop matching StaticImageWallpaperView's own layer background — without this, anything
         // not covered by the player layer (a frame swap, the brief gap before the first frame decodes)

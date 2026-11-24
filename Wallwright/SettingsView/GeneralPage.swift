@@ -29,6 +29,19 @@ struct GeneralPage: SettingsPage {
             } header: {
                 Label("macOS", systemImage: "apple.logo")
             }
+            // MARK: Wallpaper Display
+            Section {
+                Picker("Video Fit", selection: $viewModel.settings.videoFit) {
+                    Text("Fill").tag(GSVideoFit.fill)
+                    Text("Fit").tag(GSVideoFit.fit)
+                    Text("Stretch").tag(GSVideoFit.stretch)
+                }
+                .help("Fill crops the video to cover the whole screen with no borders. Fit shows the entire video with black bars if its aspect ratio doesn't match your display. Stretch fills the screen without cropping, distorting the video if the aspect ratios differ.")
+            } header: {
+                Label("Wallpaper Display", systemImage: "rectangle.on.rectangle")
+            } footer: {
+                Text("Changing this briefly reloads every wallpaper.")
+            }
             // MARK: Steam Workshop
             Section {
                 Toggle("Safe Mode", isOn: $viewModel.settings.steamWorkshopSafeMode)

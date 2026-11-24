@@ -5,6 +5,7 @@
 //  Created by Haren on 2023/9/2.
 //
 
+import AVFoundation
 import Cocoa
 import Combine
 import SwiftUI
@@ -15,6 +16,31 @@ import os
 enum GSPlayback: String, CaseIterable, Identifiable, Codable {
     var id: Self { self }
     case keepRunning, mute, pause, stop
+}
+
+/// Maps directly to `AVLayerVideoGravity` at the one call site that reads it
+/// (`VideoWallpaperView.makeNSView`) — kept as this app's own enum rather than storing
+/// `AVLayerVideoGravity`'s raw string directly so a future macOS SDK change to that type's cases
+/// can't silently corrupt a saved settings file.
+enum GSVideoFit: String, CaseIterable, Identifiable, Codable {
+    var id: Self { self }
+    case fill, fit, stretch
+
+    var label: String {
+        switch self {
+        case .fill: return "Fill"
+        case .fit: return "Fit"
+        case .stretch: return "Stretch"
+        }
+    }
+
+    var videoGravity: AVLayerVideoGravity {
+        switch self {
+        case .fill: return .resizeAspectFill
+        case .fit: return .resizeAspect
+        case .stretch: return .resize
+        }
+    }
 }
 
 /// Where the clock actually sits on screen is purely drag-and-drop now (see `clockDraggable`/
@@ -206,6 +232,14 @@ struct GlobalSettings: Codable, Equatable {
     // MARK: macOS
     var adjustMenuBarTint = true
 
+    // MARK: Wallpaper Display
+    /// Read once, at `AVPlayerView` creation (`VideoWallpaperView.makeNSView`) — changing this
+    /// triggers `AppDelegate.rebuildWallpaperWindows()` (see this service's `$settings` subscription
+    /// below) rather than threading a live value through `updateNSView`, the same tradeoff this
+    /// codebase already makes for other settings that affect how the wallpaper window itself is
+    /// built, not just how it behaves.
+    var videoFit = GSVideoFit.fill
+
     // MARK: Appearance
     var appearance = GSAppearance.followSystem
     /// Whether the main library and Settings windows use real desktop-blurring vibrancy
@@ -327,6 +361,7 @@ struct GlobalSettings: Codable, Equatable {
         autoStart = (try? c.decodeIfPresent(Bool.self, forKey: .autoStart)) ?? nil ?? false
         inboxNtfyTopic = (try? c.decodeIfPresent(String.self, forKey: .inboxNtfyTopic)) ?? nil ?? ""
         adjustMenuBarTint = (try? c.decodeIfPresent(Bool.self, forKey: .adjustMenuBarTint)) ?? nil ?? true
+        videoFit = (try? c.decodeIfPresent(GSVideoFit.self, forKey: .videoFit)) ?? nil ?? .fill
         appearance = (try? c.decodeIfPresent(GSAppearance.self, forKey: .appearance)) ?? nil ?? .followSystem
         windowVibrancy = (try? c.decodeIfPresent(Bool.self, forKey: .windowVibrancy)) ?? nil ?? true
         showClockOverlay = (try? c.decodeIfPresent(Bool.self, forKey: .showClockOverlay)) ?? nil ?? false
@@ -378,6 +413,7 @@ class GlobalSettingsViewModel: ObservableObject {
     var didCurrentWallpaperChangeCancellable: Cancellable?
     var didAddToLoginItemCancellable: Cancellable?
     var didChangeAdjustMenuBarTintCancellable: Cancellable?
+    var didChangeVideoFitCancellable: Cancellable?
     var didChangeShowClockOverlayCancellable: Cancellable?
     var didOtherAudioChangeCancellable: Cancellable?
     var otherAudioPolicyCancellable: Cancellable?
@@ -499,6 +535,16 @@ class GlobalSettingsViewModel: ObservableObject {
             .removeDuplicates { $0.adjustMenuBarTint == $1.adjustMenuBarTint }
             .map { $0.adjustMenuBarTint }
             .sink { [weak self] in self?.didChangeAdjustMenuBarTint($0) }
+
+        // `videoFit` is only ever read once, at `AVPlayerView` creation — `dropFirst()` skips the
+        // value this sink receives immediately on subscribe (same reasoning already documented at
+        // `didAddToLoginItemCancellable`'s own subscription), so this never rebuilds every wallpaper
+        // window as a side effect of simply starting up.
+        self.didChangeVideoFitCancellable =
+        self.$settings
+            .removeDuplicates { $0.videoFit == $1.videoFit }
+            .dropFirst()
+            .sink { _ in AppDelegate.shared.rebuildWallpaperWindows() }
 
         self.didChangeShowClockOverlayCancellable =
         self.$settings
