@@ -5,6 +5,8 @@ All notable changes to Wallwright are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-24
+
 ### Added
 - Video wallpapers now play live on the lock screen and screen saver through a real macOS
   ExtensionKit wallpaper provider, not just the desktop. The old aerials catalog hack
@@ -75,6 +77,15 @@ All notable changes to Wallwright are documented here. Format follows
   macOS ordering.
 
 ### Fixed
+- The lock screen and screen saver silently falling back to Apple's default aerial on every single
+  lock, regardless of how long it lasted. `WallpaperAgent` decides whether a choice supports the
+  screen saver by matching its `Store/Index.plist` Configuration bytes against the descriptor
+  Wallwright's own settings provider declares; an empty Configuration never matched, so the check
+  silently failed every time. Fixed by writing the matching bytes instead.
+- A looping, muted lock-screen video could keep the display from sleeping indefinitely while
+  locked — `AVPlayer.preventsDisplaySleepDuringVideoPlayback` defaults to true and was never set on
+  the lock-screen player, reopening the same class of bug a bounded assertion already fixed
+  elsewhere in this same subsystem through a different path.
 - DesktopHut browse tab returning zero results: the site reverted its thumbnail URL scheme back
   to its original `/images/...` path, which silently dropped every parsed item. Now matches both
   that path and the newer `/img/{WxH}/...` one it had switched to.
@@ -200,6 +211,14 @@ All notable changes to Wallwright are documented here. Format follows
   while one is already in flight waits its turn instead of racing it.
 
 ### Performance
+- Lock-screen video held onto 2-3x more decoder memory than it needed to: no forward-buffer cap
+  (AVFoundation defaulted to its network-streaming heuristic), audio tracks decoded even though the
+  lock screen is always muted, and extra preroll buffering on every loop restart. All three now
+  match the desktop player's existing, already-proven settings.
+- A couple of background timers (the fullscreen-detection safety net, the lock-screen self-heal
+  re-assertion) and the lock-screen extension's own diagnostic logging moved off the critical path
+  or onto a coalesced/background schedule, trading a little latency nobody notices for less
+  uncoalesced wakeup and main-thread disk I/O.
 - Lowered the thumbnail cache cap from 300MB to 64MB and added a cache count limit; right-sized thumbnail decoding.
 - Moved disk I/O and image decoding off the main thread.
 - Cached the clock overlay's `DateFormatter` instead of allocating one per draw.
@@ -232,5 +251,6 @@ Initial public release: live video wallpapers synced across desktop, lock screen
 a library manager, playlist rotation, a drag-anywhere clock overlay, and built-in browsers for
 several free wallpaper sites.
 
-[Unreleased]: https://github.com/anonyks/wallwright/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/anonyks/wallwright/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/anonyks/wallwright/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/anonyks/wallwright/releases/tag/v1.0.0
