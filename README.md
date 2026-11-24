@@ -13,7 +13,7 @@ Video wallpapers on your desktop, lock screen, and screensaver, all in sync, all
 
 ![Wallwright: a video wallpaper playing live behind the library, with the clock overlay and per-wallpaper detail panel visible](docs/assets/wallwright-hero.gif)
 
-*[Watch the full demo in 4K](docs/assets/wallwright-showcase-4k.mp4)*
+*[Watch the full demo](docs/assets/wallwright-showcase.mp4)*
 
 </div>
 
