@@ -141,10 +141,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // numbers frozen at some earlier point rather than anything current.
             guard item !== systemUsageMenuItem else { continue }
             if let shared = item.view as? ShortcutMenuItemView {
-                let fresh = NSMenuItem(title: item.title, action: item.action, keyEquivalent: "")
-                let view = shared.rebuildFreshView()
-                view.menuItem = fresh
-                fresh.view = view
+                // No custom `.view` here — Apple's own "Views in Menu Items" guide documents that
+                // menu item views aren't supported in the Dock menu at all (Dock.app renders this
+                // menu out-of-process, and a custom NSView can't cross that boundary the way a
+                // plain NSMenuItem can). The underlying NSMenuItem's own `.action` is always nil by
+                // design (`ShortcutMenuItemView` handles clicks itself — see
+                // `NSMenuItem.withShortcutHint`), so the real action/title come from the view
+                // itself; `target` is always `self` at every real call site (every file that builds
+                // one of these is an `AppDelegate` extension), so that's hardcoded here rather than
+                // exposing the view's own private `target` just for this.
+                let fresh = NSMenuItem(title: shared.currentTitle, action: shared.action, keyEquivalent: "")
+                fresh.target = self
                 dockMenu.addItem(fresh)
             } else if item.isSeparatorItem {
                 // Skip a separator immediately following another separator (or opening the
@@ -156,12 +163,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let copy = NSMenuItem(title: item.title, action: item.action, keyEquivalent: item.keyEquivalent)
                 copy.target = item.target
                 copy.image = item.image
-                copy.submenu = item.submenu
+                // Never `copy.submenu = item.submenu` — an `NSMenu` can only have one `supermenu`
+                // at a time, so handing the SAME live instance to a second `NSMenuItem` here threw
+                // `NSInternalInconsistencyException` (`NSMenuItem.m:1563`) every single time this
+                // ran, confirmed live via Console across multiple real app launches. The only
+                // submenu-bearing item today is Recent Wallpapers, and `buildRecentWallpapersMenu()`
+                // is already a pure factory (reads `wallpaperViewModel.recentWallpapers`, builds a
+                // fresh `NSMenu`, no side effects) — calling it again here gives the Dock menu its
+                // own independent, equally-fresh copy instead of stealing the status bar's.
+                if item.hasSubmenu {
+                    copy.submenu = buildRecentWallpapersMenu()
+                }
                 copy.isEnabled = item.isEnabled
                 dockMenu.addItem(copy)
             }
         }
-        dockMenu.items.removeLast() // Remove `Quit` menu item
+        // `dockMenu.items.removeLast()` mutates a copy of the array Swift hands back from the
+        // getter, not the menu itself — the "Quit" item it was meant to drop was never actually
+        // removed. `removeItem(at:)` operates on the real menu.
+        if dockMenu.numberOfItems > 0 {
+            dockMenu.removeItem(at: dockMenu.numberOfItems - 1)
+        }
         return dockMenu
     }
     

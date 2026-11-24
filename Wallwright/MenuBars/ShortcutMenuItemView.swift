@@ -107,14 +107,12 @@ final class ShortcutMenuItemView: NSView {
         iconView.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)
     }
 
-    /// `NSMenuItem.copy()` (used for the Dock menu — see `AppDelegate.applicationDockMenu`) shares
-    /// this same view instance by reference with the copied item rather than deep-copying it, and
-    /// a single NSView can't be in two menus' hierarchies at once. Whoever copies a menu item that
-    /// owns one of these views needs to swap in a fresh instance built from this one instead of
-    /// reusing it directly.
-    func rebuildFreshView() -> ShortcutMenuItemView {
-        ShortcutMenuItemView(title: titleLabel.stringValue, systemImage: systemImage, shortcut: shortcutLabel.stringValue, target: target, action: action)
-    }
+    /// The row's current displayed title — the underlying `NSMenuItem.title` is only ever set once,
+    /// at construction, and `updateTitle(_:systemImage:)` above only ever touches this view's own
+    /// label, so `item.title` goes stale (e.g. stuck on "Pause" after `updateTitle` changed this to
+    /// "Resume") the moment state first changes. `AppDelegate.applicationDockMenu` reads this
+    /// instead of `item.title` for exactly that reason.
+    var currentTitle: String { titleLabel.stringValue }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
