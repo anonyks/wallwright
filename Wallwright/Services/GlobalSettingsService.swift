@@ -18,10 +18,15 @@ enum GSPlayback: String, CaseIterable, Identifiable, Codable {
     case keepRunning, mute, pause, stop
 }
 
-/// Maps directly to `AVLayerVideoGravity` at the one call site that reads it
-/// (`VideoWallpaperView.makeNSView`) — kept as this app's own enum rather than storing
-/// `AVLayerVideoGravity`'s raw string directly so a future macOS SDK change to that type's cases
-/// can't silently corrupt a saved settings file.
+/// Maps to `AVLayerVideoGravity` (`VideoWallpaperView.makeNSView`) and the equivalent
+/// `CALayerContentsGravity` (`StaticImageWallpaperView.makeNSView`) — kept as this app's own enum
+/// rather than storing either raw string directly so a future macOS SDK change to either type's
+/// cases can't silently corrupt a saved settings file. The two computed properties below each
+/// return the correct native static member for their own type (`.resizeAspectFill` etc. on each),
+/// not a shared raw string — the two types likely don't share the same underlying string values
+/// (`CALayerContentsGravity`'s are short, `AVLayerVideoGravity`'s are `AVLayerVideoGravity`-
+/// prefixed, going by every other paired Apple API of this kind), that's just never relied on
+/// here. Both produce the same visual behavior for their respective view type.
 enum GSVideoFit: String, CaseIterable, Identifiable, Codable {
     var id: Self { self }
     case fill, fit, stretch
@@ -35,6 +40,14 @@ enum GSVideoFit: String, CaseIterable, Identifiable, Codable {
     }
 
     var videoGravity: AVLayerVideoGravity {
+        switch self {
+        case .fill: return .resizeAspectFill
+        case .fit: return .resizeAspect
+        case .stretch: return .resize
+        }
+    }
+
+    var contentsGravity: CALayerContentsGravity {
         switch self {
         case .fill: return .resizeAspectFill
         case .fit: return .resizeAspect

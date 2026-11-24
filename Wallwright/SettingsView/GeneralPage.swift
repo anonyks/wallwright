@@ -36,7 +36,7 @@ struct GeneralPage: SettingsPage {
                     Text("Fit").tag(GSVideoFit.fit)
                     Text("Stretch").tag(GSVideoFit.stretch)
                 }
-                .help("Fill crops the video to cover the whole screen with no borders. Fit shows the entire video with black bars if its aspect ratio doesn't match your display. Stretch fills the screen without cropping, distorting the video if the aspect ratios differ.")
+                .help("Fill crops the wallpaper to cover the whole screen with no borders. Fit shows the entire wallpaper with black bars if its aspect ratio doesn't match your display. Stretch fills the screen without cropping, distorting the wallpaper if the aspect ratios differ. Applies to both video and image wallpapers.")
             } header: {
                 Label("Wallpaper Display", systemImage: "rectangle.on.rectangle")
             } footer: {

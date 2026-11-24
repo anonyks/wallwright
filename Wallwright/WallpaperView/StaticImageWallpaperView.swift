@@ -23,9 +23,13 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         let view = NSView()
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.black.cgColor
-        // Fill and crop to aspect, matching VideoWallpaperView's `.resizeAspectFill` so switching
-        // between a video and image wallpaper on the same screen looks consistent.
-        view.layer?.contentsGravity = .resizeAspectFill
+        // Same `videoFit` General setting `VideoWallpaperView` reads (`GSVideoFit.contentsGravity`
+        // is the `CALayerContentsGravity` equivalent of its own `videoGravity`) — keeps switching
+        // between a video and image wallpaper on the same screen looking consistent, and changing
+        // the setting now affects both instead of just video. Read once, here, same reasoning as
+        // `VideoWallpaperView`: a change triggers `rebuildWallpaperWindows()` rather than being
+        // threaded through `updateNSView`.
+        view.layer?.contentsGravity = AppDelegate.shared.globalSettingsViewModel.settings.videoFit.contentsGravity
         updateWallpaper(view, context: context)
         return view
     }
