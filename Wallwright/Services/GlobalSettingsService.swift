@@ -955,6 +955,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 AerialsInjector.shared.inject(videoURL: videoURL, name: newValue.project.title)
                 LockScreenExtensionBridge.shared.publish(wallpaper: newValue)
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
+                WallpaperChangeHook.run(for: newValue)
             }
         } else {
             // Reverted: registering a synthetic looping video (built from the wallpaper's own
@@ -981,6 +982,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 AerialsInjector.shared.remove()
                 LockScreenExtensionBridge.shared.remove()
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
+                WallpaperChangeHook.run(for: newValue)
             }
         }
     }

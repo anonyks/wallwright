@@ -239,6 +239,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 AerialsInjector.shared.inject(videoURL: videoURL, name: wallpaper.project.title)
                 LockScreenExtensionBridge.shared.publish(wallpaper: wallpaper)
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
+                WallpaperChangeHook.run(for: wallpaper)
             }
         }
         registerBundledClockFonts()
