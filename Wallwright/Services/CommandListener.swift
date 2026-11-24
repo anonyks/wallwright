@@ -11,6 +11,7 @@
 //    echo "prev"       > /tmp/wallwright-501.pipe
 //    echo "pin"        > /tmp/wallwright-501.pipe
 //    echo "clearcache" > /tmp/wallwright-501.pipe
+//    echo "status"     > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-status.json
 //    echo "quit"       > /tmp/wallwright-501.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
@@ -18,6 +19,18 @@
 //
 
 import AppKit
+
+/// Written by the `status` command — the pipe itself is write-only from the caller's side (a
+/// script can `echo` into it but has nothing to read a reply back from), so this is the only way
+/// a script can get anything out. Same main-screen-only scoping as `CommandListener`'s own `pin`
+/// handler, for the same reason: a CLI caller has no UI context to have selected a specific screen.
+private struct WallwrightStatus: Codable {
+    var title: String
+    var type: String
+    var file: String
+    var isPaused: Bool
+    var volumePercent: Int
+}
 
 final class CommandListener {
     static let shared = CommandListener()
@@ -30,6 +43,9 @@ final class CommandListener {
     // nothing about the failure is transient. Scoping the path per-user means two users' instances
     // never contend for the same node at all.
     private let path = "/tmp/wallwright-\(getuid()).pipe"
+    // Same UID-scoping reasoning as `path` above — a predictable sibling name next to the pipe,
+    // not under a user-writable directory a script would need to create first.
+    private let statusPath = "/tmp/wallwright-\(getuid())-status.json"
     private var started = false
 
     private init() {}
@@ -136,6 +152,8 @@ final class CommandListener {
             // opening/closing the library window, e.g. from a script or while diagnosing memory
             // footprint live.
             ThumbnailImage.clearCache()
+        case "status":
+            writeStatus()
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()
@@ -145,5 +163,28 @@ final class CommandListener {
             }
         default: break
         }
+    }
+
+    private func writeStatus() {
+        let wallpaperViewModel = AppDelegate.shared.wallpaperViewModel
+        let wallpaper = wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId())
+        let status = WallwrightStatus(
+            title: wallpaper.project.title,
+            type: wallpaper.project.type,
+            file: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file).path,
+            isPaused: wallpaperViewModel.playRate == 0,
+            volumePercent: Int((wallpaperViewModel.playVolume * 100).rounded())
+        )
+        guard let data = try? JSONEncoder().encode(status) else { return }
+        // Atomic — a script polling this file (rather than only reacting right after sending
+        // `status`) should never be able to read a half-written file.
+        try? data.write(to: URL(fileURLWithPath: statusPath), options: .atomic)
+        // `Data.write` creates the file at the umask's default mode (commonly world-readable),
+        // not `path`'s own deliberate 0600 — this file carries the same kind of information the
+        // pipe above was scoped per-user to protect (the current wallpaper's title and full file
+        // path), so it gets the same posture. Set after writing, not via a creation attribute,
+        // since `.atomic` writes to a temp file and renames it into place, which would otherwise
+        // carry whatever mode that temp file got instead.
+        chmod(statusPath, 0o600)
     }
 }
