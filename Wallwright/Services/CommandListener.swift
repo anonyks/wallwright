@@ -4,15 +4,16 @@
 //
 //  Lets a terminal or script control the app via a named pipe (substitute your own UID for
 //  `501` — `id -u`):
-//    echo "pause"      > /tmp/wallwright-501.pipe
-//    echo "resume"     > /tmp/wallwright-501.pipe
-//    echo "volume 50"  > /tmp/wallwright-501.pipe
-//    echo "next"       > /tmp/wallwright-501.pipe
-//    echo "prev"       > /tmp/wallwright-501.pipe
-//    echo "pin"        > /tmp/wallwright-501.pipe
-//    echo "clearcache" > /tmp/wallwright-501.pipe
-//    echo "status"     > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-status.json
-//    echo "quit"       > /tmp/wallwright-501.pipe
+//    echo "pause"             > /tmp/wallwright-501.pipe
+//    echo "resume"            > /tmp/wallwright-501.pipe
+//    echo "volume 50"         > /tmp/wallwright-501.pipe
+//    echo "next"              > /tmp/wallwright-501.pipe
+//    echo "prev"              > /tmp/wallwright-501.pipe
+//    echo "pin"               > /tmp/wallwright-501.pipe
+//    echo "clearcache"        > /tmp/wallwright-501.pipe
+//    echo "status"            > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-status.json
+//    echo "apply <title>"     > /tmp/wallwright-501.pipe   # case-insensitive substring match, first hit wins
+//    echo "quit"              > /tmp/wallwright-501.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
 //  https://github.com/Raunik2/LivePaper
@@ -154,6 +155,10 @@ final class CommandListener {
             ThumbnailImage.clearCache()
         case "status":
             writeStatus()
+        case "apply":
+            if parts.count > 1 {
+                applyWallpaper(matching: String(parts[1]))
+            }
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()
@@ -163,6 +168,22 @@ final class CommandListener {
             }
         default: break
         }
+    }
+
+    /// Applies the first library wallpaper whose title contains `query` (case-insensitive) to the
+    /// main screen — same main-screen-only scoping as `pin`/`status` above, for the same reason a
+    /// CLI caller has no UI context to have selected a specific screen. Reuses the exact mechanism
+    /// clicking a library tile already triggers (`WallpaperViewModel.setWallpaper(_:for:)` — see
+    /// `ExplorerItem`'s own tap handler), not `nextCurrentWallpaper`, which depends on whatever
+    /// screen happens to be selected in the Display Settings UI right now — a CLI call shouldn't
+    /// depend on UI state nobody can see. Silently does nothing on no match, matching every other
+    /// handler in this file's own "no corresponding command, no error channel to report one on" posture.
+    private func applyWallpaper(matching query: String) {
+        let needle = query.lowercased()
+        guard let match = AppDelegate.shared.contentViewModel.wallpapers.first(where: {
+            $0.project.title.lowercased().contains(needle)
+        }) else { return }
+        AppDelegate.shared.wallpaperViewModel.setWallpaper(match, for: WallpaperViewModel.mainScreenId())
     }
 
     private func writeStatus() {
