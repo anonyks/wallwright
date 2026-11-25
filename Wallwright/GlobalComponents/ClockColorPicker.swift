@@ -61,11 +61,18 @@ struct ClockColorPicker: View {
                             .foregroundStyle(.white, .secondary)
                             .font(.system(size: 11))
                             .offset(x: 3, y: 3)
+                    } else if option == .dynamicWallpaperMatch {
+                        Image(systemName: "photo.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .secondary)
+                            .font(.system(size: 11))
+                            .offset(x: 3, y: 3)
                     }
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(option.rawValue)
+        .accessibilityLabel(option == .dynamicWallpaperMatch ? "Match Wallpaper" : option.rawValue)
+        .help(option == .dynamicWallpaperMatch ? "Follows the current wallpaper's own extracted accent colors" : "")
 
         // Only the custom swatch actually needs a popover, but this used to attach one to every
         // swatch in the ForEach (gated on `option == .custom` inside the binding itself), so N
@@ -115,6 +122,19 @@ struct ClockColorPicker: View {
             return AnyShapeStyle(LinearGradient(
                 colors: [settings.clockCustomGradientStart.color, settings.clockCustomGradientEnd.color],
                 startPoint: startPoint, endPoint: endPoint
+            ))
+        }
+        if option == .dynamicWallpaperMatch {
+            // Live preview of today's actual extraction when one's available, same colors
+            // `resolvedClockGradient` itself would resolve to right now — falls back to a neutral
+            // gray-to-white swatch (distinct from any fixed preset) before the first extraction
+            // completes.
+            guard let palette = PaletteExporter.current else {
+                return AnyShapeStyle(LinearGradient(colors: [.gray, .white], startPoint: .leading, endPoint: .trailing))
+            }
+            return AnyShapeStyle(LinearGradient(
+                colors: [Color(nsColor: palette.accent), Color(nsColor: palette.vibrant)],
+                startPoint: .leading, endPoint: .trailing
             ))
         }
         if let (start, end) = option.gradientColors {

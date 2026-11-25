@@ -3,6 +3,7 @@
 //  Wallwright
 //
 
+import AppKit
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -11,6 +12,11 @@ import ImageIO
 /// on every wallpaper change, for ricing tools (SketchyBar, Ghostty, Kitty, Raycast, ...) that
 /// want to theme themselves off the current desktop. Called from the same background-queue call
 /// sites as `WallpaperChangeHook`.
+///
+/// Also keeps the same extraction available in-process as real `NSColor`s (`current`), read
+/// directly by `GlobalSettings.resolvedClockGradient` for the clock overlay's "Dynamic Wallpaper
+/// Match" color — that path doesn't need to re-parse hex strings back out of the JSON file this
+/// same extraction already wrote.
 enum PaletteExporter {
     struct Palette: Codable, Equatable {
         let dominant: String
@@ -19,6 +25,24 @@ enum PaletteExporter {
         let surface: String
         let isDark: Bool
     }
+
+    struct ResolvedColors {
+        let dominant: NSColor
+        let accent: NSColor
+        let vibrant: NSColor
+        let surface: NSColor
+        let isDark: Bool
+    }
+
+    /// Only ever assigned on the main queue (see `export(for:)` below), even though extraction
+    /// itself runs on a background queue — safe to read from the main thread at any time,
+    /// including mid-draw from `ClockOverlayView`.
+    static private(set) var current: ResolvedColors?
+
+    /// Posted on the main queue right after `current` updates — lets `ClockOverlayView` redraw
+    /// immediately when "Dynamic Wallpaper Match" is selected, instead of waiting for its own
+    /// periodic tick (up to a minute away with seconds display off).
+    static let didUpdateNotification = Notification.Name("Wallwright.paletteDidUpdate")
 
     private static let outputURL = URL(
         fileURLWithPath: ("~/.config/wallwright/palettes/current.json" as NSString).expandingTildeInPath
@@ -32,14 +56,39 @@ enum PaletteExporter {
     static func export(for wallpaper: WEWallpaper) {
         guard !wallpaper.project.preview.isEmpty else { return }
         let previewURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview)
-        guard let palette = extractPalette(from: previewURL),
-              let data = try? JSONEncoder().encode(palette)
-        else { return }
+        guard let raw = extractRawPalette(from: previewURL) else { return }
+
+        let resolved = ResolvedColors(
+            dominant: nsColor(raw.dominant), accent: nsColor(raw.accent),
+            vibrant: nsColor(raw.vibrant), surface: nsColor(raw.surface), isDark: raw.isDark
+        )
+        DispatchQueue.main.async {
+            current = resolved
+            NotificationCenter.default.post(name: didUpdateNotification, object: nil)
+        }
+        WWLog.settings.notice(
+            "PaletteExporter: dominant=\(hexString(raw.dominant), privacy: .public) accent=\(hexString(raw.accent), privacy: .public) vibrant=\(hexString(raw.vibrant), privacy: .public) surface=\(hexString(raw.surface), privacy: .public) isDark=\(raw.isDark, privacy: .public) for \(wallpaper.project.title, privacy: .public)"
+        )
+
+        let palette = Palette(
+            dominant: hexString(raw.dominant), accent: hexString(raw.accent),
+            vibrant: hexString(raw.vibrant), surface: hexString(raw.surface), isDark: raw.isDark
+        )
+        guard let data = try? JSONEncoder().encode(palette) else { return }
         try? FileManager.default.createDirectory(
             at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
         try? data.write(to: outputURL, options: .atomic)
     }
+
+    private static func nsColor(_ color: (r: Int, g: Int, b: Int)) -> NSColor {
+        NSColor(red: CGFloat(color.r) / 255, green: CGFloat(color.g) / 255, blue: CGFloat(color.b) / 255, alpha: 1)
+    }
+
+    private typealias RawPalette = (
+        dominant: (r: Int, g: Int, b: Int), accent: (r: Int, g: Int, b: Int),
+        vibrant: (r: Int, g: Int, b: Int), surface: (r: Int, g: Int, b: Int), isDark: Bool
+    )
 
     private struct ColorBucket {
         var count = 0
@@ -51,7 +100,7 @@ enum PaletteExporter {
         }
     }
 
-    private static func extractPalette(from url: URL) -> Palette? {
+    private static func extractRawPalette(from url: URL) -> RawPalette? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -125,13 +174,7 @@ enum PaletteExporter {
 
         let overallLuminance = luminanceSum / Double(totalPixels)
 
-        return Palette(
-            dominant: hexString(dominant),
-            accent: hexString(accent),
-            vibrant: hexString(vibrant),
-            surface: hexString(surface),
-            isDark: overallLuminance < 128
-        )
+        return (dominant: dominant, accent: accent, vibrant: vibrant, surface: surface, isDark: overallLuminance < 128)
     }
 
     /// Perceived luminance, 0-255 scale — the same weighting the roadmap's own WCAG-guarding note

@@ -149,6 +149,11 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
     /// `GlobalSettings.clockCustomGradientStart`/`End`/`Horizontal` instead. See
     /// `GlobalSettings.resolvedClockGradient`, which folds those in.
     case custom
+    /// Tracks the active wallpaper's own extracted accent/vibrant colors (see
+    /// `PaletteExporter.current`) instead of a fixed gradient — resolved dynamically in
+    /// `GlobalSettings.resolvedClockGradient`, same as `.custom` resolves through
+    /// `clockCustomGradientStart`/`End` instead of a fixed case value.
+    case dynamicWallpaperMatch
     // Mostly neutrals plus a handful of high-contrast accents — not a full rainbow, but enough
     // that most people find something close to what they want.
     case white, black, gray, red, orange, yellow, green, mint, cyan, blue, purple, pink
@@ -171,7 +176,7 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
         case .purple: return .purple
         case .pink: return .pink
         case .gradientBlackToWhiteVertical, .gradientWhiteToBlackVertical,
-             .gradientBlackToWhiteHorizontal, .gradientWhiteToBlackHorizontal, .custom:
+             .gradientBlackToWhiteHorizontal, .gradientWhiteToBlackHorizontal, .custom, .dynamicWallpaperMatch:
             return .gray
         }
     }
@@ -189,7 +194,7 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var isGradient: Bool { self == .custom || gradientColors != nil }
+    var isGradient: Bool { self == .custom || self == .dynamicWallpaperMatch || gradientColors != nil }
 
     /// Non-nil (and matches `gradientColors`) only for the gradient cases — whether the swatch
     /// preview and actual text fill run left-to-right or top-to-bottom.
@@ -310,6 +315,13 @@ struct GlobalSettings: Codable, Equatable {
     var resolvedClockGradient: (start: NSColor, end: NSColor, horizontal: Bool)? {
         if clockColor == .custom {
             return (clockCustomGradientStart.nsColor, clockCustomGradientEnd.nsColor, clockCustomGradientHorizontal)
+        }
+        if clockColor == .dynamicWallpaperMatch {
+            // Nil until the first `PaletteExporter.export` call completes (briefly, at launch) —
+            // falls back to solid white via `drawText`'s own nil-gradient path exactly like any
+            // other solid color, rather than drawing nothing.
+            guard let palette = PaletteExporter.current else { return nil }
+            return (palette.accent, palette.vibrant, false)
         }
         guard let (start, end) = clockColor.gradientColors else { return nil }
         return (start, end, clockColor.gradientIsHorizontal)

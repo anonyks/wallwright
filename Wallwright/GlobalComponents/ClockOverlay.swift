@@ -181,7 +181,14 @@ final class ClockOverlayView: NSView {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(restartTimerFromNotification), name: NSWorkspace.screensDidWakeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(stopTimer), name: LockScreenSync.screenDidLockNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(restartTimerFromNotification), name: LockScreenSync.screenDidUnlockNotification, object: nil)
+        // Redraws as soon as a new wallpaper's colors are extracted — without this, "Dynamic
+        // Wallpaper Match" would only pick up the new colors on this view's own next periodic
+        // tick (up to a minute away with seconds display off), reading as a stuck/stale color
+        // right after switching wallpapers.
+        NotificationCenter.default.addObserver(self, selector: #selector(setNeedsDisplayTrue), name: PaletteExporter.didUpdateNotification, object: nil)
     }
+
+    @objc private func setNeedsDisplayTrue() { needsDisplay = true }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
     deinit {
