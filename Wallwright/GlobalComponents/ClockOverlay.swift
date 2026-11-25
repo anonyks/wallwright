@@ -344,7 +344,12 @@ final class ClockOverlayView: NSView {
     private func drawSummitLine(centerX: CGFloat, centerY: CGFloat, length: CGFloat) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
-        let lineColor = clockColor.isGradient ? NSColor.white : clockColor.nsColor
+        // The gradient's own first stop, not a hardcoded white — for `.custom` on a light
+        // wallpaper that stop is a dark neutral (see `wcagGuardedDynamicGradient`), and a flat
+        // white divider line next to dark charcoal text would clash rather than match. Falls
+        // back to plain white only when there's no gradient resolved at all (a solid color, or
+        // `.custom` before the very first extraction completes).
+        let lineColor = resolvedGradient?.start ?? (clockColor.isGradient ? NSColor.white : clockColor.nsColor)
         context.setFillColor(lineColor.withAlphaComponent(0.85 * clockOpacity).cgColor)
         context.fill(NSRect(x: centerX - 0.75, y: centerY - length / 2, width: 1.5, height: length))
         context.restoreGState()
