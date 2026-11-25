@@ -241,6 +241,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
                 WallpaperChangeHook.run(for: wallpaper)
                 PaletteExporter.export(for: wallpaper)
+                // `applyClockPresetIfSaved` mutates `@Published var settings` — hopped to main
+                // since this whole block runs on a background `.utility` queue.
+                DispatchQueue.main.async {
+                    AppDelegate.shared.globalSettingsViewModel.applyClockPresetIfSaved(for: wallpaper)
+                }
             }
         }
         registerBundledClockFonts()
