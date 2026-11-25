@@ -4,8 +4,8 @@
 //
 //  A horizontally-scrollable row of tappable color swatches for the clock overlay's text color —
 //  shared between the Settings → General page and the in-app Clock Overlay quick-access sheet.
-//  Gradients (including the user-built one) come first, solids after — see `GSClockColor`'s
-//  declaration order, which `allCases` follows.
+//  Gradients (including Custom, which follows the wallpaper by default) come first, solids after
+//  — see `GSClockColor`'s declaration order, which `allCases` follows.
 //
 
 import SwiftUI
@@ -14,7 +14,6 @@ struct ClockColorPicker: View {
     @Binding var settings: GlobalSettings
 
     @State private var isCustomGradientPopoverPresented = false
-    @State private var isDynamicMatchPopoverPresented = false
 
     var body: some View {
         HStack {
@@ -43,8 +42,6 @@ struct ClockColorPicker: View {
             settings.clockColor = option
             if option == .custom {
                 isCustomGradientPopoverPresented = true
-            } else if option == .dynamicWallpaperMatch {
-                isDynamicMatchPopoverPresented = true
             }
         } label: {
             Circle()
@@ -64,18 +61,12 @@ struct ClockColorPicker: View {
                             .foregroundStyle(.white, .secondary)
                             .font(.system(size: 11))
                             .offset(x: 3, y: 3)
-                    } else if option == .dynamicWallpaperMatch {
-                        Image(systemName: "photo.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .secondary)
-                            .font(.system(size: 11))
-                            .offset(x: 3, y: 3)
                     }
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(option == .dynamicWallpaperMatch ? "Match Wallpaper" : option.rawValue)
-        .help(option == .dynamicWallpaperMatch ? "Follows the current wallpaper's own extracted accent colors" : "")
+        .accessibilityLabel(option.rawValue)
+        .help(option == .custom ? "Follows the current wallpaper's own colors — tap to fine-tune or pick your own" : "")
 
         // Only the custom swatch actually needs a popover, but this used to attach one to every
         // swatch in the ForEach (gated on `option == .custom` inside the binding itself), so N
@@ -87,31 +78,27 @@ struct ClockColorPicker: View {
             button.popover(isPresented: $isCustomGradientPopoverPresented) {
                 customGradientEditor
             }
-        } else if option == .dynamicWallpaperMatch {
-            button.popover(isPresented: $isDynamicMatchPopoverPresented) {
-                dynamicMatchEditor
-            }
         } else {
             button
         }
     }
 
-    private var dynamicMatchEditor: some View {
+    private var customGradientEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Match Wallpaper")
+            Text("Custom")
                 .font(.headline)
-            Text("Auto-extracted from the current wallpaper. Adjust to save a tweak just for this wallpaper.")
+            Text("Follows the current wallpaper's own colors. Adjust to save a tweak just for this wallpaper.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let wallpaperId = PaletteExporter.current?.wallpaperId {
-                ColorPicker("Start", selection: dynamicMatchColorBinding(wallpaperId: wallpaperId, isStart: true), supportsOpacity: false)
-                ColorPicker("End", selection: dynamicMatchColorBinding(wallpaperId: wallpaperId, isStart: false), supportsOpacity: false)
+                ColorPicker("Start", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: true), supportsOpacity: false)
+                ColorPicker("End", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: false), supportsOpacity: false)
 
-                if settings.clockDynamicMatchOverrides?[wallpaperId] != nil {
+                if settings.clockCustomGradientOverrides?[wallpaperId] != nil {
                     Button("Reset to Auto") {
-                        settings.clockDynamicMatchOverrides?.removeValue(forKey: wallpaperId)
+                        settings.clockCustomGradientOverrides?.removeValue(forKey: wallpaperId)
                     }
                     .font(.caption)
                 }
@@ -125,15 +112,15 @@ struct ClockColorPicker: View {
         .frame(width: 240)
     }
 
-    /// Reads/writes `settings.clockDynamicMatchOverrides[wallpaperId]` — seeding a brand new
+    /// Reads/writes `settings.clockCustomGradientOverrides[wallpaperId]` — seeding a brand new
     /// entry from the same WCAG-guarded colors actually being rendered right now (see
     /// `GlobalSettings.wcagGuardedDynamicGradient`, not the raw accent/vibrant extraction) on the
     /// first edit, so adjusting only one of the two wells doesn't leave the other defaulting to
     /// black, and the editor opens showing what's already on screen rather than something else.
-    private func dynamicMatchColorBinding(wallpaperId: String, isStart: Bool) -> Binding<Color> {
+    private func customGradientColorBinding(wallpaperId: String, isStart: Bool) -> Binding<Color> {
         Binding(
             get: {
-                if let override = settings.clockDynamicMatchOverrides?[wallpaperId] {
+                if let override = settings.clockCustomGradientOverrides?[wallpaperId] {
                     return (isStart ? override.start : override.end).color
                 }
                 guard let palette = PaletteExporter.current else { return .white }
@@ -141,74 +128,41 @@ struct ClockColorPicker: View {
                 return Color(nsColor: isStart ? guarded.start : guarded.end)
             },
             set: { newColor in
-                var overrides = settings.clockDynamicMatchOverrides ?? [:]
+                var overrides = settings.clockCustomGradientOverrides ?? [:]
                 var entry = overrides[wallpaperId] ?? seedOverride(wallpaperId: wallpaperId)
                 if isStart { entry.start = GSColor(newColor) } else { entry.end = GSColor(newColor) }
                 overrides[wallpaperId] = entry
-                settings.clockDynamicMatchOverrides = overrides
+                settings.clockCustomGradientOverrides = overrides
             }
         )
     }
 
+    /// Carries over the live gradient's own direction (not a hardcoded value) — `.custom`'s live
+    /// wallpaper match always resolves horizontal (see `wcagGuardedDynamicGradient`'s own doc
+    /// comment on why), so a freshly-created override should keep that, not silently flip back to
+    /// vertical the moment the user touches either color well.
     private func seedOverride(wallpaperId: String) -> GSWallpaperGradientOverride {
         guard let palette = PaletteExporter.current, palette.wallpaperId == wallpaperId else {
             return GSWallpaperGradientOverride(start: .black, end: .black, horizontal: false)
         }
         let guarded = GlobalSettings.wcagGuardedDynamicGradient(for: palette)
         return GSWallpaperGradientOverride(
-            start: GSColor(Color(nsColor: guarded.start)), end: GSColor(Color(nsColor: guarded.end)), horizontal: false
-        )
-    }
-
-    private var customGradientEditor: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Custom Gradient")
-                .font(.headline)
-
-            Picker("Direction", selection: $settings.clockCustomGradientHorizontal) {
-                Text("Vertical").tag(false)
-                Text("Horizontal").tag(true)
-            }
-            .pickerStyle(.segmented)
-
-            ColorPicker("Start", selection: gsColorBinding(\.clockCustomGradientStart), supportsOpacity: false)
-            ColorPicker("End", selection: gsColorBinding(\.clockCustomGradientEnd), supportsOpacity: false)
-        }
-        .padding()
-        .frame(width: 240)
-    }
-
-    /// `ColorPicker` binds to SwiftUI `Color`, but the underlying setting is the Codable `GSColor`
-    /// — converts on the way in/out rather than storing a second, redundant `Color` copy anywhere.
-    private func gsColorBinding(_ keyPath: WritableKeyPath<GlobalSettings, GSColor>) -> Binding<Color> {
-        Binding(
-            get: { settings[keyPath: keyPath].color },
-            set: { settings[keyPath: keyPath] = GSColor($0) }
+            start: GSColor(Color(nsColor: guarded.start)), end: GSColor(Color(nsColor: guarded.end)), horizontal: guarded.horizontal
         )
     }
 
     private func swatchFill(for option: GSClockColor) -> AnyShapeStyle {
         if option == .custom {
-            let (startPoint, endPoint): (UnitPoint, UnitPoint) = settings.clockCustomGradientHorizontal ? (.leading, .trailing) : (.top, .bottom)
-            return AnyShapeStyle(LinearGradient(
-                colors: [settings.clockCustomGradientStart.color, settings.clockCustomGradientEnd.color],
-                startPoint: startPoint, endPoint: endPoint
-            ))
-        }
-        if option == .dynamicWallpaperMatch {
             // Same resolution order as `resolvedClockGradient` itself: a saved per-wallpaper
-            // tweak first, then the live extraction, then a neutral gray-to-white placeholder
-            // (distinct from any fixed preset) before the first extraction completes.
+            // tweak first, then the live WCAG-guarded extraction, then a neutral gray-to-white
+            // placeholder (distinct from any fixed preset) before the first extraction completes.
             if let wallpaperId = PaletteExporter.current?.wallpaperId,
-               let override = settings.clockDynamicMatchOverrides?[wallpaperId] {
+               let override = settings.clockCustomGradientOverrides?[wallpaperId] {
                 return AnyShapeStyle(LinearGradient(colors: [override.start.color, override.end.color], startPoint: .leading, endPoint: .trailing))
             }
             guard let palette = PaletteExporter.current else {
                 return AnyShapeStyle(LinearGradient(colors: [.gray, .white], startPoint: .leading, endPoint: .trailing))
             }
-            // Same WCAG-guarded resolution `resolvedClockGradient` itself uses — not the raw
-            // accent/vibrant pair, so this preview never shows a different gradient than what
-            // actually renders.
             let guarded = GlobalSettings.wcagGuardedDynamicGradient(for: palette)
             return AnyShapeStyle(LinearGradient(
                 colors: [Color(nsColor: guarded.start), Color(nsColor: guarded.end)],

@@ -136,9 +136,9 @@ struct GSColor: Codable, Equatable, Hashable {
     }
 }
 
-/// A user-saved two-stop gradient for one specific wallpaper, overriding
-/// `GSClockColor.dynamicWallpaperMatch`'s own live extraction for just that wallpaper. See
-/// `GlobalSettings.clockDynamicMatchOverrides`.
+/// A user-saved two-stop gradient for one specific wallpaper, overriding `GSClockColor.custom`'s
+/// own live wallpaper-matched extraction for just that wallpaper. See
+/// `GlobalSettings.clockCustomGradientOverrides`.
 struct GSWallpaperGradientOverride: Codable, Equatable {
     var start: GSColor
     var end: GSColor
@@ -152,12 +152,10 @@ struct GSWallpaperGradientOverride: Codable, Equatable {
 /// instant that wallpaper becomes active again. Deliberately excludes `clockCustomOrigins`
 /// (window position) and `clockDraggable` — those are about where the overlay sits on a given
 /// screen/monitor arrangement, not about a wallpaper's own look, and mixing the two axes would
-/// mean switching wallpapers could also silently relocate the window. If `color == .custom`, the
-/// actual gradient still comes from the single global `clockCustomGradientStart`/`End` fields
-/// (shared across every wallpaper using Custom, same as before this existed); if `color ==
-/// .dynamicWallpaperMatch`, it resolves through the existing live extraction and
-/// `clockDynamicMatchOverrides` exactly as it already did — this struct only decides *which mode*
-/// a wallpaper uses, not how that mode itself resolves its colors.
+/// mean switching wallpapers could also silently relocate the window. `color` just decides which
+/// `GSClockColor` case this wallpaper uses — `.custom`'s own resolution (live wallpaper match,
+/// a saved per-wallpaper override, or the vestigial global fallback) happens in
+/// `resolvedClockGradient` exactly as it already does, unaffected by this preset.
 struct GSWallpaperClockPreset: Codable, Equatable {
     var dayFont: GSClockFormat
     var dayFontSize: Double
@@ -178,17 +176,15 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
     // that's the more distinctive/less-common choice worth surfacing first.
     case gradientBlackToWhiteVertical, gradientWhiteToBlackVertical
     case gradientBlackToWhiteHorizontal, gradientWhiteToBlackHorizontal
-    /// A user-built two-stop gradient — its actual colors/direction aren't on this case (a
-    /// String-backed enum can't hold arbitrary associated data while staying simply Codable and
-    /// backward-compatible with settings files saved before this existed), they live in
-    /// `GlobalSettings.clockCustomGradientStart`/`End`/`Horizontal` instead. See
-    /// `GlobalSettings.resolvedClockGradient`, which folds those in.
+    /// A two-stop gradient that follows the active wallpaper by default — a saved per-wallpaper
+    /// tweak (`GlobalSettings.clockCustomGradientOverrides`) wins when one exists, otherwise it's
+    /// the live WCAG-guarded extraction (`GlobalSettings.wcagGuardedDynamicGradient`), otherwise
+    /// (no extraction yet at all, a brief launch-time gap) the plain manually-set
+    /// `clockCustomGradientStart`/`End`/`Horizontal` fields. None of those colors live on this
+    /// case itself (a String-backed enum can't hold arbitrary associated data while staying
+    /// simply Codable and backward-compatible with settings files saved before this existed) —
+    /// see `GlobalSettings.resolvedClockGradient`, which resolves all of this.
     case custom
-    /// Tracks the active wallpaper's own extracted accent/vibrant colors (see
-    /// `PaletteExporter.current`) instead of a fixed gradient — resolved dynamically in
-    /// `GlobalSettings.resolvedClockGradient`, same as `.custom` resolves through
-    /// `clockCustomGradientStart`/`End` instead of a fixed case value.
-    case dynamicWallpaperMatch
     // Mostly neutrals plus a handful of high-contrast accents — not a full rainbow, but enough
     // that most people find something close to what they want.
     case white, black, gray, red, orange, yellow, green, mint, cyan, blue, purple, pink
@@ -211,7 +207,7 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
         case .purple: return .purple
         case .pink: return .pink
         case .gradientBlackToWhiteVertical, .gradientWhiteToBlackVertical,
-             .gradientBlackToWhiteHorizontal, .gradientWhiteToBlackHorizontal, .custom, .dynamicWallpaperMatch:
+             .gradientBlackToWhiteHorizontal, .gradientWhiteToBlackHorizontal, .custom:
             return .gray
         }
     }
@@ -229,7 +225,7 @@ enum GSClockColor: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var isGradient: Bool { self == .custom || self == .dynamicWallpaperMatch || gradientColors != nil }
+    var isGradient: Bool { self == .custom || gradientColors != nil }
 
     /// Non-nil (and matches `gradientColors`) only for the gradient cases — whether the swatch
     /// preview and actual text fill run left-to-right or top-to-bottom.
@@ -309,10 +305,13 @@ struct GlobalSettings: Codable, Equatable {
     /// (`showClockOverlay` itself still defaults to off). Anyone who already has a saved
     /// `clockColor` value keeps it exactly as-is: this only changes what a *missing* key decodes
     /// to (see `init(from decoder:)` below), never an existing choice.
-    var clockColor = GSClockColor.dynamicWallpaperMatch
-    /// The two stops of the user-built gradient (`GSClockColor.custom`) — each independently
-    /// defaults to black, matching "gradient of [black + gradient type]" until the user picks
-    /// something else for that stop.
+    var clockColor = GSClockColor.custom
+    /// The vestigial manual fallback for `.custom` — only ever actually drawn in the brief gap
+    /// before the first `PaletteExporter` extraction completes at launch, since `.custom`
+    /// otherwise always resolves through the live wallpaper match or a saved per-wallpaper
+    /// override instead (see `resolvedClockGradient`). Kept rather than removed: still a real,
+    /// reachable (if narrow) code path, and removing it would just be a stored property with
+    /// nothing left reading it in the common case, not nothing reading it at all.
     var clockCustomGradientStart = GSColor.black
     var clockCustomGradientEnd = GSColor.black
     var clockCustomGradientHorizontal = false
@@ -341,11 +340,11 @@ struct GlobalSettings: Codable, Equatable {
     /// *only* thing that decides where the clock sits on screen — until the user drags it at
     /// least once on a given screen, it just defaults to that screen's center.
     var clockCustomOrigins: [String: CGPoint]? = nil
-    /// Per-wallpaper hand-tweaks to `.dynamicWallpaperMatch`, keyed by `WEWallpaper.id`. A
-    /// wallpaper with no entry here just uses its own live `PaletteExporter.current` extraction,
-    /// same as before this existed — this only matters once the user actually adjusts and saves
-    /// a tweak for a specific wallpaper via `ClockColorPicker`'s "Match Wallpaper" editor.
-    var clockDynamicMatchOverrides: [String: GSWallpaperGradientOverride]? = nil
+    /// Per-wallpaper hand-tweaks to `.custom`'s live wallpaper match, keyed by `WEWallpaper.id`.
+    /// A wallpaper with no entry here just uses its own live `PaletteExporter.current`
+    /// extraction — this only matters once the user actually adjusts and saves a tweak for a
+    /// specific wallpaper via `ClockColorPicker`'s Custom editor.
+    var clockCustomGradientOverrides: [String: GSWallpaperGradientOverride]? = nil
     /// Per-wallpaper full clock "look" — font, sizes, color mode, alignment, seconds/24h,
     /// opacity — keyed by `WEWallpaper.id`. See `GSWallpaperClockPreset`'s own doc comment and
     /// `GlobalSettingsService.applyClockPresetIfSaved`/its auto-save subscription.
@@ -356,25 +355,21 @@ struct GlobalSettings: Codable, Equatable {
     /// into `clockColor` separately.
     var resolvedClockIsGradient: Bool { clockColor.isGradient }
 
-    /// Resolves `clockColor` to its actual gradient endpoints/direction, folding in
-    /// `clockCustomGradientStart`/`End`/`Horizontal` when `clockColor == .custom` (a user-built
-    /// gradient's colors aren't fixed on the enum case itself — see `GSClockColor.custom`'s doc
-    /// comment). Every other gradient case resolves exactly as `GSClockColor.gradientColors`
-    /// already did. Nil for solid colors.
+    /// Resolves `clockColor` to its actual gradient endpoints/direction. `.custom` follows the
+    /// active wallpaper by default: a saved per-wallpaper tweak
+    /// (`clockCustomGradientOverrides`) wins when one exists for the exact wallpaper the current
+    /// `PaletteExporter.current` extraction is for (a stale override for some *other* wallpaper,
+    /// still present in the dictionary but not relevant right now, must never leak through);
+    /// otherwise it's the live WCAG-guarded extraction; otherwise (no extraction yet at all, a
+    /// brief gap right at launch) the plain manually-set `clockCustomGradientStart`/`End`/
+    /// `Horizontal` fields. Every other gradient case resolves exactly as
+    /// `GSClockColor.gradientColors` already did. Nil for solid colors.
     var resolvedClockGradient: (start: NSColor, end: NSColor, horizontal: Bool)? {
         if clockColor == .custom {
-            return (clockCustomGradientStart.nsColor, clockCustomGradientEnd.nsColor, clockCustomGradientHorizontal)
-        }
-        if clockColor == .dynamicWallpaperMatch {
-            // Nil until the first `PaletteExporter.export` call completes (briefly, at launch) —
-            // falls back to solid white via `drawText`'s own nil-gradient path exactly like any
-            // other solid color, rather than drawing nothing.
-            guard let palette = PaletteExporter.current else { return nil }
-            // A saved per-wallpaper tweak wins over the live extraction — but only when it's
-            // actually for the wallpaper `palette` was just extracted from; a stale override for
-            // some other wallpaper (still present in the dictionary, just not relevant right now)
-            // must never leak through as this wallpaper's colors.
-            if let override = clockDynamicMatchOverrides?[palette.wallpaperId] {
+            guard let palette = PaletteExporter.current else {
+                return (clockCustomGradientStart.nsColor, clockCustomGradientEnd.nsColor, clockCustomGradientHorizontal)
+            }
+            if let override = clockCustomGradientOverrides?[palette.wallpaperId] {
                 return (override.start.nsColor, override.end.nsColor, override.horizontal)
             }
             return Self.wcagGuardedDynamicGradient(for: palette)
@@ -481,7 +476,7 @@ struct GlobalSettings: Codable, Equatable {
         windowVibrancy = (try? c.decodeIfPresent(Bool.self, forKey: .windowVibrancy)) ?? nil ?? true
         showClockOverlay = (try? c.decodeIfPresent(Bool.self, forKey: .showClockOverlay)) ?? nil ?? false
         clockDayFont = (try? c.decodeIfPresent(GSClockFormat.self, forKey: .clockDayFont)) ?? nil ?? .anurati
-        clockColor = (try? c.decodeIfPresent(GSClockColor.self, forKey: .clockColor)) ?? nil ?? .dynamicWallpaperMatch
+        clockColor = (try? c.decodeIfPresent(GSClockColor.self, forKey: .clockColor)) ?? nil ?? .custom
         clockCustomGradientStart = (try? c.decodeIfPresent(GSColor.self, forKey: .clockCustomGradientStart)) ?? nil ?? .black
         clockCustomGradientEnd = (try? c.decodeIfPresent(GSColor.self, forKey: .clockCustomGradientEnd)) ?? nil ?? .black
         clockCustomGradientHorizontal = (try? c.decodeIfPresent(Bool.self, forKey: .clockCustomGradientHorizontal)) ?? nil ?? false
@@ -495,7 +490,7 @@ struct GlobalSettings: Codable, Equatable {
         clockSummitLineLength = (try? c.decodeIfPresent(Double.self, forKey: .clockSummitLineLength)) ?? nil ?? 30
         clockDraggable = (try? c.decodeIfPresent(Bool.self, forKey: .clockDraggable)) ?? nil ?? false
         clockCustomOrigins = (try? c.decodeIfPresent([String: CGPoint].self, forKey: .clockCustomOrigins)) ?? nil
-        clockDynamicMatchOverrides = (try? c.decodeIfPresent([String: GSWallpaperGradientOverride].self, forKey: .clockDynamicMatchOverrides)) ?? nil
+        clockCustomGradientOverrides = (try? c.decodeIfPresent([String: GSWallpaperGradientOverride].self, forKey: .clockCustomGradientOverrides)) ?? nil
         clockWallpaperPresets = (try? c.decodeIfPresent([String: GSWallpaperClockPreset].self, forKey: .clockWallpaperPresets)) ?? nil
         steamUsername = (try? c.decodeIfPresent(String.self, forKey: .steamUsername)) ?? nil
         steamWorkshopSafeMode = (try? c.decodeIfPresent(Bool.self, forKey: .steamWorkshopSafeMode)) ?? nil ?? true
