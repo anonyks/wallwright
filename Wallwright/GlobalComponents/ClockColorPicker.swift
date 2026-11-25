@@ -126,8 +126,10 @@ struct ClockColorPicker: View {
     }
 
     /// Reads/writes `settings.clockDynamicMatchOverrides[wallpaperId]` — seeding a brand new
-    /// entry from the live `PaletteExporter.current` extraction (accent/vibrant) on the first
-    /// edit, so adjusting only one of the two wells doesn't leave the other defaulting to black.
+    /// entry from the same WCAG-guarded colors actually being rendered right now (see
+    /// `GlobalSettings.wcagGuardedDynamicGradient`, not the raw accent/vibrant extraction) on the
+    /// first edit, so adjusting only one of the two wells doesn't leave the other defaulting to
+    /// black, and the editor opens showing what's already on screen rather than something else.
     private func dynamicMatchColorBinding(wallpaperId: String, isStart: Bool) -> Binding<Color> {
         Binding(
             get: {
@@ -135,7 +137,8 @@ struct ClockColorPicker: View {
                     return (isStart ? override.start : override.end).color
                 }
                 guard let palette = PaletteExporter.current else { return .white }
-                return Color(nsColor: isStart ? palette.accent : palette.vibrant)
+                let guarded = GlobalSettings.wcagGuardedDynamicGradient(for: palette)
+                return Color(nsColor: isStart ? guarded.start : guarded.end)
             },
             set: { newColor in
                 var overrides = settings.clockDynamicMatchOverrides ?? [:]
@@ -151,8 +154,9 @@ struct ClockColorPicker: View {
         guard let palette = PaletteExporter.current, palette.wallpaperId == wallpaperId else {
             return GSWallpaperGradientOverride(start: .black, end: .black, horizontal: false)
         }
+        let guarded = GlobalSettings.wcagGuardedDynamicGradient(for: palette)
         return GSWallpaperGradientOverride(
-            start: GSColor(Color(nsColor: palette.accent)), end: GSColor(Color(nsColor: palette.vibrant)), horizontal: false
+            start: GSColor(Color(nsColor: guarded.start)), end: GSColor(Color(nsColor: guarded.end)), horizontal: false
         )
     }
 
@@ -202,8 +206,12 @@ struct ClockColorPicker: View {
             guard let palette = PaletteExporter.current else {
                 return AnyShapeStyle(LinearGradient(colors: [.gray, .white], startPoint: .leading, endPoint: .trailing))
             }
+            // Same WCAG-guarded resolution `resolvedClockGradient` itself uses — not the raw
+            // accent/vibrant pair, so this preview never shows a different gradient than what
+            // actually renders.
+            let guarded = GlobalSettings.wcagGuardedDynamicGradient(for: palette)
             return AnyShapeStyle(LinearGradient(
-                colors: [Color(nsColor: palette.accent), Color(nsColor: palette.vibrant)],
+                colors: [Color(nsColor: guarded.start), Color(nsColor: guarded.end)],
                 startPoint: .leading, endPoint: .trailing
             ))
         }

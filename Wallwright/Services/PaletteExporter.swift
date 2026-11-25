@@ -169,11 +169,28 @@ enum PaletteExporter {
         let dominant = byFrequency[0].averageColor
         // The next-most-frequent bucket that's actually a different color from `dominant` — a
         // second shade of the same color (common in near-flat backgrounds) shouldn't masquerade
-        // as a distinct accent tone. 40 is an RGB-space Euclidean threshold found by eye against
-        // real wallpaper previews — "same color, different shade" sits well under it.
-        let accent = byFrequency.first { colorDistance($0.averageColor, dominant) > 40 }?.averageColor
+        // as a distinct accent tone. 70 is an RGB-space Euclidean threshold — verified against a
+        // concrete false positive at the old threshold of 40: (20,20,20) vs (45,45,45), two
+        // shades of the same gray, sit at distance 43.3 and would have passed as "accent" there;
+        // genuinely different hues (not just a lighter/darker version of the same one) land
+        // comfortably above 70 in practice.
+        let accent = byFrequency.first { colorDistance($0.averageColor, dominant) > 70 }?.averageColor
             ?? (byFrequency.count > 1 ? byFrequency[1].averageColor : dominant)
-        let vibrant = candidates.max { saturation($0.averageColor) < saturation($1.averageColor) }?.averageColor
+        // Plain HSB saturation is scale-invariant, so a near-black shadow pixel like (12, 1, 1)
+        // scores ~92% saturated despite being pure mud, not a vivid color — confirmed live by hand
+        // against that exact RGB triple. Restricting the candidate pool to buckets that are
+        // either bright enough or saturated enough to plausibly be a real color (not shadow/noise)
+        // before ranking by chroma (saturation × √brightness, which penalizes darkness directly)
+        // keeps "vibrant" from ever resolving to a dark corner of the image. Scoped to `vibrant`
+        // alone, not `candidates` itself — `surface` below still needs the genuinely dark buckets
+        // this filter excludes; it's the one color role that's SUPPOSED to be dark.
+        let vibrancyPool = candidates.filter { bucket in
+            let (r, g, b) = bucket.averageColor
+            let brightness = Double(max(r, g, b)) / 255.0
+            return brightness >= 0.12 || saturation(bucket.averageColor) >= 0.25
+        }
+        let vibrantSource = vibrancyPool.isEmpty ? candidates : vibrancyPool
+        let vibrant = vibrantSource.max { chroma($0.averageColor) < chroma($1.averageColor) }?.averageColor
             ?? dominant
         let surface = candidates.min { luminance($0.averageColor) < luminance($1.averageColor) }?.averageColor
             ?? dominant
@@ -194,6 +211,15 @@ enum PaletteExporter {
         let minChannel = Double(min(color.r, color.g, color.b))
         guard maxChannel > 0 else { return 0 }
         return (maxChannel - minChannel) / maxChannel
+    }
+
+    /// Visual chroma — saturation weighted by brightness (`sat × √brightness`, both 0-1) — unlike
+    /// plain `saturation(_:)` above, this can't be fooled by a dark, barely-colored pixel: a
+    /// shadow at (12, 1, 1) has saturation ≈ 0.92 but chroma ≈ 0.92 × √0.047 ≈ 0.20, well below a
+    /// real vivid color's chroma even at moderate saturation and mid brightness.
+    private static func chroma(_ color: (r: Int, g: Int, b: Int)) -> Double {
+        let brightness = Double(max(color.r, color.g, color.b)) / 255.0
+        return saturation(color) * brightness.squareRoot()
     }
 
     private static func colorDistance(_ a: (r: Int, g: Int, b: Int), _ b: (r: Int, g: Int, b: Int)) -> Double {
