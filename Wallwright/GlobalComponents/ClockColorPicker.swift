@@ -14,6 +14,7 @@ struct ClockColorPicker: View {
     @Binding var settings: GlobalSettings
 
     @State private var isCustomGradientPopoverPresented = false
+    @State private var isDynamicMatchPopoverPresented = false
 
     var body: some View {
         HStack {
@@ -42,6 +43,8 @@ struct ClockColorPicker: View {
             settings.clockColor = option
             if option == .custom {
                 isCustomGradientPopoverPresented = true
+            } else if option == .dynamicWallpaperMatch {
+                isDynamicMatchPopoverPresented = true
             }
         } label: {
             Circle()
@@ -84,9 +87,73 @@ struct ClockColorPicker: View {
             button.popover(isPresented: $isCustomGradientPopoverPresented) {
                 customGradientEditor
             }
+        } else if option == .dynamicWallpaperMatch {
+            button.popover(isPresented: $isDynamicMatchPopoverPresented) {
+                dynamicMatchEditor
+            }
         } else {
             button
         }
+    }
+
+    private var dynamicMatchEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Match Wallpaper")
+                .font(.headline)
+            Text("Auto-extracted from the current wallpaper. Adjust to save a tweak just for this wallpaper.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let wallpaperId = PaletteExporter.current?.wallpaperId {
+                ColorPicker("Start", selection: dynamicMatchColorBinding(wallpaperId: wallpaperId, isStart: true), supportsOpacity: false)
+                ColorPicker("End", selection: dynamicMatchColorBinding(wallpaperId: wallpaperId, isStart: false), supportsOpacity: false)
+
+                if settings.clockDynamicMatchOverrides?[wallpaperId] != nil {
+                    Button("Reset to Auto") {
+                        settings.clockDynamicMatchOverrides?.removeValue(forKey: wallpaperId)
+                    }
+                    .font(.caption)
+                }
+            } else {
+                Text("No wallpaper colors extracted yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .frame(width: 240)
+    }
+
+    /// Reads/writes `settings.clockDynamicMatchOverrides[wallpaperId]` — seeding a brand new
+    /// entry from the live `PaletteExporter.current` extraction (accent/vibrant) on the first
+    /// edit, so adjusting only one of the two wells doesn't leave the other defaulting to black.
+    private func dynamicMatchColorBinding(wallpaperId: String, isStart: Bool) -> Binding<Color> {
+        Binding(
+            get: {
+                if let override = settings.clockDynamicMatchOverrides?[wallpaperId] {
+                    return (isStart ? override.start : override.end).color
+                }
+                guard let palette = PaletteExporter.current else { return .white }
+                return Color(nsColor: isStart ? palette.accent : palette.vibrant)
+            },
+            set: { newColor in
+                var overrides = settings.clockDynamicMatchOverrides ?? [:]
+                var entry = overrides[wallpaperId] ?? seedOverride(wallpaperId: wallpaperId)
+                if isStart { entry.start = GSColor(newColor) } else { entry.end = GSColor(newColor) }
+                overrides[wallpaperId] = entry
+                settings.clockDynamicMatchOverrides = overrides
+            }
+        )
+    }
+
+    private func seedOverride(wallpaperId: String) -> GSWallpaperGradientOverride {
+        guard let palette = PaletteExporter.current, palette.wallpaperId == wallpaperId else {
+            return GSWallpaperGradientOverride(start: .black, end: .black, horizontal: false)
+        }
+        return GSWallpaperGradientOverride(
+            start: GSColor(Color(nsColor: palette.accent)), end: GSColor(Color(nsColor: palette.vibrant)), horizontal: false
+        )
     }
 
     private var customGradientEditor: some View {
@@ -125,10 +192,13 @@ struct ClockColorPicker: View {
             ))
         }
         if option == .dynamicWallpaperMatch {
-            // Live preview of today's actual extraction when one's available, same colors
-            // `resolvedClockGradient` itself would resolve to right now — falls back to a neutral
-            // gray-to-white swatch (distinct from any fixed preset) before the first extraction
-            // completes.
+            // Same resolution order as `resolvedClockGradient` itself: a saved per-wallpaper
+            // tweak first, then the live extraction, then a neutral gray-to-white placeholder
+            // (distinct from any fixed preset) before the first extraction completes.
+            if let wallpaperId = PaletteExporter.current?.wallpaperId,
+               let override = settings.clockDynamicMatchOverrides?[wallpaperId] {
+                return AnyShapeStyle(LinearGradient(colors: [override.start.color, override.end.color], startPoint: .leading, endPoint: .trailing))
+            }
             guard let palette = PaletteExporter.current else {
                 return AnyShapeStyle(LinearGradient(colors: [.gray, .white], startPoint: .leading, endPoint: .trailing))
             }

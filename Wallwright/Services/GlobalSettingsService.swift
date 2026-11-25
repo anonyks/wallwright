@@ -136,6 +136,15 @@ struct GSColor: Codable, Equatable, Hashable {
     }
 }
 
+/// A user-saved two-stop gradient for one specific wallpaper, overriding
+/// `GSClockColor.dynamicWallpaperMatch`'s own live extraction for just that wallpaper. See
+/// `GlobalSettings.clockDynamicMatchOverrides`.
+struct GSWallpaperGradientOverride: Codable, Equatable {
+    var start: GSColor
+    var end: GSColor
+    var horizontal: Bool = false
+}
+
 enum GSClockColor: String, CaseIterable, Identifiable, Codable {
     var id: Self { self }
     // All 4 black/white combinations (both directions, both orientations) plus the user-built
@@ -301,6 +310,11 @@ struct GlobalSettings: Codable, Equatable {
     /// *only* thing that decides where the clock sits on screen — until the user drags it at
     /// least once on a given screen, it just defaults to that screen's center.
     var clockCustomOrigins: [String: CGPoint]? = nil
+    /// Per-wallpaper hand-tweaks to `.dynamicWallpaperMatch`, keyed by `WEWallpaper.id`. A
+    /// wallpaper with no entry here just uses its own live `PaletteExporter.current` extraction,
+    /// same as before this existed — this only matters once the user actually adjusts and saves
+    /// a tweak for a specific wallpaper via `ClockColorPicker`'s "Match Wallpaper" editor.
+    var clockDynamicMatchOverrides: [String: GSWallpaperGradientOverride]? = nil
 
     /// `true` for every gradient case, including `.custom` — `GSClockColor.isGradient` already
     /// covers this; kept here too so callers reading through `GlobalSettings` don't need to reach
@@ -321,6 +335,13 @@ struct GlobalSettings: Codable, Equatable {
             // falls back to solid white via `drawText`'s own nil-gradient path exactly like any
             // other solid color, rather than drawing nothing.
             guard let palette = PaletteExporter.current else { return nil }
+            // A saved per-wallpaper tweak wins over the live extraction — but only when it's
+            // actually for the wallpaper `palette` was just extracted from; a stale override for
+            // some other wallpaper (still present in the dictionary, just not relevant right now)
+            // must never leak through as this wallpaper's colors.
+            if let override = clockDynamicMatchOverrides?[palette.wallpaperId] {
+                return (override.start.nsColor, override.end.nsColor, override.horizontal)
+            }
             return (palette.accent, palette.vibrant, false)
         }
         guard let (start, end) = clockColor.gradientColors else { return nil }
@@ -405,6 +426,7 @@ struct GlobalSettings: Codable, Equatable {
         clockSummitLineLength = (try? c.decodeIfPresent(Double.self, forKey: .clockSummitLineLength)) ?? nil ?? 30
         clockDraggable = (try? c.decodeIfPresent(Bool.self, forKey: .clockDraggable)) ?? nil ?? false
         clockCustomOrigins = (try? c.decodeIfPresent([String: CGPoint].self, forKey: .clockCustomOrigins)) ?? nil
+        clockDynamicMatchOverrides = (try? c.decodeIfPresent([String: GSWallpaperGradientOverride].self, forKey: .clockDynamicMatchOverrides)) ?? nil
         steamUsername = (try? c.decodeIfPresent(String.self, forKey: .steamUsername)) ?? nil
         steamWorkshopSafeMode = (try? c.decodeIfPresent(Bool.self, forKey: .steamWorkshopSafeMode)) ?? nil ?? true
         pauseHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .pauseHotkey)) ?? nil ?? Self.defaultPauseHotkey

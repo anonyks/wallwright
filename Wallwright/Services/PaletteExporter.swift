@@ -27,6 +27,11 @@ enum PaletteExporter {
     }
 
     struct ResolvedColors {
+        /// `WEWallpaper.id` of the wallpaper these colors were extracted from — lets a caller
+        /// (`GlobalSettings.resolvedClockGradient`) key a per-wallpaper override to the exact
+        /// wallpaper this extraction actually ran against, rather than separately asking some
+        /// other subsystem "what's the current wallpaper" and risking the two disagreeing.
+        let wallpaperId: String
         let dominant: NSColor
         let accent: NSColor
         let vibrant: NSColor
@@ -59,6 +64,7 @@ enum PaletteExporter {
         guard let raw = extractRawPalette(from: previewURL) else { return }
 
         let resolved = ResolvedColors(
+            wallpaperId: wallpaper.id,
             dominant: nsColor(raw.dominant), accent: nsColor(raw.accent),
             vibrant: nsColor(raw.vibrant), surface: nsColor(raw.surface), isDark: raw.isDark
         )
