@@ -246,6 +246,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         LockScreenSync.shared.start()
         AerialsInjector.shared.resumeHealthMonitoringIfNeeded()
         CommandListener.shared.start()
+        WallpaperLibraryWatcher.shared.start()
 
         // 显示桌面壁纸
         for (_, window) in self.wallpaperWindows {

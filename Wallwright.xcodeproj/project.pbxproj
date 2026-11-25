@@ -74,6 +74,7 @@
 		EE0000000000000000000001 /* AerialsInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000002 /* AerialsInjector.swift */; };
 		EE0000000000000000000003 /* LockScreenSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000004 /* LockScreenSync.swift */; };
 		EE0000000000000000000005 /* CommandListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000006 /* CommandListener.swift */; };
+		EE0000000000000000000093 /* WallpaperLibraryWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000094 /* WallpaperLibraryWatcher.swift */; };
 		EE0000000000000000000007 /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000008 /* BatteryMonitor.swift */; };
 		EE0000000000000000000009 /* ClockOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000A /* ClockOverlay.swift */; };
 		EE000000000000000000000B /* ClockSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000000C /* ClockSettings.swift */; };
@@ -278,6 +279,7 @@
 		AE000000000000000000001F /* preview.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = Resources/preview.jpg; sourceTree = "<group>"; };
 		EE0000000000000000000004 /* LockScreenSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSync.swift; sourceTree = "<group>"; };
 		EE0000000000000000000006 /* CommandListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandListener.swift; sourceTree = "<group>"; };
+		EE0000000000000000000094 /* WallpaperLibraryWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperLibraryWatcher.swift; sourceTree = "<group>"; };
 		EE0000000000000000000008 /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
 		EE000000000000000000000A /* ClockOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockOverlay.swift; sourceTree = "<group>"; };
 		EE000000000000000000000C /* ClockSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockSettings.swift; sourceTree = "<group>"; };
@@ -504,6 +506,7 @@
 				AE0000000000000000000007 /* LockScreenExchange.swift */,
 				AE000000000000000000001A /* LockScreenExtensionBridge.swift */,
 				EE0000000000000000000006 /* CommandListener.swift */,
+				EE0000000000000000000094 /* WallpaperLibraryWatcher.swift */,
 				EE0000000000000000000008 /* BatteryMonitor.swift */,
 				EE0000000000000000000090 /* PowerConditionMonitor.swift */,
 				EE0000000000000000000092 /* HTMLEntityDecoding.swift */,
@@ -917,6 +920,7 @@
 				EE0000000000000000000001 /* AerialsInjector.swift in Sources */,
 				EE0000000000000000000003 /* LockScreenSync.swift in Sources */,
 				EE0000000000000000000005 /* CommandListener.swift in Sources */,
+				EE0000000000000000000093 /* WallpaperLibraryWatcher.swift in Sources */,
 				EE0000000000000000000007 /* BatteryMonitor.swift in Sources */,
 				EE000000000000000000008F /* PowerConditionMonitor.swift in Sources */,
 				EE0000000000000000000091 /* HTMLEntityDecoding.swift in Sources */,
