@@ -240,6 +240,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 LockScreenExtensionBridge.shared.publish(wallpaper: wallpaper)
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
                 WallpaperChangeHook.run(for: wallpaper)
+                PaletteExporter.export(for: wallpaper)
             }
         }
         registerBundledClockFonts()

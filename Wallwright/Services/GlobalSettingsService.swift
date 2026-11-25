@@ -1015,6 +1015,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 LockScreenExtensionBridge.shared.publish(wallpaper: newValue)
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
                 WallpaperChangeHook.run(for: newValue)
+                PaletteExporter.export(for: newValue)
             }
         } else {
             // Reverted: registering a synthetic looping video (built from the wallpaper's own
@@ -1042,6 +1043,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 LockScreenExtensionBridge.shared.remove()
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
                 WallpaperChangeHook.run(for: newValue)
+                PaletteExporter.export(for: newValue)
             }
         }
     }
