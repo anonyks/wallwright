@@ -13,6 +13,7 @@
 //    echo "clearcache"        > /tmp/wallwright-501.pipe
 //    echo "status"            > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-status.json
 //    echo "apply <title>"     > /tmp/wallwright-501.pipe   # case-insensitive substring match, first hit wins
+//    echo "import <path>"     > /tmp/wallwright-501.pipe   # adds a local file to the library (does not apply it)
 //    echo "quit"              > /tmp/wallwright-501.pipe
 //
 //  Adapted from LivePaper (MIT License, Copyright (c) 2026 Raunak Gupta)
@@ -159,6 +160,10 @@ final class CommandListener {
             if parts.count > 1 {
                 applyWallpaper(matching: String(parts[1]))
             }
+        case "import":
+            if parts.count > 1 {
+                importFile(at: String(parts[1]))
+            }
         case "quit": NSApplication.shared.terminate(nil)
         case "toggleclock":
             AppDelegate.shared.globalSettingsViewModel.settings.showClockOverlay.toggle()
@@ -184,6 +189,31 @@ final class CommandListener {
             $0.project.title.lowercased().contains(needle)
         }) else { return }
         AppDelegate.shared.wallpaperViewModel.setWallpaper(match, for: WallpaperViewModel.mainScreenId())
+    }
+
+    /// Adds a local file already on disk to the library — does NOT also apply it, deliberately:
+    /// unlike `apply` above (which only ever reassigns an existing, already-validated wallpaper),
+    /// an import can fail for real reasons (corrupt file, unsupported codec, transcode failure),
+    /// and a script that wants both can just send `apply <title>` right after this succeeds. Reuses
+    /// `VideoImporter.importVideoFile`/`ImageImporter.importImageFile` wholesale — the exact same
+    /// direct-commit calls the Inbox's own downloaded-file path already uses, not the
+    /// prepare-then-review flow the drag-and-drop UI uses, since there's no UI here to review
+    /// anything in. `sourceProvider: "cli"` so an imported item's origin is visible in its own
+    /// `project.json` the same way "inbox"/"motionbgs"/etc. already are for theirs.
+    private func importFile(at pathString: String) {
+        let path = (pathString as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: path)
+        let ext = url.pathExtension.lowercased()
+        if ImageImporter.importableExtensions.contains(ext) {
+            let success = ImageImporter.importImageFile(at: url, sourceProvider: "cli")
+            WWLog.importing.notice("CommandListener: import (image) \(success ? "succeeded" : "failed", privacy: .public) for \(path, privacy: .public)")
+        } else if VideoImporter.importableExtensions.contains(ext) {
+            VideoImporter.importVideoFile(at: url, sourceProvider: "cli") { success in
+                WWLog.importing.notice("CommandListener: import (video) \(success ? "succeeded" : "failed", privacy: .public) for \(path, privacy: .public)")
+            }
+        } else {
+            WWLog.importing.notice("CommandListener: import — unsupported extension \(ext, privacy: .public) for \(path, privacy: .public)")
+        }
     }
 
     private func writeStatus() {
