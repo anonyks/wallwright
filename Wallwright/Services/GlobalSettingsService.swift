@@ -278,7 +278,12 @@ struct GlobalSettings: Codable, Equatable {
     var windowVibrancy = true
     var showClockOverlay = false
     var clockDayFont = GSClockFormat.anurati
-    var clockColor = GSClockColor.white
+    /// Defaults to following the wallpaper rather than a fixed solid color — only matters the
+    /// first time someone who's never touched this setting turns the clock overlay on at all
+    /// (`showClockOverlay` itself still defaults to off). Anyone who already has a saved
+    /// `clockColor` value keeps it exactly as-is: this only changes what a *missing* key decodes
+    /// to (see `init(from decoder:)` below), never an existing choice.
+    var clockColor = GSClockColor.dynamicWallpaperMatch
     /// The two stops of the user-built gradient (`GSClockColor.custom`) — each independently
     /// defaults to black, matching "gradient of [black + gradient type]" until the user picks
     /// something else for that stop.
@@ -435,7 +440,7 @@ struct GlobalSettings: Codable, Equatable {
         windowVibrancy = (try? c.decodeIfPresent(Bool.self, forKey: .windowVibrancy)) ?? nil ?? true
         showClockOverlay = (try? c.decodeIfPresent(Bool.self, forKey: .showClockOverlay)) ?? nil ?? false
         clockDayFont = (try? c.decodeIfPresent(GSClockFormat.self, forKey: .clockDayFont)) ?? nil ?? .anurati
-        clockColor = (try? c.decodeIfPresent(GSClockColor.self, forKey: .clockColor)) ?? nil ?? .white
+        clockColor = (try? c.decodeIfPresent(GSClockColor.self, forKey: .clockColor)) ?? nil ?? .dynamicWallpaperMatch
         clockCustomGradientStart = (try? c.decodeIfPresent(GSColor.self, forKey: .clockCustomGradientStart)) ?? nil ?? .black
         clockCustomGradientEnd = (try? c.decodeIfPresent(GSColor.self, forKey: .clockCustomGradientEnd)) ?? nil ?? .black
         clockCustomGradientHorizontal = (try? c.decodeIfPresent(Bool.self, forKey: .clockCustomGradientHorizontal)) ?? nil ?? false
