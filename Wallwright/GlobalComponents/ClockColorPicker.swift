@@ -93,6 +93,12 @@ struct ClockColorPicker: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let wallpaperId = PaletteExporter.current?.wallpaperId {
+                Picker("Direction", selection: customGradientDirectionBinding(wallpaperId: wallpaperId)) {
+                    Text("Horizontal").tag(true)
+                    Text("Vertical").tag(false)
+                }
+                .pickerStyle(.segmented)
+
                 ColorPicker("Start", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: true), supportsOpacity: false)
                 ColorPicker("End", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: false), supportsOpacity: false)
 
@@ -131,6 +137,28 @@ struct ClockColorPicker: View {
                 var overrides = settings.clockCustomGradientOverrides ?? [:]
                 var entry = overrides[wallpaperId] ?? seedOverride(wallpaperId: wallpaperId)
                 if isStart { entry.start = GSColor(newColor) } else { entry.end = GSColor(newColor) }
+                overrides[wallpaperId] = entry
+                settings.clockCustomGradientOverrides = overrides
+            }
+        )
+    }
+
+    /// Same read/seed/write pattern as `customGradientColorBinding`, for the override's
+    /// `horizontal` flag instead of its colors — lets direction be tweaked and saved per
+    /// wallpaper too, not just left at whatever the live gradient's own default is.
+    private func customGradientDirectionBinding(wallpaperId: String) -> Binding<Bool> {
+        Binding(
+            get: {
+                if let override = settings.clockCustomGradientOverrides?[wallpaperId] {
+                    return override.horizontal
+                }
+                guard let palette = PaletteExporter.current else { return true }
+                return GlobalSettings.wcagGuardedDynamicGradient(for: palette).horizontal
+            },
+            set: { newValue in
+                var overrides = settings.clockCustomGradientOverrides ?? [:]
+                var entry = overrides[wallpaperId] ?? seedOverride(wallpaperId: wallpaperId)
+                entry.horizontal = newValue
                 overrides[wallpaperId] = entry
                 settings.clockCustomGradientOverrides = overrides
             }
