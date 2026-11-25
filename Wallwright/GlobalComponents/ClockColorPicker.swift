@@ -66,7 +66,7 @@ struct ClockColorPicker: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(option.rawValue)
-        .help(option == .custom ? "Follows the current wallpaper's own colors — tap to fine-tune or pick your own" : "")
+        .help(option == .custom ? "Matches the wallpaper" : "")
 
         // Only the custom swatch actually needs a popover, but this used to attach one to every
         // swatch in the ForEach (gated on `option == .custom` inside the binding itself), so N
@@ -87,10 +87,9 @@ struct ClockColorPicker: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Custom")
                 .font(.headline)
-            Text("Follows the current wallpaper's own colors. Adjust to save a tweak just for this wallpaper.")
+            Text("Matches the wallpaper. Edit to override.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             if let wallpaperId = PaletteExporter.current?.wallpaperId {
                 Picker("Direction", selection: customGradientDirectionBinding(wallpaperId: wallpaperId)) {
@@ -98,6 +97,7 @@ struct ClockColorPicker: View {
                     Text("Vertical").tag(false)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
 
                 ColorPicker("Start", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: true), supportsOpacity: false)
                 ColorPicker("End", selection: customGradientColorBinding(wallpaperId: wallpaperId, isStart: false), supportsOpacity: false)
@@ -109,7 +109,7 @@ struct ClockColorPicker: View {
                     .font(.caption)
                 }
             } else {
-                Text("No wallpaper colors extracted yet.")
+                Text("No colors extracted yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
