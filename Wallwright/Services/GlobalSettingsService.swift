@@ -355,24 +355,31 @@ struct GlobalSettings: Codable, Equatable {
 
     /// A flat `(accent, vibrant)` pairing has no contrast guarantee at all — a dark wallpaper
     /// whose extracted accent/vibrant are both dark tones (navy + maroon, say) would render dark
-    /// text on a dark background. Anchoring one gradient stop to a fixed, guaranteed-legible
-    /// neutral (near-white on a dark wallpaper, near-black on a light one) and clamping the
-    /// extracted stop to a safe brightness range keeps every pairing readable while still
-    /// carrying each wallpaper's actual hue through the other stop. Shared between
-    /// `resolvedClockGradient` (the actual render) and `ClockColorPicker`'s swatch preview, so
-    /// the two can't drift apart.
+    /// text on a dark background. Anchoring one gradient stop to a near-white/near-black neutral
+    /// and clamping the extracted stop to a safe brightness range keeps every pairing readable
+    /// while still carrying each wallpaper's actual hue through that stop. The "neutral" stop
+    /// itself carries a faint trace of the same hue (low saturation, held at a safe brightness)
+    /// rather than being flat gray — confirmed live across several wallpapers that without this,
+    /// every dark wallpaper (most of this app's own library) produced the exact same literal
+    /// white, reading as disconnected from the actual image rather than wallpaper-matched.
+    /// Horizontal, not vertical — every line this overlay draws (day/date/time, each gradient
+    /// painted within just that one line's own box) is short and wide, so a vertical gradient's
+    /// transition is compressed into each glyph's own small height and barely reads, while
+    /// horizontal stretches the full color range across the line's much greater width. Shared
+    /// between `resolvedClockGradient` (the actual render) and `ClockColorPicker`'s swatch
+    /// preview, so the two can't drift apart.
     static func wcagGuardedDynamicGradient(for palette: PaletteExporter.ResolvedColors) -> (start: NSColor, end: NSColor, horizontal: Bool) {
         let extracted = palette.isDark ? palette.vibrant : palette.accent
         var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
         extracted.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         if palette.isDark {
-            let neutral = NSColor(white: 0.98, alpha: 1)
+            let neutral = NSColor(hue: hue, saturation: 0.08, brightness: 0.98, alpha: 1)
             let boosted = NSColor(hue: hue, saturation: min(saturation * 1.15, 0.85), brightness: max(brightness, 0.80), alpha: 1)
-            return (neutral, boosted, false)
+            return (neutral, boosted, true)
         } else {
-            let neutral = NSColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1)
+            let neutral = NSColor(hue: hue, saturation: 0.12, brightness: 0.10, alpha: 1)
             let deepened = NSColor(hue: hue, saturation: max(saturation, 0.60), brightness: min(brightness * 0.40, 0.32), alpha: 1)
-            return (neutral, deepened, false)
+            return (neutral, deepened, true)
         }
     }
 
