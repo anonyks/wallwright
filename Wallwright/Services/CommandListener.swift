@@ -6,6 +6,8 @@
 //  `501` — `id -u`):
 //    echo "pause"             > /tmp/wallwright-501.pipe
 //    echo "resume"            > /tmp/wallwright-501.pipe
+//    echo "toggle"            > /tmp/wallwright-501.pipe   # pause/resume without checking state first
+//    echo "togglemute"        > /tmp/wallwright-501.pipe
 //    echo "volume 50"         > /tmp/wallwright-501.pipe
 //    echo "next"              > /tmp/wallwright-501.pipe
 //    echo "prev"              > /tmp/wallwright-501.pipe
@@ -135,6 +137,15 @@ final class CommandListener {
             AppDelegate.shared.resume()
         case "mute": AppDelegate.shared.mute()
         case "unmute": AppDelegate.shared.unmute()
+        case "toggle":
+            // `togglePause()`, not duplicating the pause/resume branch above — it already sets
+            // `isPausedByUser` correctly either way (see its own definition), so this is a thin
+            // wrapper, not new logic. Exists so a script bound to one single trigger (a hotkey
+            // app, a BetterTouchTool-style action) doesn't need to call `status` first just to
+            // decide which of `pause`/`resume` to send.
+            AppDelegate.shared.togglePause()
+        case "togglemute":
+            AppDelegate.shared.toggleMute()
         case "volume":
             if parts.count > 1, let value = Float(parts[1]) {
                 AppDelegate.shared.wallpaperViewModel.playVolume = max(0, min(1, value / 100))
