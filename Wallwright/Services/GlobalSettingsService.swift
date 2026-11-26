@@ -1099,7 +1099,7 @@ class GlobalSettingsViewModel: ObservableObject {
         // `.receive(on:)`), and `setDesktopImageURL` is a slow, blocking IPC call to the Dock —
         // same class of bug as the wallpaper-switch lag fixed elsewhere; dispatched off-main here
         // for the same reason.
-        DispatchQueue.global(qos: .utility).async {
+        DesktopUpdates.refresh {
             if newValue != true {
                 if let wallpaper = UserDefaults.standard.url(forKey: "OSWallpaper") {
                     do {
@@ -1204,7 +1204,7 @@ class GlobalSettingsViewModel: ObservableObject {
             // macOS's own default if none ever has this session) for as long as the video wallpaper
             // stayed active — confirmed live as a soft gradient from Apple's own default aerial
             // bleeding through the menu bar while a completely unrelated video played.
-            DispatchQueue.global(qos: .utility).async {
+            DesktopUpdates.applySwitch {
                 let videoURL = newValue.wallpaperDirectory.appending(path: newValue.project.file)
                 AerialsInjector.shared.inject(videoURL: videoURL, name: newValue.project.title)
                 LockScreenExtensionBridge.shared.publish(wallpaper: newValue)
@@ -1232,7 +1232,7 @@ class GlobalSettingsViewModel: ObservableObject {
             // call, silently reverting the desktop to macOS's default. Running both inside one
             // closure guarantees the aerial cleanup (and its restart, if any) fully settles before
             // we write the desktop image, so that write is always the last thing that happens.
-            DispatchQueue.global(qos: .utility).async {
+            DesktopUpdates.applySwitch {
                 AerialsInjector.shared.remove()
                 LockScreenExtensionBridge.shared.remove()
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)

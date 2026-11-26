@@ -205,11 +205,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // but decodes zero frames when this happens). This unconditional startup call was
         // reintroducing that exact bug on every launch.
         if wallpaperViewModel.currentWallpaper.project.type != "video" {
-            let wallpaper = wallpaperViewModel.currentWallpaper
+            let wallpaper = wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId())
             // `setPlacehoderWallpaper` is a plain synchronous call (see its own doc comment) —
             // dispatched here, same as `didCurrentWallpaperChange`, so a slow `setDesktopImageURL`
             // IPC call doesn't stall app launch on the main thread.
-            DispatchQueue.global(qos: .utility).async {
+            DesktopUpdates.applySwitch {
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
             }
         } else {
@@ -228,10 +228,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // actually cheap to call twice); `AerialsInjector.inject()` now debounces a same-URL
             // re-injection on its own, so this call staying here is safe regardless of whether the
             // reactive path also fires.
-            let wallpaper = wallpaperViewModel.currentWallpaper
-            // Main screen, not the selected one: the clock follows the main screen's wallpaper.
-            PaletteExporter.export(for: wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId()))
-            DispatchQueue.global(qos: .utility).async {
+            // Main screen, not the selected one, like the reactive path. Whichever of the two
+            // asks last replaces the other, so they have to mean the same wallpaper.
+            let wallpaper = wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId())
+            PaletteExporter.export(for: wallpaper)
+            DesktopUpdates.applySwitch {
                 // Same ordering as `didCurrentWallpaperChange`'s video branch, and for the same
                 // reason (see its own doc comment) — `inject()` first, including the WallpaperAgent
                 // restart it always ends with, THEN `setPlacehoderWallpaper` so its

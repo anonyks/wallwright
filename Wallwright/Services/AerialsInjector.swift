@@ -94,7 +94,7 @@ final class AerialsInjector {
             // not anything the user is actively watching for. A few extra minutes before self-
             // healing is imperceptible, so it's not worth checking this often.
             self.healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-                self?.checkHealth()
+                DesktopUpdates.refresh { self?.checkHealth() }
             }
             self.healthCheckTimer?.tolerance = 60
         }

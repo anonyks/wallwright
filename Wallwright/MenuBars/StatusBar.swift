@@ -112,7 +112,7 @@ extension AppDelegate {
         // delivery failure, just never-ending churn). `republishCurrent()` now self-debounces
         // (skips the restart entirely when already correctly selected), so this is cheap to call
         // directly with no delay.
-        DispatchQueue.global(qos: .utility).async {
+        DesktopUpdates.refresh {
             LockScreenExtensionBridge.shared.republishCurrent()
         }
     }

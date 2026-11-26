@@ -128,7 +128,7 @@ final class LockScreenSync {
         // Store/Index.plist slots was the actual cause of the lock screen looking stuck/static, not
         // a delivery failure. `republishCurrent()` self-debounces (skips the restart when already
         // correctly selected), so no delay is needed now that nothing competes with it here.
-        DispatchQueue.global(qos: .utility).async {
+        DesktopUpdates.refresh {
             LockScreenExtensionBridge.shared.republishCurrent()
         }
     }
@@ -161,7 +161,7 @@ final class LockScreenSync {
 
         selfHealTimer?.invalidate()
         let timer = Timer.scheduledTimer(withTimeInterval: Self.selfHealInterval, repeats: true) { _ in
-            DispatchQueue.global(qos: .utility).async {
+            DesktopUpdates.refresh {
                 LockScreenExtensionBridge.shared.republishCurrent()
             }
         }
@@ -195,7 +195,7 @@ final class LockScreenSync {
         // was the actual cause of the lock screen looking stuck/static, not a delivery failure.
         // `republishCurrent()` self-debounces (skips the restart when already correctly selected),
         // so no delay is needed now that nothing competes with it here.
-        DispatchQueue.global(qos: .utility).async {
+        DesktopUpdates.refresh {
             LockScreenExtensionBridge.shared.republishCurrent()
         }
     }
