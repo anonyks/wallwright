@@ -52,6 +52,9 @@ extension FileManager {
             candidate = wallpapersDirectory.appending(path: "\(base) \(suffix)")
             suffix += 1
         }
+        // Clock settings are keyed by folder path. Nothing exists at this one, so any saved
+        // under it belong to a deleted wallpaper and mustn't carry over to the new import.
+        GlobalSettingsViewModel.forgetClockSettings(forWallpaperAt: candidate)
         return candidate
     }
 }

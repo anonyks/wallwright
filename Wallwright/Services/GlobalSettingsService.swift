@@ -1124,6 +1124,25 @@ class GlobalSettingsViewModel: ObservableObject {
         }
     }
     
+    /// Drops the clock profile and custom gradient saved for a folder. Callable from any thread:
+    /// importers run both on and off the main one.
+    static func forgetClockSettings(forWallpaperAt directory: URL) {
+        let id = directory.standardizedFileURL.path
+        let forget = { AppDelegate.shared.globalSettingsViewModel.forgetClockSettings(forWallpaperId: id) }
+        if Thread.isMainThread { forget() } else { DispatchQueue.main.async(execute: forget) }
+    }
+
+    private func forgetClockSettings(forWallpaperId id: String) {
+        // The deleted wallpaper may still be the active one. Without this, `didSet` would save
+        // the live settings straight back under its id.
+        if activeClockWallpaperId == id { activeClockWallpaperId = nil }
+        guard settings.clockWallpaperPresets?[id] != nil || settings.clockCustomGradientOverrides?[id] != nil else { return }
+        var next = settings
+        next.clockWallpaperPresets?[id] = nil
+        next.clockCustomGradientOverrides?[id] = nil
+        settings = next
+    }
+
     /// Loads `wallpaper`'s clock profile, creating it first if it has none.
     func activateClockProfile(for wallpaper: WEWallpaper) {
         var next = settings
