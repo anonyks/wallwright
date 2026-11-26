@@ -77,6 +77,22 @@ enum PaletteExporter {
         }
     }
 
+    /// This wallpaper's own colors, read directly from its preview. For callers that have to be
+    /// certain which wallpaper the colors belong to, which `current` can't promise in the brief
+    /// moment after a switch. Safe on any thread.
+    static func palette(for wallpaper: WEWallpaper) -> Palette? {
+        guard !wallpaper.project.preview.isEmpty else { return nil }
+        return extractRawPalette(from: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview))
+            .map(hexPalette)
+    }
+
+    private static func hexPalette(_ raw: RawPalette) -> Palette {
+        Palette(
+            dominant: hexString(raw.dominant), accent: hexString(raw.accent),
+            vibrant: hexString(raw.vibrant), surface: hexString(raw.surface), isDark: raw.isDark
+        )
+    }
+
     private static func publish(_ raw: RawPalette?, for wallpaper: WEWallpaper) {
         // A failed extraction clears `current`: the previous wallpaper's colors (and the
         // target for color edits) must not carry over to this one.
@@ -93,10 +109,7 @@ enum PaletteExporter {
             "PaletteExporter: dominant=\(hexString(raw.dominant), privacy: .public) accent=\(hexString(raw.accent), privacy: .public) vibrant=\(hexString(raw.vibrant), privacy: .public) surface=\(hexString(raw.surface), privacy: .public) isDark=\(raw.isDark, privacy: .public) for \(wallpaper.project.title, privacy: .public)"
         )
 
-        let palette = Palette(
-            dominant: hexString(raw.dominant), accent: hexString(raw.accent),
-            vibrant: hexString(raw.vibrant), surface: hexString(raw.surface), isDark: raw.isDark
-        )
+        let palette = hexPalette(raw)
         queue.async {
             guard let data = try? JSONEncoder().encode(palette) else { return }
             try? FileManager.default.createDirectory(

@@ -14,11 +14,11 @@ import Foundation
 enum WallpaperChangeHook {
     private static let scriptPath = NSString(string: "~/.config/wallwright/on_change.sh").expandingTildeInPath
 
-    /// Every real call site already dispatches to `DispatchQueue.global(qos: .utility)` — a
-    /// *concurrent* queue — before calling `run(for:)`, so two wallpaper-apply paths (confirmed:
+    /// Callers go through `DesktopUpdates`, which keeps calls in switch order. This queue was
+    /// added when they ran on a concurrent queue, where two wallpaper-apply paths (confirmed:
     /// `AppDelegate`'s launch-time restore and `GlobalSettingsService.didCurrentWallpaperChange`'s
     /// reactive subscription both fire for the same wallpaper at startup, the latter delivering its
-    /// current value immediately on subscribe) can call in genuinely concurrently. A bare
+    /// current value immediately on subscribe) could call in genuinely concurrently. A bare
     /// `static var` debounce check would race exactly the way this codebase's own file-write races
     /// already did (see `LockScreenExtensionBridge.atomicCopy`'s doc comment) — serial, not
     /// concurrent, closes that instead of just making the race less likely.
@@ -28,10 +28,11 @@ enum WallpaperChangeHook {
     /// Call from wherever a wallpaper actually gets applied — this does its own file-existence
     /// check up front, so calling it unconditionally on every wallpaper change is fine.
     ///
-    /// Only passes `--file` for now, not the fuller `--screen`/`--dominant-hex`/`--accent-hex`/
-    /// `--is-dark` set sketched in the roadmap — this app doesn't have a per-display wallpaper
-    /// identity or any color-extraction pipeline yet (`docs/ROADMAP.md` milestones 3 and 4), and
-    /// inventing placeholder values for those would be worse than just not sending them.
+    /// The script receives `--file <path>`, followed by `--dominant-hex <#RRGGBB>`,
+    /// `--accent-hex <#RRGGBB>` and `--is-dark <true|false>` for that same file. The color
+    /// arguments are left out if the preview can't be read. `--file` stays first, so scripts that
+    /// read it by position keep working. No `--screen` yet: this app has no per-display identity
+    /// to pass.
     static func run(for wallpaper: WEWallpaper) {
         guard FileManager.default.isExecutableFile(atPath: scriptPath) else { return }
         let fileURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
@@ -42,7 +43,14 @@ enum WallpaperChangeHook {
 
             let task = Process()
             task.executableURL = URL(fileURLWithPath: scriptPath)
-            task.arguments = ["--file", fileURL.path]
+            var arguments = ["--file", fileURL.path]
+            if let palette = PaletteExporter.palette(for: wallpaper) {
+                arguments += [
+                    "--dominant-hex", palette.dominant, "--accent-hex", palette.accent,
+                    "--is-dark", String(palette.isDark),
+                ]
+            }
+            task.arguments = arguments
             // `nil` is `Process`'s own default and means INHERIT the parent's file handles, not
             // discard — actually swallowing the script's output (so it never ends up interleaved
             // in Wallwright's own logs) means handing it a real file handle on `/dev/null`.

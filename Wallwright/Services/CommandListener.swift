@@ -14,6 +14,7 @@
 //    echo "pin"               > /tmp/wallwright-501.pipe
 //    echo "clearcache"        > /tmp/wallwright-501.pipe
 //    echo "status"            > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-status.json
+//    echo "palette"           > /tmp/wallwright-501.pipe   # writes /tmp/wallwright-501-palette.json
 //    echo "apply <title>"     > /tmp/wallwright-501.pipe   # case-insensitive substring match, first hit wins
 //    echo "import <path>"     > /tmp/wallwright-501.pipe   # adds a local file to the library (does not apply it)
 //    echo "quit"              > /tmp/wallwright-501.pipe
@@ -36,6 +37,18 @@ private struct WallwrightStatus: Codable {
     var volumePercent: Int
 }
 
+/// Written by the `palette` command: the main screen's wallpaper colors, with the wallpaper they
+/// belong to. These are the wallpaper's own colors, not the clock's gradient or a custom override.
+private struct WallwrightPalette: Codable {
+    var title: String
+    var file: String
+    var dominant: String
+    var accent: String
+    var vibrant: String
+    var surface: String
+    var isDark: Bool
+}
+
 final class CommandListener {
     static let shared = CommandListener()
 
@@ -50,6 +63,7 @@ final class CommandListener {
     // Same UID-scoping reasoning as `path` above — a predictable sibling name next to the pipe,
     // not under a user-writable directory a script would need to create first.
     private let statusPath = "/tmp/wallwright-\(getuid())-status.json"
+    private let palettePath = "/tmp/wallwright-\(getuid())-palette.json"
     private var started = false
 
     private init() {}
@@ -167,6 +181,8 @@ final class CommandListener {
             ThumbnailImage.clearCache()
         case "status":
             writeStatus()
+        case "palette":
+            writePalette()
         case "apply":
             if parts.count > 1 {
                 applyWallpaper(matching: String(parts[1]))
@@ -184,6 +200,24 @@ final class CommandListener {
             }
         default: break
         }
+    }
+
+    private func writePalette() {
+        // Removed first, so a preview that can't be read leaves no file instead of an older
+        // wallpaper's colors.
+        try? FileManager.default.removeItem(atPath: palettePath)
+        let wallpaper = AppDelegate.shared.wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId())
+        guard let colors = PaletteExporter.palette(for: wallpaper),
+              let data = try? JSONEncoder().encode(WallwrightPalette(
+                title: wallpaper.project.title,
+                file: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file).path,
+                dominant: colors.dominant, accent: colors.accent,
+                vibrant: colors.vibrant, surface: colors.surface, isDark: colors.isDark
+              ))
+        else { return }
+        try? data.write(to: URL(fileURLWithPath: palettePath), options: .atomic)
+        // Same 0600 posture as the status file, for the same reason (title and file path).
+        chmod(palettePath, 0o600)
     }
 
     /// Applies the first library wallpaper whose title contains `query` (case-insensitive) to the
