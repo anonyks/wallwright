@@ -229,6 +229,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // re-injection on its own, so this call staying here is safe regardless of whether the
             // reactive path also fires.
             let wallpaper = wallpaperViewModel.currentWallpaper
+            // Main screen, not the selected one: the clock follows the main screen's wallpaper.
+            PaletteExporter.export(for: wallpaperViewModel.wallpaper(for: WallpaperViewModel.mainScreenId()))
             DispatchQueue.global(qos: .utility).async {
                 // Same ordering as `didCurrentWallpaperChange`'s video branch, and for the same
                 // reason (see its own doc comment) — `inject()` first, including the WallpaperAgent
@@ -240,12 +242,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 LockScreenExtensionBridge.shared.publish(wallpaper: wallpaper)
                 AppDelegate.shared.setPlacehoderWallpaper(with: wallpaper)
                 WallpaperChangeHook.run(for: wallpaper)
-                PaletteExporter.export(for: wallpaper)
-                // `applyClockPresetIfSaved` mutates `@Published var settings` — hopped to main
-                // since this whole block runs on a background `.utility` queue.
-                DispatchQueue.main.async {
-                    AppDelegate.shared.globalSettingsViewModel.applyClockPresetIfSaved(for: wallpaper)
-                }
             }
         }
         registerBundledClockFonts()

@@ -10,8 +10,7 @@ import ImageIO
 
 /// Writes the active wallpaper's extracted colors to `~/.config/wallwright/palettes/current.json`
 /// on every wallpaper change, for ricing tools (SketchyBar, Ghostty, Kitty, Raycast, ...) that
-/// want to theme themselves off the current desktop. Called from the same background-queue call
-/// sites as `WallpaperChangeHook`.
+/// want to theme themselves off the current desktop.
 ///
 /// Also keeps the same extraction available in-process as real `NSColor`s (`current`), read
 /// directly by `GlobalSettings.resolvedClockGradient` for the clock overlay's "Dynamic Wallpaper
@@ -39,7 +38,7 @@ enum PaletteExporter {
         let isDark: Bool
     }
 
-    /// Only ever assigned on the main queue (see `export(for:)` below), even though extraction
+    /// Only ever assigned on the main queue (see `publish` below), even though extraction
     /// itself runs on a background queue — safe to read from the main thread at any time,
     /// including mid-draw from `ClockOverlayView`.
     static private(set) var current: ResolvedColors?
@@ -54,24 +53,42 @@ enum PaletteExporter {
     )
 
     /// Downsampled sample size — large enough to capture the image's real color distribution,
-    /// small enough that extraction runs in low-single-digit milliseconds even though every call
-    /// site already dispatches this to a background `.utility` queue anyway.
+    /// small enough that extraction runs in low-single-digit milliseconds.
     private static let sampleDimension = 24
 
-    static func export(for wallpaper: WEWallpaper) {
-        guard !wallpaper.project.preview.isEmpty else { return }
-        let previewURL = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview)
-        guard let raw = extractRawPalette(from: previewURL) else { return }
+    /// Serial, so JSON writes land in the order results were accepted.
+    private static let queue = DispatchQueue(label: "Wallwright.PaletteExporter", qos: .userInitiated)
+    /// Main queue only. Identifies the newest request, so an older one can't overwrite it.
+    private static var latestRequest = 0
 
-        let resolved = ResolvedColors(
-            wallpaperId: wallpaper.id,
-            dominant: nsColor(raw.dominant), accent: nsColor(raw.accent),
-            vibrant: nsColor(raw.vibrant), surface: nsColor(raw.surface), isDark: raw.isDark
-        )
-        DispatchQueue.main.async {
-            current = resolved
-            NotificationCenter.default.post(name: didUpdateNotification, object: nil)
+    /// Call on the main queue, as soon as the wallpaper changes and ahead of any slow desktop
+    /// updates, so the clock doesn't sit on the previous wallpaper's colors.
+    static func export(for wallpaper: WEWallpaper) {
+        latestRequest += 1
+        let request = latestRequest
+        queue.async {
+            let raw = wallpaper.project.preview.isEmpty ? nil : extractRawPalette(
+                from: wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview)
+            )
+            DispatchQueue.main.async {
+                guard request == latestRequest else { return }
+                publish(raw, for: wallpaper)
+            }
         }
+    }
+
+    private static func publish(_ raw: RawPalette?, for wallpaper: WEWallpaper) {
+        // A failed extraction clears `current`: the previous wallpaper's colors (and the
+        // target for color edits) must not carry over to this one.
+        current = raw.map { raw in
+            ResolvedColors(
+                wallpaperId: wallpaper.id,
+                dominant: nsColor(raw.dominant), accent: nsColor(raw.accent),
+                vibrant: nsColor(raw.vibrant), surface: nsColor(raw.surface), isDark: raw.isDark
+            )
+        }
+        NotificationCenter.default.post(name: didUpdateNotification, object: nil)
+        guard let raw else { return }
         WWLog.settings.notice(
             "PaletteExporter: dominant=\(hexString(raw.dominant), privacy: .public) accent=\(hexString(raw.accent), privacy: .public) vibrant=\(hexString(raw.vibrant), privacy: .public) surface=\(hexString(raw.surface), privacy: .public) isDark=\(raw.isDark, privacy: .public) for \(wallpaper.project.title, privacy: .public)"
         )
@@ -80,11 +97,13 @@ enum PaletteExporter {
             dominant: hexString(raw.dominant), accent: hexString(raw.accent),
             vibrant: hexString(raw.vibrant), surface: hexString(raw.surface), isDark: raw.isDark
         )
-        guard let data = try? JSONEncoder().encode(palette) else { return }
-        try? FileManager.default.createDirectory(
-            at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        try? data.write(to: outputURL, options: .atomic)
+        queue.async {
+            guard let data = try? JSONEncoder().encode(palette) else { return }
+            try? FileManager.default.createDirectory(
+                at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try? data.write(to: outputURL, options: .atomic)
+        }
     }
 
     private static func nsColor(_ color: (r: Int, g: Int, b: Int)) -> NSColor {

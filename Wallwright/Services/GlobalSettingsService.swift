@@ -145,17 +145,9 @@ struct GSWallpaperGradientOverride: Codable, Equatable {
     var horizontal: Bool = false
 }
 
-/// A full clock-overlay "look" for one specific wallpaper — font, all three font sizes, which
-/// color mode is active, text alignment, seconds/24h format, the Summit divider length, and
-/// opacity. Captured automatically (see `GlobalSettingsService`'s auto-save subscription) the
-/// moment any of these fields changes while a given wallpaper is active, and re-applied the
-/// instant that wallpaper becomes active again. Deliberately excludes `clockCustomOrigins`
-/// (window position) and `clockDraggable` — those are about where the overlay sits on a given
-/// screen/monitor arrangement, not about a wallpaper's own look, and mixing the two axes would
-/// mean switching wallpapers could also silently relocate the window. `color` just decides which
-/// `GSClockColor` case this wallpaper uses — `.custom`'s own resolution (live wallpaper match,
-/// a saved per-wallpaper override, or the vestigial global fallback) happens in
-/// `resolvedClockGradient` exactly as it already does, unaffected by this preset.
+/// One wallpaper's whole clock setup, position included. Every wallpaper gets one the first
+/// time it's shown, so none ever inherits whatever the previous wallpaper left behind. Show/hide
+/// and drag mode stay global: they're app controls, not part of a wallpaper's look.
 struct GSWallpaperClockPreset: Codable, Equatable {
     var dayFont: GSClockFormat
     var dayFontSize: Double
@@ -167,6 +159,36 @@ struct GSWallpaperClockPreset: Codable, Equatable {
     var use24HourTime: Bool
     var summitLineLength: Double
     var opacity: Double
+    /// Per screen, same shape as `GlobalSettings.clockCustomOrigins`. Nil means centered.
+    var origins: [String: CGPoint]?
+
+    init(from settings: GlobalSettings) {
+        dayFont = settings.clockDayFont
+        dayFontSize = settings.clockDayFontSize
+        dateFontSize = settings.clockDateFontSize
+        timeFontSize = settings.clockTimeFontSize
+        color = settings.clockColor
+        textAlignment = settings.clockTextAlignment
+        showSeconds = settings.clockShowSeconds
+        use24HourTime = settings.clockUse24HourTime
+        summitLineLength = settings.clockSummitLineLength
+        opacity = settings.clockOpacity
+        origins = settings.clockCustomOrigins
+    }
+
+    func apply(to settings: inout GlobalSettings) {
+        settings.clockDayFont = dayFont
+        settings.clockDayFontSize = dayFontSize
+        settings.clockDateFontSize = dateFontSize
+        settings.clockTimeFontSize = timeFontSize
+        settings.clockColor = color
+        settings.clockTextAlignment = textAlignment
+        settings.clockShowSeconds = showSeconds
+        settings.clockUse24HourTime = use24HourTime
+        settings.clockSummitLineLength = summitLineLength
+        settings.clockOpacity = opacity
+        settings.clockCustomOrigins = origins
+    }
 }
 
 enum GSClockColor: String, CaseIterable, Identifiable, Codable {
@@ -345,10 +367,11 @@ struct GlobalSettings: Codable, Equatable {
     /// extraction — this only matters once the user actually adjusts and saves a tweak for a
     /// specific wallpaper via `ClockColorPicker`'s Custom editor.
     var clockCustomGradientOverrides: [String: GSWallpaperGradientOverride]? = nil
-    /// Per-wallpaper full clock "look" — font, sizes, color mode, alignment, seconds/24h,
-    /// opacity — keyed by `WEWallpaper.id`. See `GSWallpaperClockPreset`'s own doc comment and
-    /// `GlobalSettingsService.applyClockPresetIfSaved`/its auto-save subscription.
+    /// Each wallpaper's clock profile, keyed by `WEWallpaper.id`.
     var clockWallpaperPresets: [String: GSWallpaperClockPreset]? = nil
+    /// What a wallpaper without a profile starts from (always with `.custom` color). Captured
+    /// once, so later edits to one wallpaper don't change what new ones start with.
+    var clockDefaultProfile: GSWallpaperClockPreset? = nil
 
     /// `true` for every gradient case, including `.custom` — `GSClockColor.isGradient` already
     /// covers this; kept here too so callers reading through `GlobalSettings` don't need to reach
@@ -401,7 +424,16 @@ struct GlobalSettings: Codable, Equatable {
         let extracted = palette.accent
         var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
         extracted.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        if palette.isDark {
+        // Per spec, the neutral is the opposite of whichever color is MOST PRESENT — the
+        // dominant bucket's own lightness, not `palette.isDark` (the whole image's *average*
+        // luminance, used for the exported ricing JSON instead — a different, valid question).
+        // A wallpaper whose dominant tone is a light gray, scattered with enough small dark
+        // detail to pull the overall average below the dark threshold, should still get a black
+        // neutral (dominant is light), not white (average reads dark) — the two can disagree.
+        var dr: CGFloat = 0, dg: CGFloat = 0, db: CGFloat = 0, da: CGFloat = 0
+        palette.dominant.getRed(&dr, green: &dg, blue: &db, alpha: &da)
+        let dominantIsDark = (0.299 * dr + 0.587 * dg + 0.114 * db) < 0.5
+        if dominantIsDark {
             let neutral = NSColor(hue: hue, saturation: 0.08, brightness: 0.98, alpha: 1)
             let boosted = NSColor(hue: hue, saturation: min(saturation * 1.15, 0.85), brightness: max(brightness, 0.80), alpha: 1)
             return (neutral, boosted, true)
@@ -492,6 +524,7 @@ struct GlobalSettings: Codable, Equatable {
         clockCustomOrigins = (try? c.decodeIfPresent([String: CGPoint].self, forKey: .clockCustomOrigins)) ?? nil
         clockCustomGradientOverrides = (try? c.decodeIfPresent([String: GSWallpaperGradientOverride].self, forKey: .clockCustomGradientOverrides)) ?? nil
         clockWallpaperPresets = (try? c.decodeIfPresent([String: GSWallpaperClockPreset].self, forKey: .clockWallpaperPresets)) ?? nil
+        clockDefaultProfile = (try? c.decodeIfPresent(GSWallpaperClockPreset.self, forKey: .clockDefaultProfile)) ?? nil
         steamUsername = (try? c.decodeIfPresent(String.self, forKey: .steamUsername)) ?? nil
         steamWorkshopSafeMode = (try? c.decodeIfPresent(Bool.self, forKey: .steamWorkshopSafeMode)) ?? nil ?? true
         pauseHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .pauseHotkey)) ?? nil ?? Self.defaultPauseHotkey
@@ -509,7 +542,10 @@ class GlobalSettingsViewModel: ObservableObject {
         // `init` for why. `validate()` stays synchronous: it's cheap (no disk I/O) and some of what
         // it does (`NSApp.appearance`) should track the live value immediately, not lag behind a
         // debounce.
-        didSet { validate() }
+        didSet {
+            validate()
+            saveActiveClockProfile()
+        }
     }
 
     /// Debounces the actual disk write for `settings` — see its own doc comment where it's wired
@@ -535,16 +571,15 @@ class GlobalSettingsViewModel: ObservableObject {
     var didFullscreenChangeCancellable: Cancellable?
     var didDisplaySleepChangeCancellable: Cancellable?
     var didChangeHotkeysCancellable: Cancellable?
-    var autoSaveWallpaperClockPresetCancellable: Cancellable?
 
     /// Tracked directly here rather than via a dedicated monitor class — `NSWorkspace`'s own
     /// screensDidSleep/didWake notifications are already the real, first-party signal, so there's
     /// nothing to poll or approximate the way BatteryMonitor/FullscreenAppMonitor have to.
     private var isDisplayAsleep = false
 
-    /// Guards `autoSaveWallpaperClockPresetCancellable` from treating `applyClockPresetIfSaved`'s
-    /// own writes as a user edit worth re-saving — see that subscription's own doc comment.
-    private var isApplyingWallpaperClockPreset = false
+    /// The wallpaper whose clock profile is currently loaded into `settings` — the one edits are
+    /// saved to. Set only by `activateClockProfile`, so saving and loading can't disagree.
+    private var activeClockWallpaperId: String?
 
     /// Settings live in their own file rather than `UserDefaults` — `UserDefaults.synchronize()`
     /// has been a documented no-op for years, so a write can still be sitting unflushed in
@@ -604,7 +639,6 @@ class GlobalSettingsViewModel: ObservableObject {
         didDisplaySleepChangeCancellable?.cancel()
         didChangeHotkeysCancellable?.cancel()
         settingsSaveCancellable?.cancel()
-        autoSaveWallpaperClockPresetCancellable?.cancel()
     }
     
     func didFinishLaunchingNotification() {
@@ -631,52 +665,6 @@ class GlobalSettingsViewModel: ObservableObject {
                 else { return }
                 lastMainWallpaper = wp
                 self?.didCurrentWallpaperChange(wp)
-            }
-
-        self.autoSaveWallpaperClockPresetCancellable =
-        self.$settings
-            .dropFirst()
-            // Ignore the writes `applyClockPresetIfSaved` itself just made — otherwise applying
-            // a saved preset on a wallpaper switch would immediately look like "the user just
-            // customized this wallpaper," re-saving the exact same preset straight back.
-            // Evaluated here, before the debounce below, so it actually sees the flag's true
-            // value at the moment each field write happens — debouncing first would let the flag
-            // reset back to false before this ever got a chance to check it.
-            .filter { [weak self] _ in self?.isApplyingWallpaperClockPreset != true }
-            .removeDuplicates {
-                $0.clockDayFont == $1.clockDayFont
-                && $0.clockDayFontSize == $1.clockDayFontSize
-                && $0.clockDateFontSize == $1.clockDateFontSize
-                && $0.clockTimeFontSize == $1.clockTimeFontSize
-                && $0.clockColor == $1.clockColor
-                && $0.clockTextAlignment == $1.clockTextAlignment
-                && $0.clockShowSeconds == $1.clockShowSeconds
-                && $0.clockUse24HourTime == $1.clockUse24HourTime
-                && $0.clockSummitLineLength == $1.clockSummitLineLength
-                && $0.clockOpacity == $1.clockOpacity
-            }
-            // Captures which wallpaper was active AT EDIT TIME, before the debounce below —
-            // otherwise switching wallpapers within the debounce window of an edit could save the
-            // new wallpaper's id instead of the one actually being customized.
-            .map { settings in (settings, AppDelegate.shared.wallpaperViewModel.currentWallpaper.id) }
-            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
-            .sink { [weak self] newSettings, wallpaperId in
-                guard let self else { return }
-                let preset = GSWallpaperClockPreset(
-                    dayFont: newSettings.clockDayFont,
-                    dayFontSize: newSettings.clockDayFontSize,
-                    dateFontSize: newSettings.clockDateFontSize,
-                    timeFontSize: newSettings.clockTimeFontSize,
-                    color: newSettings.clockColor,
-                    textAlignment: newSettings.clockTextAlignment,
-                    showSeconds: newSettings.clockShowSeconds,
-                    use24HourTime: newSettings.clockUse24HourTime,
-                    summitLineLength: newSettings.clockSummitLineLength,
-                    opacity: newSettings.clockOpacity
-                )
-                var presets = self.settings.clockWallpaperPresets ?? [:]
-                presets[wallpaperId] = preset
-                self.settings.clockWallpaperPresets = presets
             }
 
         self.didAddToLoginItemCancellable =
@@ -1136,29 +1124,45 @@ class GlobalSettingsViewModel: ObservableObject {
         }
     }
     
-    /// Re-applies a wallpaper's saved clock "look" (see `GSWallpaperClockPreset`) the instant it
-    /// becomes active — a no-op if nothing's been saved for it yet. `isApplyingWallpaperClockPreset`
-    /// is set for the duration of the writes so `autoSaveWallpaperClockPresetCancellable` doesn't
-    /// mistake re-applying a saved preset for the user customizing this wallpaper all over again.
-    func applyClockPresetIfSaved(for wallpaper: WEWallpaper) {
-        guard let preset = settings.clockWallpaperPresets?[wallpaper.id] else { return }
-        isApplyingWallpaperClockPreset = true
-        settings.clockDayFont = preset.dayFont
-        settings.clockDayFontSize = preset.dayFontSize
-        settings.clockDateFontSize = preset.dateFontSize
-        settings.clockTimeFontSize = preset.timeFontSize
-        settings.clockColor = preset.color
-        settings.clockTextAlignment = preset.textAlignment
-        settings.clockShowSeconds = preset.showSeconds
-        settings.clockUse24HourTime = preset.use24HourTime
-        settings.clockSummitLineLength = preset.summitLineLength
-        settings.clockOpacity = preset.opacity
-        isApplyingWallpaperClockPreset = false
+    /// Loads `wallpaper`'s clock profile, creating it first if it has none.
+    func activateClockProfile(for wallpaper: WEWallpaper) {
+        var next = settings
+        let fallback = next.clockDefaultProfile ?? GSWallpaperClockPreset(from: next)
+        next.clockDefaultProfile = fallback
+        var profile: GSWallpaperClockPreset
+        if let saved = next.clockWallpaperPresets?[wallpaper.id] {
+            profile = saved
+        } else {
+            profile = fallback
+            profile.color = .custom
+        }
+        let moved = next.clockCustomOrigins != profile.origins
+        profile.apply(to: &next)
+        next.clockWallpaperPresets = (next.clockWallpaperPresets ?? [:]).merging([wallpaper.id: profile]) { $1 }
+
+        activeClockWallpaperId = nil
+        settings = next
+        activeClockWallpaperId = wallpaper.id
+        // The clock-window rebuild subscription ignores position (it changes on every drag
+        // step), so a profile with a different position has to move the windows itself.
+        if moved { AppDelegate.shared.rebuildClockWindows() }
+    }
+
+    /// Runs on every `settings` change, with no delay, so no edit can be lost to a quick
+    /// wallpaper switch or quit. The disk write itself is still debounced.
+    private func saveActiveClockProfile() {
+        guard let id = activeClockWallpaperId else { return }
+        let profile = GSWallpaperClockPreset(from: settings)
+        guard settings.clockWallpaperPresets?[id] != profile else { return }
+        var presets = settings.clockWallpaperPresets ?? [:]
+        presets[id] = profile
+        settings.clockWallpaperPresets = presets
     }
 
     func didCurrentWallpaperChange(_ newValue: WEWallpaper) {
         guard newValue.project != .invalid else { return }
-        applyClockPresetIfSaved(for: newValue)
+        activateClockProfile(for: newValue)
+        PaletteExporter.export(for: newValue)
 
         if newValue.project.type == "video" {
             // `AerialsInjector.inject()` governs the desktop picture (and lock/idle screen) for a
@@ -1187,7 +1191,6 @@ class GlobalSettingsViewModel: ObservableObject {
                 LockScreenExtensionBridge.shared.publish(wallpaper: newValue)
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
                 WallpaperChangeHook.run(for: newValue)
-                PaletteExporter.export(for: newValue)
             }
         } else {
             // Reverted: registering a synthetic looping video (built from the wallpaper's own
@@ -1215,7 +1218,6 @@ class GlobalSettingsViewModel: ObservableObject {
                 LockScreenExtensionBridge.shared.remove()
                 AppDelegate.shared.setPlacehoderWallpaper(with: newValue)
                 WallpaperChangeHook.run(for: newValue)
-                PaletteExporter.export(for: newValue)
             }
         }
     }
