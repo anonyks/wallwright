@@ -70,6 +70,8 @@ struct ClockSettings: SubviewOfContentView {
                             if let origins = globalSettingsViewModel.settings.clockCustomOrigins, !origins.isEmpty {
                                 Button("Reset Position") {
                                     globalSettingsViewModel.settings.clockCustomOrigins = nil
+                                    // The window rebuild subscription ignores position, so move it here.
+                                    AppDelegate.shared.rebuildClockWindows()
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.secondary)
