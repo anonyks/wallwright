@@ -57,14 +57,48 @@ not just in the demo.
 - Multi-display support with a per-screen wallpaper picker
 - Playlist rotation, pinning (right-click, or float pinned wallpapers to the top), and a
   recent-wallpapers menu
-- Drag-repositionable clock overlay with custom formats and gradients
+- Drag-repositionable clock overlay with custom formats and gradients. Each wallpaper keeps its
+  own clock setup, and the Custom color follows the wallpaper until you override it
 - Auto-pause on thermal pressure, low battery, fullscreen apps, or the display asleep, each its
   own configurable trigger
-- Spotlight-style command palette for every action, and a named-pipe interface for scripting
-  (`echo "next" > /tmp/wallwright-$(id -u).pipe`)
+- Spotlight-style command palette for every action, plus [scripting](#scripting) through a
+  named pipe
 - Menu bar controls for playback, volume, and system usage
 - Trim and crop editing, including auto-detection of black bars baked into a video
-- Tag, audio, and media-type filtering in the library grid
+- Tag, audio, media-type and color filtering in the library grid
+- Video Fit setting: Fill, Fit or Stretch
+
+## Scripting
+
+While Wallwright is running, write a command to its named pipe:
+
+```sh
+echo "next" > /tmp/wallwright-$(id -u).pipe
+```
+
+| Command | Does |
+|---|---|
+| `pause`, `resume`, `toggle` | Control playback |
+| `mute`, `unmute`, `togglemute`, `volume 0-100` | Control sound |
+| `next`, `prev` | Move through the playlist |
+| `apply <title>` | Apply the first library wallpaper whose title contains the text |
+| `import <path>` | Add a local video or image to the library |
+| `pin` | Pin or unpin the current wallpaper |
+| `status` | Write the current state to `/tmp/wallwright-$(id -u)-status.json` |
+| `palette` | Write the current wallpaper's colors to `/tmp/wallwright-$(id -u)-palette.json` |
+| `toggleclock` | Show or hide the clock |
+| `clockalignment left\|center\|right` | Set the clock's text alignment |
+| `clearcache` | Clear the thumbnail cache |
+| `quit` | Quit Wallwright |
+
+Writing to the pipe waits until something reads it, so check that the app is running first
+(`pgrep -x Wallwright`).
+
+To react to wallpaper changes, put an executable script at `~/.config/wallwright/on_change.sh`.
+It receives `--file <path>`, then `--dominant-hex <#RRGGBB>`, `--accent-hex <#RRGGBB>` and
+`--is-dark <true|false>` (left out if the preview can't be read), and is stopped if it runs for
+more than 5 seconds. The same colors are also written to
+`~/.config/wallwright/palettes/current.json`.
 
 ## Import
 

@@ -5,6 +5,40 @@ All notable changes to Wallwright are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- Each wallpaper keeps its own clock setup: format, sizes, color, alignment, opacity, seconds,
+  24-hour time, Summit line length and position. It is saved as you edit and applied when you
+  switch back. Showing the clock and dragging mode stay global.
+- Use for New Wallpapers in the Clock Overlay panel makes the current clock layout the starting
+  one for wallpapers with no saved clock setup. Color is not included.
+- The Custom clock color follows the wallpaper: the wallpaper's second most common color, paired
+  with a tinted white or near-black chosen against its most common color for contrast. Start,
+  end and direction can be changed per wallpaper, with Reset to Auto to go back.
+- A color filter in the library's Filters sidebar.
+- Video Fit setting (Fill, Fit or Stretch) for video and image wallpapers. It applies to all
+  wallpapers.
+- New named-pipe commands: `status`, `palette`, `apply <title>`, `import <path>`, `toggle` and
+  `togglemute`.
+- An optional `~/.config/wallwright/on_change.sh` script, run when the wallpaper changes with
+  `--file`, `--dominant-hex`, `--accent-hex` and `--is-dark`. The color arguments are left out
+  if the preview can't be read.
+- The active wallpaper's colors are written to `~/.config/wallwright/palettes/current.json`.
+- Wallpaper folders added, removed or renamed in Finder show up without a relaunch.
+
+### Changed
+- New wallpapers start with the Custom clock color.
+- The lock screen plays video at its own frame rate, up to 60 fps on power and 30 fps on
+  battery, instead of a fixed 12 fps. It pauses while the display is asleep.
+- The lock screen extension creates its video player only while the screen is locked.
+- The library interface is kept in memory only while its window is in use. In testing this
+  lowered the app's memory footprint at launch from about 160 MB to about 76 MB.
+
+### Fixed
+- The Dock menu no longer hangs and shows "Application Not Responding".
+- Reset Position moves the clock right away.
+- After several quick wallpaper switches, the lock screen and `on_change.sh` no longer end up on
+  an earlier wallpaper.
+
 ## [1.1.0] - 2026-11-24
 
 ### Added
