@@ -48,6 +48,13 @@ final class LockScreenSurface {
     /// doesn't depend on this extension process receiving workspace sleep/wake notifications.
     private var playbackMonitor: Timer?
     private let displayID: CGDirectDisplayID
+    /// The video this surface should play. The player for it only exists while the screen is
+    /// locked: an idle one still holds a hardware decoder (measured 30MB) on the unlocked desktop.
+    private var videoURL: URL?
+    /// Delays the release after unlock, so a quick re-lock reuses the player.
+    private var releaseTimer: Timer?
+    private static let releaseDelay: TimeInterval = 5
+    private var playerCreatedAt: Date?
     private var framesShown = 0
     private var timerStartedAt: Date?
 
@@ -92,10 +99,29 @@ final class LockScreenSurface {
     func applyVideo(relativeVideoName: String, relativePosterName: String) throws {
         try applyImage(relativeImageName: relativePosterName)
 
-        let videoURL = try WallpaperPrivateRuntime.asset(relativeVideoName)
-        WallpaperPrivateRuntime.log("applyVideo: starting for \(relativeVideoName) at \(videoURL.path)")
-        let item = Self.videoOnlyItem(url: videoURL)
-        let sourceRate = AVURLAsset(url: videoURL).tracks(withMediaType: .video).first?.nominalFrameRate ?? 0
+        let url = try WallpaperPrivateRuntime.asset(relativeVideoName)
+        videoURL = url
+        WallpaperPrivateRuntime.log("applyVideo: ready for \(relativeVideoName) at \(url.path)")
+
+        // Only auto-play if the screen is ACTUALLY locked right now — `acquire` can be (and
+        // confirmed live, 2026-10-29, routinely is) called while the Mac is sitting unlocked on
+        // the normal desktop (WallpaperAgent bookkeeping/export, not real on-screen display).
+        // `pauseVideo()`/`resumeVideo()` only react to the NEXT lock/unlock transition, so without
+        // this check, a surface acquired while already unlocked would decode indefinitely with
+        // nothing to ever tell it to stop. The poster frame from `applyImage` above stays showing
+        // either way — nothing is visibly blank.
+        if Self.isScreenCurrentlyLocked() {
+            resumeVideo()
+        }
+    }
+
+    private func makePlayer(for url: URL) {
+        playerCreatedAt = Date()
+        loggedFirstFrame = false
+        pullAttempts = 0
+        pullFailures = 0
+        let item = Self.videoOnlyItem(url: url)
+        let sourceRate = AVURLAsset(url: url).tracks(withMediaType: .video).first?.nominalFrameRate ?? 0
         sourceFrameRate = sourceRate > 0 ? Double(sourceRate) : 30
         // Same cap `VideoWallpaperViewModel` already applies to the desktop player — without it,
         // AVFoundation falls back to its network-streaming heuristic and buffers several seconds
@@ -130,17 +156,26 @@ final class LockScreenSurface {
         ) { [weak player] _ in
             player?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         }
+    }
 
-        // Only auto-play if the screen is ACTUALLY locked right now — `acquire` can be (and
-        // confirmed live, 2026-10-29, routinely is) called while the Mac is sitting unlocked on
-        // the normal desktop (WallpaperAgent bookkeeping/export, not real on-screen display).
-        // `pauseVideo()`/`resumeVideo()` only react to the NEXT lock/unlock transition, so without
-        // this check, a surface acquired while already unlocked would decode indefinitely with
-        // nothing to ever tell it to stop. The poster frame from `applyImage` above stays showing
-        // either way — nothing is visibly blank.
-        if Self.isScreenCurrentlyLocked() {
-            resumeVideo()
-        }
+    /// Back to the poster, which is the video's first frame, so the next lock starts the video
+    /// from the beginning with no visible jump.
+    private func releasePlayer() {
+        releaseTimer?.invalidate()
+        releaseTimer = nil
+        guard player != nil else { return }
+        removePlayer()
+        if let currentImageSurface { installContents(currentImageSurface) }
+        WallpaperPrivateRuntime.log("Released video player")
+    }
+
+    private func removePlayer() {
+        if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
+        loopObserver = nil
+        player?.pause()
+        if let item = player?.currentItem, let videoOutput { item.remove(videoOutput) }
+        videoOutput = nil
+        player = nil
     }
 
     private var loggedFirstFrame = false
@@ -173,7 +208,8 @@ final class LockScreenSurface {
         }
         if !loggedFirstFrame {
             loggedFirstFrame = true
-            WallpaperPrivateRuntime.log("pullVideoFrame: first real frame installed (attempts=\(pullAttempts))")
+            let delay = Date().timeIntervalSince(playerCreatedAt ?? Date()) * 1000
+            WallpaperPrivateRuntime.log("pullVideoFrame: first real frame installed (attempts=\(pullAttempts), \(Int(delay))ms after creating the player)")
         }
         framesShown += 1
         installContents(surface)
@@ -285,18 +321,32 @@ final class LockScreenSurface {
         playbackMonitor = nil
         stopFrameTimer()
         player?.pause()
+        releaseTimer?.invalidate()
+        let timer = Timer(timeInterval: Self.releaseDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.releasePlayer() }
+        }
+        releaseTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// Reverses `pauseVideo()`. A no-op if there's no video configured (image-only wallpaper) or
     /// it's already running.
     func resumeVideo() {
-        guard player != nil, playbackMonitor == nil else { return }
+        guard let videoURL, playbackMonitor == nil else { return }
+        releaseTimer?.invalidate()
+        releaseTimer = nil
+        if player == nil { makePlayer(for: videoURL) }
         let monitor = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updatePlayback() }
         }
         playbackMonitor = monitor
         RunLoop.main.add(monitor, forMode: .common)
-        updatePlayback()
+        // Started without asking whether the display is asleep: waiting on that answer here would
+        // cost a full monitor tick (1s) before the first frame if the display reported asleep
+        // while locking. If it really is asleep, the monitor pauses playback within a second.
+        WallpaperPrivateRuntime.log("Starting playback; display reports asleep: \(CGDisplayIsAsleep(displayID) != 0)")
+        startFrameTimer()
+        player?.play()
     }
 
     /// Tears down the player/timer/observer — called before switching to a different content type
@@ -306,13 +356,11 @@ final class LockScreenSurface {
     private func stopVideo() {
         playbackMonitor?.invalidate()
         playbackMonitor = nil
+        releaseTimer?.invalidate()
+        releaseTimer = nil
         stopFrameTimer()
-        if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
-        loopObserver = nil
-        player?.pause()
-        if let item = player?.currentItem, let videoOutput { item.remove(videoOutput) }
-        videoOutput = nil
-        player = nil
+        videoURL = nil
+        removePlayer()
     }
 
     func invalidate() {
