@@ -39,6 +39,9 @@ extension AppDelegate {
         panel.allowedContentTypes = [.folder, .zip, .movie]
             + VideoImporter.importableExtensions.compactMap { UTType(filenameExtension: $0) }
             + ImageImporter.importableExtensions.compactMap { UTType(filenameExtension: $0) }
+        // Reachable from the menu bar with the library closed, and attaching a sheet shows the
+        // window without going through the methods that rebuild its interface.
+        self.mainWindowController.installContentIfNeeded()
         panel.beginSheetModal(for: self.mainWindowController.window) { [weak self] response in
             if response != .OK { return }
             guard !panel.urls.isEmpty else { return }

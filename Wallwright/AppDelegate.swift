@@ -260,6 +260,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // here too would create a second, orphaned set that never gets cleaned up.
 
         if globalSettingsViewModel.isFirstLaunch {
+            // Before centering: building the interface can change the window's size.
+            self.mainWindowController.installContentIfNeeded()
             self.mainWindowController.window.center()
             self.mainWindowController.window.makeKeyAndOrderFront(nil)
         }

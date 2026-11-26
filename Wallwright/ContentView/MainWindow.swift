@@ -50,7 +50,35 @@ class FreelyDraggableWindow: NSWindow {
     }
 }
 
+/// The library window. Its SwiftUI interface only exists while the window is in use (measured
+/// about 90MB otherwise), so every way of putting the window on screen has to rebuild it first.
+/// The window and its controller themselves always exist, so nothing that refers to them has to
+/// care. An earlier version hooked `showWindow`, which this app never calls to show the window,
+/// and left an empty title bar on screen.
+final class LibraryWindow: FreelyDraggableWindow {
+    var prepareToShow: (() -> Void)?
+
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        prepareToShow?()
+        super.makeKeyAndOrderFront(sender)
+    }
+
+    override func orderFront(_ sender: Any?) {
+        prepareToShow?()
+        super.orderFront(sender)
+    }
+
+    override func orderFrontRegardless() {
+        prepareToShow?()
+        super.orderFrontRegardless()
+    }
+}
+
 class MainWindowController: NSWindowController, NSWindowDelegate {
+    /// The window's size and position when its interface was released. A new interface would
+    /// otherwise resize the window to its own preferred size.
+    private var releasedFrame: NSRect?
+
     override var window: NSWindow! {
         get {
             return super.window
@@ -61,7 +89,7 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     override init(window: NSWindow?) {
-        super.init(window: FreelyDraggableWindow(
+        super.init(window: LibraryWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false))
@@ -86,11 +114,26 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
         // slider dragged the entire app window. SwiftUI controls like `Slider` don't always
         // reliably report to AppKit's `isMovableByWindowBackground` hit-testing that a click landed
         // on them rather than on "background," a known SwiftUI/AppKit integration gap.
-        self.window.contentView = NSHostingView(rootView: ContentView(
+        self.window.contentView = NSView()
+        (self.window as? LibraryWindow)?.prepareToShow = { [weak self] in self?.installContentIfNeeded() }
+    }
+
+    private var hasContent: Bool { window.contentView is NSHostingView<AnyView> }
+
+    /// Builds the library interface if it isn't there. Cheap to call when it already is.
+    func installContentIfNeeded() {
+        guard !hasContent else { return }
+        window.contentView = NSHostingView(rootView: AnyView(ContentView(
                 viewModel: AppDelegate.shared.contentViewModel,
                 wallpaperViewModel: AppDelegate.shared.wallpaperViewModel
             ).environmentObject(AppDelegate.shared.globalSettingsViewModel)
-        )
+        ))
+        if let releasedFrame { window.setFrame(releasedFrame, display: false) }
+    }
+
+    /// A safety net for any way of showing the window that skips `LibraryWindow`'s overrides.
+    func windowDidBecomeKey(_ notification: Notification) {
+        installContentIfNeeded()
     }
     
     required init?(coder: NSCoder) {
@@ -101,12 +144,19 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
         super.windowDidLoad()
     }
 
-    /// Evicts the shared thumbnail cache (library grid + every browse tab) once nothing can be
+    /// Releases the library interface and evicts the shared thumbnail cache (library grid + every browse tab) once nothing can be
     /// looking at it — keeps the app's footprint down while it's just sitting in the menu bar,
     /// without touching per-source state (e.g. WallperViewModel's fetched sitemap) that would cost
     /// a real re-fetch over the network to rebuild on the next window open.
     func windowWillClose(_ notification: Notification) {
         ThumbnailImage.clearCache()
+        // After the close finishes, and only if the window stayed closed. A sheet still attached
+        // (an import review, say) keeps its interface so it isn't torn down mid-task.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.hasContent, !self.window.isVisible, self.window.attachedSheet == nil else { return }
+            self.releasedFrame = self.window.frame
+            self.window.contentView = NSView()
+        }
     }
 
 }
