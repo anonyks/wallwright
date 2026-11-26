@@ -35,6 +35,8 @@ All notable changes to Wallwright are documented here. Format follows
 
 ### Fixed
 - The Dock menu no longer hangs and shows "Application Not Responding".
+- A wallpaper paused because a window covered it is checked again as soon as it is visible,
+  instead of staying frozen for another second or more.
 - Reset Position moves the clock right away.
 - After several quick wallpaper switches, the lock screen and `on_change.sh` no longer end up on
   an earlier wallpaper.

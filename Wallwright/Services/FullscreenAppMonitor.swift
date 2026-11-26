@@ -35,6 +35,7 @@ final class FullscreenAppMonitor {
 
     private var isObserving = false
     private var pendingRecomputeWorkItem: DispatchWorkItem?
+    private var pendingUncoveredCheckWorkItem: DispatchWorkItem?
     private var pendingFullscreenConfirmationWorkItem: DispatchWorkItem?
     private var isAwaitingFullscreenConfirmation = false
 
@@ -117,6 +118,13 @@ final class FullscreenAppMonitor {
     /// pending bounds this to firing 5s after the *first* event in a burst, no matter how much
     /// further noise follows.
     @objc private func windowOcclusionStateDidChange(_ notification: Notification) {
+        // The long delay below is there to avoid pausing on a passing blip. Resuming needs only a
+        // moment: with it, the wallpaper sat frozen for 1 to 3s after coming back into view.
+        if isOtherAppFullscreen, AppDelegate.shared.wallpaperWindows.values.contains(where: {
+            $0.occlusionState.contains(.visible)
+        }) {
+            scheduleUncoveredCheck()
+        }
         guard pendingRecomputeWorkItem == nil else { return }
         let workItem = DispatchWorkItem { [weak self] in
             self?.pendingRecomputeWorkItem = nil
@@ -124,6 +132,18 @@ final class FullscreenAppMonitor {
         }
         pendingRecomputeWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+    }
+
+    /// Re-reads shortly after a covered wallpaper shows up as visible. Like the delay above, it's
+    /// never pushed back by later notifications.
+    private func scheduleUncoveredCheck() {
+        guard pendingUncoveredCheckWorkItem == nil else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingUncoveredCheckWorkItem = nil
+            self?.recompute()
+        }
+        pendingUncoveredCheckWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
     }
 
     private func recompute() {
