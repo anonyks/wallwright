@@ -1167,6 +1167,20 @@ class GlobalSettingsViewModel: ObservableObject {
         if moved { AppDelegate.shared.rebuildClockWindows() }
     }
 
+    /// Whether new wallpapers would already start like the clock on screen. Color is ignored:
+    /// they always start on `.custom`.
+    var isClockLayoutTheStartingOne: Bool {
+        guard let fallback = settings.clockDefaultProfile else { return false }
+        var current = GSWallpaperClockPreset(from: settings)
+        current.color = fallback.color
+        return current == fallback
+    }
+
+    /// Makes the clock on screen the starting point for wallpapers that have no profile yet.
+    func useClockLayoutForNewWallpapers() {
+        settings.clockDefaultProfile = GSWallpaperClockPreset(from: settings)
+    }
+
     /// Runs on every `settings` change, with no delay, so no edit can be lost to a quick
     /// wallpaper switch or quit. The disk write itself is still debounced.
     private func saveActiveClockProfile() {

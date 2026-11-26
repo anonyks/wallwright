@@ -113,6 +113,11 @@ struct ClockSettings: SubviewOfContentView {
 
                         Toggle("Show Seconds", isOn: $globalSettingsViewModel.settings.clockShowSeconds)
                         Toggle("24-Hour Time", isOn: $globalSettingsViewModel.settings.clockUse24HourTime)
+
+                        Button("Use for New Wallpapers") {
+                            globalSettingsViewModel.useClockLayoutForNewWallpapers()
+                        }
+                        .disabled(globalSettingsViewModel.isClockLayoutTheStartingOne)
                     }
                 }
                 .padding()
