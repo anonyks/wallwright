@@ -76,7 +76,7 @@ struct FilterResults: View {
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
-                        .disabled(viewModel.selectedTagFilters.isEmpty && !viewModel.audioOnlyFilter && !viewModel.staticOnlyFilter)
+                        .disabled(viewModel.selectedTagFilters.isEmpty && !viewModel.audioOnlyFilter && !viewModel.staticOnlyFilter && viewModel.colorFilter == nil)
                         .help("Reset Filters")
                     }
 
@@ -86,6 +86,12 @@ struct FilterResults: View {
 
                     FilterSection("Type", alignment: .leading, spacing: 4) {
                         staticFilterRow
+                    }
+
+                    if !viewModel.availableColorBands.isEmpty {
+                        FilterSection("Color", alignment: .leading, spacing: 6) {
+                            colorSwatches
+                        }
                     }
 
                     FilterSection("Tags", alignment: .leading, spacing: 4) {
@@ -107,6 +113,52 @@ struct FilterResults: View {
             .lineLimit(1)
         }
         Divider()
+        // The sidebar stays mounted while hidden, so wait until it's actually opened.
+        .task(id: viewModel.isFilterReveal) {
+            if viewModel.isFilterReveal { viewModel.updateColorBands() }
+        }
+    }
+
+    private var colorSwatches: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 24), spacing: 6)], alignment: .leading, spacing: 6) {
+            ForEach(viewModel.availableColorBands) { band in
+                let isSelected = viewModel.colorFilter == band
+                Button {
+                    viewModel.colorFilter = isSelected ? nil : band
+                } label: {
+                    Circle()
+                        .fill(swatchStyle(for: band))
+                        .frame(width: 18, height: 18)
+                        .overlay(Circle().stroke(.secondary.opacity(0.35), lineWidth: 1))
+                        .padding(3)
+                        .overlay(Circle().stroke(Color.primary, lineWidth: isSelected ? 2 : 0))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help(band.label)
+                .accessibilityLabel(band.label)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, 6)
+    }
+
+    private func swatchStyle(for band: ColorBand) -> AnyShapeStyle {
+        switch band {
+        case .red: return AnyShapeStyle(Color.red)
+        case .orange: return AnyShapeStyle(Color.orange)
+        case .yellow: return AnyShapeStyle(Color.yellow)
+        case .green: return AnyShapeStyle(Color.green)
+        case .cyan: return AnyShapeStyle(Color.cyan)
+        case .blue: return AnyShapeStyle(Color.blue)
+        case .purple: return AnyShapeStyle(Color.purple)
+        case .pink: return AnyShapeStyle(Color.pink)
+        case .monochrome:
+            return AnyShapeStyle(LinearGradient(
+                stops: [.init(color: .black, location: 0.5), .init(color: .white, location: 0.5)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            ))
+        }
     }
 
     private var audioFilterRow: some View {

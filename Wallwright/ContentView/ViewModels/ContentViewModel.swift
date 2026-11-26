@@ -113,6 +113,55 @@ class ContentViewModel: ObservableObject, DropDelegate {
         }
     }
 
+    /// The one color band picked in the Filter sidebar, or nil for any color.
+    @Published var colorFilter: ColorBand? = UserDefaults.standard.string(forKey: "ColorFilter").flatMap(ColorBand.init) {
+        didSet {
+            UserDefaults.standard.set(colorFilter?.rawValue, forKey: "ColorFilter")
+            recomputeAutoRefreshWallpapers()
+        }
+    }
+
+    /// Each wallpaper's color bands, keyed by `WEWallpaper.id`. Only worked out once the Filter
+    /// sidebar or a saved color filter needs them — see `updateColorBands`.
+    @Published private(set) var colorBands: [String: Set<ColorBand>] = [:] {
+        didSet { recomputeAutoRefreshWallpapers() }
+    }
+    private var colorBandCache: [String: (modified: Date?, bands: Set<ColorBand>)] = [:]
+    private var wantsColorBands = false
+    private static let colorBandQueue = DispatchQueue(label: "Wallwright.ColorBands", qos: .utility)
+
+    /// Classifies, off the main thread, any preview that's new or has changed since last time.
+    func updateColorBands() {
+        wantsColorBands = true
+        let wallpapers = self.wallpapers
+        let cache = colorBandCache
+        Self.colorBandQueue.async { [weak self] in
+            var next: [String: (modified: Date?, bands: Set<ColorBand>)] = [:]
+            for wallpaper in wallpapers {
+                let url = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.preview)
+                let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+                if let cached = cache[wallpaper.id], cached.modified == modified {
+                    next[wallpaper.id] = cached
+                } else {
+                    next[wallpaper.id] = (modified, ColorBand.bands(ofImageAt: url) ?? [])
+                }
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.colorBandCache = next
+                let bands = next.mapValues(\.bands)
+                if bands != self.colorBands { self.colorBands = bands }
+            }
+        }
+    }
+
+    /// The bands worth offering: those some wallpaper has, plus the selected one so it can
+    /// always be turned off.
+    var availableColorBands: [ColorBand] {
+        let present = colorBands.values.reduce(into: Set<ColorBand>()) { $0.formUnion($1) }
+        return ColorBand.allCases.filter { present.contains($0) || $0 == colorFilter }
+    }
+
     @Published var topTabBarSelection: Int = 0
 
     @AppStorage("FilterReveal") var isFilterReveal = false
@@ -182,6 +231,7 @@ class ContentViewModel: ObservableObject, DropDelegate {
         // real, wasted churn.
         didSet {
             availableTags = Set(wallpapers.compactMap(\.project.tags).flatMap { $0 }).sorted()
+            if wantsColorBands || colorFilter != nil { updateColorBands() }
             recomputeAutoRefreshWallpapers()
         }
     }
@@ -557,6 +607,8 @@ class ContentViewModel: ObservableObject, DropDelegate {
         searchedWallpapers.filter { wallpaper in
             if audioOnlyFilter, wallpaper.project.hasAudio != true { return false }
             if staticOnlyFilter, wallpaper.project.type.lowercased() != "image" { return false }
+            // Not classified yet (only briefly, at launch or just after an import): leave it in.
+            if let colorFilter, let bands = colorBands[wallpaper.id], !bands.contains(colorFilter) { return false }
             guard !selectedTagFilters.isEmpty else { return true }
             guard let tags = wallpaper.project.tags else { return false }
             return !Set(tags).isDisjoint(with: selectedTagFilters)
@@ -883,5 +935,6 @@ class ContentViewModel: ObservableObject, DropDelegate {
         self.selectedTagFilters = []
         self.audioOnlyFilter = false
         self.staticOnlyFilter = false
+        self.colorFilter = nil
     }
 }
