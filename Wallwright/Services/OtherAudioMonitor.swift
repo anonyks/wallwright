@@ -149,6 +149,8 @@ final class OtherAudioMonitor {
             if let knownPlaying = Self.isKnownAppActuallyPlaying() {
                 DispatchQueue.main.async {
                     self.isPolling = false
+                    // Stopped while this check was running: its answer must not mute anything.
+                    guard self.started else { return }
                     self.consecutiveCoreAudioTrueCount = 0
                     self.isOtherAppPlaying = knownPlaying
                 }
@@ -158,6 +160,7 @@ final class OtherAudioMonitor {
             let coreAudioPlaying = Self.isAnyOtherProcessOutputtingAudio(excluding: ownPID)
             DispatchQueue.main.async {
                 self.isPolling = false
+                guard self.started else { return }
                 guard coreAudioPlaying else {
                     if self.consecutiveCoreAudioTrueCount > 0 {
                         WWLog.playback.notice("OtherAudioMonitor: coreAudioPlaying=false, resetting count from \(self.consecutiveCoreAudioTrueCount)")

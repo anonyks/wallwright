@@ -35,6 +35,8 @@ All notable changes to Wallwright are documented here. Format follows
 
 ### Fixed
 - The Dock menu no longer hangs and shows "Application Not Responding".
+- "Other Application Playing Audio" no longer stops working after the wallpaper has been
+  unmuted once, and a change to the rule takes effect right away.
 - A wallpaper paused because a window covered it is checked again as soon as it is visible,
   instead of staying frozen for another second or more.
 - Reset Position moves the clock right away.

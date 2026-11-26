@@ -763,11 +763,19 @@ class GlobalSettingsViewModel: ObservableObject {
             .map(\.otherApplicationPlayingAudio)
             .removeDuplicates()
             .dropFirst() // updateOtherAudioMonitoring() above already covers the initial value
-            .sink { [weak self] _ in self?.updateOtherAudioMonitoring() }
+            .sink { [weak self] _ in
+                // `@Published` calls this before it stores the new rule, so stopping here undoes
+                // whatever the old rule did (unmute or resume). Monitoring then starts again once
+                // the new rule is stored.
+                OtherAudioMonitor.shared.stop()
+                DispatchQueue.main.async { self?.updateOtherAudioMonitoring() }
+            }
         self.otherAudioVolumeCancellable = AppDelegate.shared.wallpaperViewModel.$playVolume
             .map { $0 > 0 }
             .removeDuplicates()
             .dropFirst() // updateOtherAudioMonitoring() above already covers the initial value
+            // Runs once the new volume is stored; the publisher fires before that.
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateOtherAudioMonitoring() }
         self.didOtherAudioChangeCancellable =
         NotificationCenter.default.publisher(for: OtherAudioMonitor.didChangeNotification)
@@ -936,16 +944,26 @@ class GlobalSettingsViewModel: ObservableObject {
     /// Starts/stops `OtherAudioMonitor`'s poll to match whether the policy actually needs it —
     /// `.keepRunning` never consumes `isOtherAppPlaying` at all (see the two switches above), so
     /// polling then would just be wasted CoreAudio/AppleScript work with nothing acting on the
-    /// result. Same reasoning extends to the wallpaper volume itself: a "pause"/"mute" policy only
-    /// ever has something to protect when the wallpaper's own audio could actually be heard — at
-    /// `playVolume == 0`, there's no audible wallpaper sound either policy value could meaningfully
-    /// act on, so the poll is just as wasted as under `.keepRunning`.
+    /// result. The wallpaper's own volume matters too: see `needsOtherAudioMonitoring`.
     private func updateOtherAudioMonitoring() {
-        if settings.otherApplicationPlayingAudio == .keepRunning || AppDelegate.shared.wallpaperViewModel.playVolume == 0 {
-            OtherAudioMonitor.shared.stop()
-        } else {
+        let wallpaper = AppDelegate.shared.wallpaperViewModel
+        if Self.needsOtherAudioMonitoring(
+            rule: settings.otherApplicationPlayingAudio, volume: wallpaper.playVolume,
+            otherAppPlaying: OtherAudioMonitor.shared.isOtherAppPlaying, mutedByUser: wallpaper.isMutedByUser
+        ) {
             OtherAudioMonitor.shared.startIfNeeded()
+        } else {
+            OtherAudioMonitor.shared.stop()
         }
+    }
+
+    /// A silent wallpaper needs no monitoring, with one exception: while the Mute rule is what
+    /// silenced it. Stopping then would unmute it, and the next check would mute it again.
+    static func needsOtherAudioMonitoring(
+        rule: GSPlayback, volume: Float, otherAppPlaying: Bool, mutedByUser: Bool
+    ) -> Bool {
+        guard rule != .keepRunning else { return false }
+        return volume > 0 || (rule == .mute && otherAppPlaying && !mutedByUser)
     }
 
     /// Applies the "Laptop on battery" policy — same shape as the other GSPlayback reactions
