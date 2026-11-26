@@ -16,14 +16,15 @@
 //  - M1, live video (`applyVideo`): `AVPlayerItemVideoOutput` pulls decoded frames as
 //    IOSurface-backed `CVPixelBuffer`s directly — no per-frame CGImage/CPU copy, unlike M0's
 //    one-time still. The poster image from `applyImage` stays on screen until the first real
-//    video frame is ready, then frames replace it on a capped timer (not a display link — nobody
-//    needs 60fps behind an opaque lock screen; see `frameInterval`'s own doc comment).
+//    video frame is ready, then frames replace it on a timer matching the video's frame rate (see
+//    `sourceFrameRate`'s own doc comment).
 //
 
 import AVFoundation
 import AppKit
 import CoreGraphics
 import CoreVideo
+import IOKit.ps
 import IOSurface
 
 @MainActor
@@ -37,13 +38,21 @@ final class LockScreenSurface {
     private var frameTimer: Timer?
     private var loopObserver: NSObjectProtocol?
 
-    /// Conservative on purpose — this plays behind an opaque lock screen nobody is looking at
-    /// closely, and Wallwright's own efficiency positioning (near-0% idle CPU elsewhere in the
-    /// app) argues against spending a full decode-rate timer on it. Raise only if it visibly
-    /// stutters in real use.
-    private static let frameInterval: TimeInterval = 1.0 / 12.0
+    /// The video's own frame rate, capped by `startFrameTimer` at 60 on power and 30 on battery.
+    /// A fixed 12 here used to show only one frame in five of a 60fps video, which read as the
+    /// lock screen playing slower than the desktop.
+    private var sourceFrameRate: Double = 30
+    private var timerRate: Double = 30
+    /// Runs only while the screen is locked: pauses playback while the display is asleep (it used
+    /// to keep decoding and pulling frames then) and follows power source changes. Polled, so it
+    /// doesn't depend on this extension process receiving workspace sleep/wake notifications.
+    private var playbackMonitor: Timer?
+    private let displayID: CGDirectDisplayID
+    private var framesShown = 0
+    private var timerStartedAt: Date?
 
     init(displayID: UInt32?, size: CGSize, scale: CGFloat) throws {
+        self.displayID = displayID ?? CGMainDisplayID()
         context = try WallpaperPrivateRuntime.context(displayID: displayID)
         root = CALayer()
         root.frame = CGRect(origin: .zero, size: size)
@@ -86,6 +95,8 @@ final class LockScreenSurface {
         let videoURL = try WallpaperPrivateRuntime.asset(relativeVideoName)
         WallpaperPrivateRuntime.log("applyVideo: starting for \(relativeVideoName) at \(videoURL.path)")
         let item = Self.videoOnlyItem(url: videoURL)
+        let sourceRate = AVURLAsset(url: videoURL).tracks(withMediaType: .video).first?.nominalFrameRate ?? 0
+        sourceFrameRate = sourceRate > 0 ? Double(sourceRate) : 30
         // Same cap `VideoWallpaperViewModel` already applies to the desktop player — without it,
         // AVFoundation falls back to its network-streaming heuristic and buffers several seconds
         // of decoded frames ahead, which is pure wasted RAM for a local file nobody is pre-seeking.
@@ -128,13 +139,7 @@ final class LockScreenSurface {
         // nothing to ever tell it to stop. The poster frame from `applyImage` above stays showing
         // either way — nothing is visibly blank.
         if Self.isScreenCurrentlyLocked() {
-            frameTimer?.invalidate()
-            let timer = Timer(timeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
-                self?.pullVideoFrame()
-            }
-            frameTimer = timer
-            RunLoop.main.add(timer, forMode: .common)
-            player.play()
+            resumeVideo()
         }
     }
 
@@ -151,7 +156,7 @@ final class LockScreenSurface {
         let time = item.currentTime()
         guard output.hasNewPixelBuffer(forItemTime: time) else {
             pullFailures += 1
-            if pullAttempts % 60 == 0 {
+            if pullAttempts % 600 == 0 {
                 WallpaperPrivateRuntime.log("pullVideoFrame: no new pixel buffer (attempts=\(pullAttempts) failures=\(pullFailures) time=\(time.seconds))")
             }
             return
@@ -170,7 +175,52 @@ final class LockScreenSurface {
             loggedFirstFrame = true
             WallpaperPrivateRuntime.log("pullVideoFrame: first real frame installed (attempts=\(pullAttempts))")
         }
+        framesShown += 1
         installContents(surface)
+    }
+
+    private func startFrameTimer() {
+        stopFrameTimer()
+        framesShown = 0
+        timerStartedAt = Date()
+        timerRate = targetFrameRate()
+        let timer = Timer(timeInterval: 1 / timerRate, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pullVideoFrame() }
+        }
+        frameTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopFrameTimer() {
+        frameTimer?.invalidate()
+        frameTimer = nil
+        guard let startedAt = timerStartedAt else { return }
+        timerStartedAt = nil
+        let seconds = Date().timeIntervalSince(startedAt)
+        guard seconds >= 1 else { return }
+        WallpaperPrivateRuntime.log(String(
+            format: "playback: showed %.1f fps over %.0fs (target %.0f)",
+            Double(framesShown) / seconds, seconds, timerRate
+        ))
+    }
+
+    private func targetFrameRate() -> Double {
+        let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue()
+        let source = snapshot.flatMap { IOPSGetProvidingPowerSourceType($0)?.takeUnretainedValue() as String? }
+        return min(sourceFrameRate, source == kIOPSBatteryPowerValue ? 30 : 60)
+    }
+
+    /// Starts, stops or re-times playback to match the display and power state right now.
+    private func updatePlayback() {
+        if CGDisplayIsAsleep(displayID) != 0 {
+            guard frameTimer != nil else { return }
+            WallpaperPrivateRuntime.log("Display asleep — paused playback")
+            stopFrameTimer()
+            player?.pause()
+        } else if frameTimer == nil || timerRate != targetFrameRate() {
+            startFrameTimer()
+            player?.play()
+        }
     }
 
     private func installContents(_ surface: IOSurface) {
@@ -231,21 +281,22 @@ final class LockScreenSurface {
     /// own (much coarser) acquire/invalidate lifecycle.
     func pauseVideo() {
         guard player != nil else { return }
-        frameTimer?.invalidate()
-        frameTimer = nil
+        playbackMonitor?.invalidate()
+        playbackMonitor = nil
+        stopFrameTimer()
         player?.pause()
     }
 
     /// Reverses `pauseVideo()`. A no-op if there's no video configured (image-only wallpaper) or
     /// it's already running.
     func resumeVideo() {
-        guard player != nil, frameTimer == nil else { return }
-        let timer = Timer(timeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
-            self?.pullVideoFrame()
+        guard player != nil, playbackMonitor == nil else { return }
+        let monitor = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updatePlayback() }
         }
-        frameTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
-        player?.play()
+        playbackMonitor = monitor
+        RunLoop.main.add(monitor, forMode: .common)
+        updatePlayback()
     }
 
     /// Tears down the player/timer/observer — called before switching to a different content type
@@ -253,8 +304,9 @@ final class LockScreenSurface {
     /// teardown never leaves a decode timer or observer running against a surface nobody reads
     /// from anymore.
     private func stopVideo() {
-        frameTimer?.invalidate()
-        frameTimer = nil
+        playbackMonitor?.invalidate()
+        playbackMonitor = nil
+        stopFrameTimer()
         if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
         loopObserver = nil
         player?.pause()
