@@ -696,6 +696,9 @@ class GlobalSettingsViewModel: ObservableObject {
         self.$settings
             .removeDuplicates { $0.videoFit == $1.videoFit }
             .dropFirst()
+            // `@Published` fires before it stores the new value, and the rebuilt windows read the
+            // stored one, so without this they get the previous choice.
+            .receive(on: DispatchQueue.main)
             .sink { _ in AppDelegate.shared.rebuildWallpaperWindows() }
 
         self.didChangeShowClockOverlayCancellable =
