@@ -131,12 +131,14 @@ struct DesktopHutView: SubviewOfContentView {
                     : (desktopHutVM.items.isEmpty ? "No wallpapers found" : "Everything here is hidden")
             )
         } else {
+            // Once per redraw, not once per card: reading `visibleItems` filters the whole list.
+            let lastVisibleID = desktopHutVM.visibleItems.last?.id
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(desktopHutVM.visibleItems) { item in
                         DesktopHutItemCard(item: item, viewModel: desktopHutVM, downloadState: desktopHutVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
-                                isLast: item.id == desktopHutVM.visibleItems.last?.id,
+                                isLast: item.id == lastVisibleID,
                                 visible: $loadMoreVisible,
                                 canLoad: !desktopHutVM.isLoading,
                                 load: desktopHutVM.loadNextPage
@@ -238,16 +240,7 @@ private struct DesktopHutItemCard: View {
     private var downloadControl: some View {
         switch downloadState {
         case .downloading(let progress):
-            VStack(alignment: .leading, spacing: 3) {
-                if let progress {
-                    ProgressView(value: progress)
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-            }
+            DownloadProgressView(progress: progress)
         case .importing:
             Label("Importing…", systemImage: "square.and.arrow.down")
                 .font(.caption)

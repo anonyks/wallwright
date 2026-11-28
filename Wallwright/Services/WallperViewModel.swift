@@ -13,7 +13,8 @@ import Foundation
 @MainActor
 final class WallperViewModel: ObservableObject {
     enum DownloadState: Equatable {
-        case downloading(Double?)
+        /// Its progress changes inside the object, without changing this state.
+        case downloading(DownloadProgress)
         case importing
         case completed
         case failed(String)
@@ -136,11 +137,12 @@ final class WallperViewModel: ObservableObject {
         case .downloading, .importing: return
         default: break
         }
-        downloadState[item.id] = .downloading(nil)
+        let tracker = DownloadProgress()
+        downloadState[item.id] = .downloading(tracker)
         Task {
             do {
-                let localURL = try await service.downloadVideo(for: item) { [weak self] progress in
-                    Task { @MainActor in self?.downloadState[item.id] = .downloading(progress) }
+                let localURL = try await service.downloadVideo(for: item) { progress in
+                    Task { @MainActor in tracker.update(progress) }
                 }
                 downloadState[item.id] = .importing
                 let success = await withCheckedContinuation { continuation in

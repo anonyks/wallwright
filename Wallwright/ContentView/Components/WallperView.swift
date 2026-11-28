@@ -133,12 +133,14 @@ struct WallperView: SubviewOfContentView {
                     : (categoryHasContent ? "Everything here is hidden" : "No wallpapers found")
             )
         } else {
+            // Once per redraw, not once per card: reading `visibleItems` filters the whole list.
+            let lastVisibleID = wallperVM.visibleItems.last?.id
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(wallperVM.visibleItems) { item in
                         WallperItemCard(item: item, viewModel: wallperVM, downloadState: wallperVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
-                                isLast: item.id == wallperVM.visibleItems.last?.id,
+                                isLast: item.id == lastVisibleID,
                                 visible: $loadMoreVisible,
                                 canLoad: wallperVM.hasMore,
                                 load: wallperVM.loadMore
@@ -233,16 +235,7 @@ private struct WallperItemCard: View {
     private var downloadControl: some View {
         switch downloadState {
         case .downloading(let progress):
-            VStack(alignment: .leading, spacing: 3) {
-                if let progress {
-                    ProgressView(value: progress)
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-            }
+            DownloadProgressView(progress: progress)
         case .importing:
             Label("Importing…", systemImage: "square.and.arrow.down")
                 .font(.caption)

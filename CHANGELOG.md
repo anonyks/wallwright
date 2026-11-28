@@ -37,6 +37,9 @@ All notable changes to Wallwright are documented here. Format follows
 
 ### Fixed
 - The Dock menu no longer hangs and shows "Application Not Responding".
+- Scrolling a browse tab during a download stutters less. Progress now redraws only the
+  downloading card's progress bar, a few times a second at most, instead of the tab's grid on
+  every network callback, up to hundreds of times a second.
 - Picking from Recent Wallpapers no longer brings back a wallpaper as it was before a trim,
   crop or pin change.
 - "Other Application Playing Audio" no longer stops working after the wallpaper has been

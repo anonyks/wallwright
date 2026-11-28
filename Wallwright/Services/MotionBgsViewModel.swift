@@ -8,7 +8,8 @@ import Foundation
 @MainActor
 final class MotionBgsViewModel: ObservableObject {
     enum DownloadState: Equatable {
-        case downloading(Double?)
+        /// Its progress changes inside the object, without changing this state.
+        case downloading(DownloadProgress)
         case importing
         case completed
         case failed(String)
@@ -200,15 +201,16 @@ final class MotionBgsViewModel: ObservableObject {
         case .downloading, .importing: return
         default: break
         }
-        downloadState[item.id] = .downloading(nil)
+        let tracker = DownloadProgress()
+        downloadState[item.id] = .downloading(tracker)
         Task {
             do {
                 // motionbgs.com doesn't expose per-item quality availability in the listing, and
                 // not every item has a 4K encode — requesting "4k" for one of those 500s. Fall
                 // back to "hd" once rather than surfacing a dead-end error for something the user
                 // didn't do wrong.
-                let onProgress: (Double?) -> Void = { [weak self] progress in
-                    Task { @MainActor in self?.downloadState[item.id] = .downloading(progress) }
+                let onProgress: (Double?) -> Void = { progress in
+                    Task { @MainActor in tracker.update(progress) }
                 }
                 let localURL: URL
                 let tags: [String]?

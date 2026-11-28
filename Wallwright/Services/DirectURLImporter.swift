@@ -31,6 +31,30 @@ enum DirectURLImportError: LocalizedError {
     }
 }
 
+/// Decides which of a download's progress callbacks are worth showing. `URLSession` sends them
+/// far faster than a screen needs (measured 32 to 318 a second for a 17MB file), and every one
+/// shown rebuilds the browse grid it's in, which made scrolling during a download stutter.
+struct DownloadProgressThrottle {
+    static let minimumInterval: TimeInterval = 0.2
+
+    private var lastReport: TimeInterval?
+    private var lastPercent: Int?
+
+    /// `progress` is nil when the server gave no length. `time` is any steadily rising clock.
+    mutating func shouldReport(_ progress: Double?, at time: TimeInterval) -> Bool {
+        let percent = progress.map { Int($0 * 100) }
+        if let lastReport {
+            // Nothing new to show. Also covers an unknown length, which never changes.
+            guard percent != lastPercent else { return false }
+            // The finished state is shown at once; everything else waits its turn.
+            guard percent == 100 || time - lastReport >= Self.minimumInterval else { return false }
+        }
+        lastReport = time
+        lastPercent = percent
+        return true
+    }
+}
+
 enum DirectURLImporter {
     /// Downloads `url` to a fresh scratch directory, reporting progress as it goes (`nil` when the
     /// server didn't report a content length, so the caller shows an indeterminate spinner instead
@@ -55,6 +79,8 @@ enum DirectURLImporter {
     private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         let onProgress: (Double?) -> Void
         var continuation: CheckedContinuation<URL, Error>?
+        /// Only touched from the session's serial delegate queue.
+        private var throttle = DownloadProgressThrottle()
 
         init(onProgress: @escaping (Double?) -> Void) {
             self.onProgress = onProgress
@@ -64,7 +90,9 @@ enum DirectURLImporter {
             _ session: URLSession, downloadTask: URLSessionDownloadTask,
             didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
         ) {
-            onProgress(totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : nil)
+            let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : nil
+            guard throttle.shouldReport(progress, at: ProcessInfo.processInfo.systemUptime) else { return }
+            onProgress(progress)
         }
 
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {

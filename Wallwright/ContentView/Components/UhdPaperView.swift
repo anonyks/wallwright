@@ -131,12 +131,14 @@ struct UhdPaperView: SubviewOfContentView {
                     : (uhdPaperVM.items.isEmpty ? "No wallpapers found" : "Everything here is hidden")
             )
         } else {
+            // Once per redraw, not once per card: reading `visibleItems` filters the whole list.
+            let lastVisibleID = uhdPaperVM.visibleItems.last?.id
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 14)], spacing: 18) {
                     ForEach(uhdPaperVM.visibleItems) { item in
                         UhdPaperItemCard(item: item, viewModel: uhdPaperVM, downloadState: uhdPaperVM.downloadState[item.id])
                             .modifier(LoadMoreTrigger(
-                                isLast: item.id == uhdPaperVM.visibleItems.last?.id,
+                                isLast: item.id == lastVisibleID,
                                 visible: $loadMoreVisible,
                                 canLoad: !uhdPaperVM.isLoading,
                                 load: uhdPaperVM.loadNextPage
@@ -237,16 +239,7 @@ private struct UhdPaperItemCard: View {
     private var downloadControl: some View {
         switch downloadState {
         case .downloading(let progress):
-            VStack(alignment: .leading, spacing: 3) {
-                if let progress {
-                    ProgressView(value: progress)
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-            }
+            DownloadProgressView(progress: progress)
         case .importing:
             Label("Importing…", systemImage: "square.and.arrow.down")
                 .font(.caption)
