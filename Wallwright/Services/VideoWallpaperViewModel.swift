@@ -35,9 +35,21 @@ class VideoWallpaperViewModel: ObservableObject {
 
     private var pendingWallpaperChangeWorkItem: DispatchWorkItem?
 
+    var isWallpaperChangePending: Bool { pendingWallpaperChangeWorkItem != nil }
+
+    /// Scales the video the way the wallpaper on this screen asks for. Read from the shared model:
+    /// `currentWallpaper` isn't reassigned when only the scaling changes.
+    func applyVideoFit() {
+        let gravity = AppDelegate.shared.wallpaperViewModel.wallpaper(for: screenId).project
+            .fit(otherwise: AppDelegate.shared.globalSettingsViewModel.settings.videoFit).videoGravity
+        if let playerView, playerView.videoGravity != gravity { playerView.videoGravity = gravity }
+    }
+
     private func applyCurrentWallpaperChange() {
+        pendingWallpaperChangeWorkItem = nil
         didRetryCurrentItemAfterFailure = false
         swapInFreshItems()
+        applyVideoFit()
         // Force-apply rate and volume — replaceCurrentItem resets both players to paused.
         // Reads `AppDelegate.shared.wallpaperViewModel.playRate` (the global source of truth), not
         // `self.playRate` — same stale-mirror race documented on `seedInitialFrameIfStartingPaused`

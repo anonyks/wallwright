@@ -28,7 +28,8 @@ struct VideoWallpaperView: NSViewRepresentable {
         // Read once, here, not threaded through `updateNSView` — changing this setting triggers a
         // full `rebuildWallpaperWindows()` instead (see `GlobalSettingsViewModel`'s own
         // `didChangeVideoFitCancellable`), which recreates this view fresh with the new value.
-        view.videoGravity = AppDelegate.shared.globalSettingsViewModel.settings.videoFit.videoGravity
+        view.videoGravity = wallpaperViewModel.wallpaper(for: screenId).project
+            .fit(otherwise: AppDelegate.shared.globalSettingsViewModel.settings.videoFit).videoGravity
 
         // Backstop matching StaticImageWallpaperView's own layer background — without this, anything
         // not covered by the player layer (a frame swap, the brief gap before the first frame decodes)
@@ -69,8 +70,12 @@ struct VideoWallpaperView: NSViewRepresentable {
         // that gap while still skipping a rebuild on every unrelated re-render (playRate/playVolume
         // changes below don't touch `project` at all).
         if !selectedWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: currentWallpaper.wallpaperDirectory)
-            || selectedWallpaper.project != currentWallpaper.project {
+            || !selectedWallpaper.project.hasSameContent(as: currentWallpaper.project) {
             viewModel.currentWallpaper = selectedWallpaper
+        } else if !viewModel.isWallpaperChangePending {
+            // Only the scaling can differ here. While a new wallpaper is still loading, it gets
+            // its scaling when it's swapped in, not on the outgoing video.
+            viewModel.applyVideoFit()
         }
 
         viewModel.playRate = wallpaperViewModel.playRate

@@ -66,7 +66,7 @@ not just in the demo.
 - Menu bar controls for playback, volume, and system usage
 - Trim and crop editing, including auto-detection of black bars baked into a video
 - Tag, audio, media-type and color filtering in the library grid
-- Video Fit setting: Fill, Fit or Stretch
+- Video Fit (Fill, Fit or Stretch) for all wallpapers, or one at a time
 
 ## Scripting
 

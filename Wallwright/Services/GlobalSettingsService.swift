@@ -661,7 +661,7 @@ class GlobalSettingsViewModel: ObservableObject {
                 guard let wp = wallpapers[mainId] else { return }
                 guard lastMainWallpaper == nil
                     || !wp.wallpaperDirectory.isSameWallpaperDirectory(as: lastMainWallpaper!.wallpaperDirectory)
-                    || wp.project != lastMainWallpaper!.project
+                    || !wp.project.hasSameContent(as: lastMainWallpaper!.project)
                 else { return }
                 lastMainWallpaper = wp
                 self?.didCurrentWallpaperChange(wp)

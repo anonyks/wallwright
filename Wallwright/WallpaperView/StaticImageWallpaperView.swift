@@ -23,13 +23,6 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         let view = NSView()
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.black.cgColor
-        // Same `videoFit` General setting `VideoWallpaperView` reads (`GSVideoFit.contentsGravity`
-        // is the `CALayerContentsGravity` equivalent of its own `videoGravity`) — keeps switching
-        // between a video and image wallpaper on the same screen looking consistent, and changing
-        // the setting now affects both instead of just video. Read once, here, same reasoning as
-        // `VideoWallpaperView`: a change triggers `rebuildWallpaperWindows()` rather than being
-        // threaded through `updateNSView`.
-        view.layer?.contentsGravity = AppDelegate.shared.globalSettingsViewModel.settings.videoFit.contentsGravity
         updateWallpaper(view, context: context)
         return view
     }
@@ -43,9 +36,19 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         let url = wallpaper.wallpaperDirectory.appending(path: wallpaper.project.file)
         let coordinator = context.coordinator
 
+        // This wallpaper's own Video Fit, or the General setting (`contentsGravity` is the
+        // `CALayerContentsGravity` equivalent of the video view's `videoGravity`). A new image
+        // gets it together with its picture, below; a change of scaling alone applies right here.
+        let gravity = wallpaper.project
+            .fit(otherwise: AppDelegate.shared.globalSettingsViewModel.settings.videoFit).contentsGravity
+        coordinator.gravity = gravity
+
         // `updateNSView` can fire far more often than the wallpaper actually changes (any
         // unrelated SwiftUI re-render upstream) — only actually reload when the URL changed.
-        guard coordinator.lastURL != url else { return }
+        guard coordinator.lastURL != url else {
+            view.layer?.contentsGravity = gravity
+            return
+        }
         coordinator.lastURL = url
         coordinator.stopCycling()
 
@@ -64,6 +67,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
         coordinator.loadGeneration += 1
         let generation = coordinator.loadGeneration
         if wallpaper.project.isDynamicDesktop == true {
+            view.layer?.contentsGravity = gravity
             coordinator.startCycling(url: url, view: view, maxPixelSize: maxPixelSize)
         } else if let screen {
             // Decoded at the screen's own native pixel resolution, not the source's — confirmed
@@ -74,6 +78,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
                 let cgImage = ThumbnailDownsampler.decodedForScreen(at: url, screen: screen)
                 DispatchQueue.main.async {
                     guard let view, let coordinator, coordinator.loadGeneration == generation else { return }
+                    view.layer?.contentsGravity = coordinator.gravity
                     view.layer?.contents = cgImage
                 }
             }
@@ -82,6 +87,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
                 let image = NSImage(contentsOf: url)
                 DispatchQueue.main.async {
                     guard let view, let coordinator, coordinator.loadGeneration == generation else { return }
+                    view.layer?.contentsGravity = coordinator.gravity
                     view.layer?.contents = image
                 }
             }
@@ -92,6 +98,7 @@ struct StaticImageWallpaperView: NSViewRepresentable {
 
     final class Coordinator {
         var lastURL: URL?
+        var gravity: CALayerContentsGravity = .resizeAspectFill
         private var timer: Timer?
         private var lastFrameIndex: Int?
         private var appearanceObservation: NSKeyValueObservation?

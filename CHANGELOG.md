@@ -15,8 +15,9 @@ All notable changes to Wallwright are documented here. Format follows
   with a tinted white or near-black chosen against its most common color for contrast. Start,
   end and direction can be changed per wallpaper, with Reset to Auto to go back.
 - A color filter in the library's Filters sidebar.
-- Video Fit setting (Fill, Fit or Stretch) for video and image wallpapers. It applies to all
-  wallpapers.
+- Video Fit setting (Fill, Fit or Stretch) for video and image wallpapers. Settings sets it for
+  all wallpapers, and the library's details panel can give one wallpaper its own choice. Like
+  the general setting, it affects the desktop, not the lock screen.
 - New named-pipe commands: `status`, `palette`, `apply <title>`, `import <path>`, `toggle` and
   `togglemute`.
 - An optional `~/.config/wallwright/on_change.sh` script, run when the wallpaper changes with
@@ -35,6 +36,8 @@ All notable changes to Wallwright are documented here. Format follows
 
 ### Fixed
 - The Dock menu no longer hangs and shows "Application Not Responding".
+- Picking from Recent Wallpapers no longer brings back a wallpaper as it was before a trim,
+  crop or pin change.
 - "Other Application Playing Audio" no longer stops working after the wallpaper has been
   unmuted once, and a change to the rule takes effect right away.
 - A wallpaper paused because a window covered it is checked again as soon as it is visible,

@@ -129,6 +129,25 @@ struct WEProject: Codable, Equatable, Hashable {
     /// Nil/false means not pinned, same convention as the other optional flags on this type.
     var isPinned: Bool?
 
+    /// This wallpaper's own Video Fit, as a `GSVideoFit` raw value. Nil follows the General
+    /// setting. Stored as a string so a value this build doesn't know can't make the whole
+    /// project fail to decode.
+    var videoFit: String?
+
+    var videoFitOverride: GSVideoFit? { videoFit.flatMap(GSVideoFit.init(rawValue:)) }
+
+    /// How to scale this wallpaper: its own choice if it has one.
+    func fit(otherwise generalSetting: GSVideoFit) -> GSVideoFit { videoFitOverride ?? generalSetting }
+
+    /// Equal apart from how it's drawn. For places where a change means reloading the media,
+    /// which a change of scaling doesn't need.
+    func hasSameContent(as other: WEProject) -> Bool {
+        var lhs = self, rhs = other
+        lhs.videoFit = nil
+        rhs.videoFit = nil
+        return lhs == rhs
+    }
+
     /// "M:SS" formatted `videoDuration`, or nil if it hasn't been probed.
     var durationText: String? {
         guard let videoDuration, videoDuration.isFinite, videoDuration > 0 else { return nil }

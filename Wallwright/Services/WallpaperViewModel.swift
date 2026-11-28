@@ -90,6 +90,21 @@ class WallpaperViewModel: ObservableObject {
         }
     }
 
+    /// Puts an edited wallpaper everywhere a copy of it is kept: each screen showing it, and
+    /// Recent Wallpapers, which would otherwise bring the old settings back when picked.
+    func replaceCopies(of updated: WEWallpaper) {
+        for (screenId, screenWallpaper) in wallpapers
+        where screenWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: updated.wallpaperDirectory) {
+            wallpapers[screenId] = updated
+        }
+        if let index = recentWallpapers.firstIndex(where: {
+            $0.wallpaperDirectory.isSameWallpaperDirectory(as: updated.wallpaperDirectory)
+        }) {
+            recentWallpapers[index] = updated
+            saveRecents()
+        }
+    }
+
     func addToRecents(_ wallpaper: WEWallpaper) {
         guard wallpaper.project != .invalid else { return }
         recentWallpapers.removeAll { $0.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) }

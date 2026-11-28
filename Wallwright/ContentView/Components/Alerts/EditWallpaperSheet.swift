@@ -275,19 +275,10 @@ struct EditWallpaperSheet: SubviewOfContentView {
     private func propagateUpdatedProject(_ updated: WEProject) {
         let updatedWallpaper = WEWallpaper(using: updated, where: wallpaper.wallpaperDirectory)
         viewModel.hoveredWallpaper = updatedWallpaper
-        // Every screen currently showing this wallpaper needs the update, not just whichever one
-        // happens to be selected in the Settings UI — `wallpaperViewModel.wallpapers` is a per-screen
-        // dictionary (a real, reachable multi-monitor case: the same wallpaper assigned to two
-        // displays, or just a different screen selected in Display Settings than the one being
-        // edited here). This matters especially for a crop: `VideoCropDetector.crop`/
-        // `VideoImporter.applyCrop` always re-encodes to `.mp4`, and when the source was a
-        // different container (`.mov`), the original file is deleted outright (see `applyCrop`'s own
-        // doc comment) — a screen left pointing at the stale `WEProject` would still reference a
-        // filename that no longer exists on disk at all, not just outdated dimensions.
-        for (screenId, screenWallpaper) in wallpaperViewModel.wallpapers
-        where screenWallpaper.wallpaperDirectory.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory) {
-            wallpaperViewModel.wallpapers[screenId] = updatedWallpaper
-        }
+        // Every screen showing this wallpaper needs the update, not just the one selected in
+        // Display Settings. This matters most for a crop: it re-encodes to `.mp4` and, from a
+        // `.mov` source, deletes the original, so a stale copy would name a file that's gone.
+        wallpaperViewModel.replaceCopies(of: updatedWallpaper)
         // `updateWallpaperInPlace`, not `refresh()` — see its own doc comment: a full library
         // rescan here could race the background `project.json` write just below and read back
         // stale (pre-edit) content, silently reverting the edit that was just made.

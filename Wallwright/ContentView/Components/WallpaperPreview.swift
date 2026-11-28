@@ -341,6 +341,23 @@ struct WallpaperPreview: SubviewOfContentView {
                     default:
                         EmptyView()
                     }
+
+                    // This wallpaper only. "Default" follows Settings, shown in brackets.
+                    HStack {
+                        Label("Video Fit", systemImage: "arrow.up.left.and.arrow.down.right")
+                        Spacer()
+                        Picker("Video Fit", selection: Binding(
+                            get: { wallpaperViewModel.currentWallpaper.project.videoFitOverride },
+                            set: { viewModel.setVideoFit($0, for: wallpaperViewModel.currentWallpaper) }
+                        )) {
+                            Text("Default (\(globalSettingsViewModel.settings.videoFit.label))").tag(GSVideoFit?.none)
+                            ForEach(GSVideoFit.allCases) { fit in
+                                Text(fit.label).tag(GSVideoFit?.some(fit))
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                 }
                 .blur(radius: wallpaperViewModel.currentWallpaper.project == .invalid ? 16.0 : 0)
                 .overlay {
