@@ -185,9 +185,10 @@ final class AlphaCodersService {
             let rawKeywords = firstMatch(#"itemprop="keywords" content="([^"]+)""#, in: block) ?? ""
 
             let id = fullImageURL.deletingPathExtension().lastPathComponent
-            let title = (rawName ?? id).decodingHTMLEntities()
+            // Decoded twice: the site encodes these twice over ("NARUTO &amp;amp; KURAMA").
+            let title = (rawName ?? id).decodingHTMLEntities().decodingHTMLEntities()
             let tags = rawKeywords.components(separatedBy: ", ")
-                .map { $0.decodingHTMLEntities() }
+                .map { $0.decodingHTMLEntities().decodingHTMLEntities() }
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
 

@@ -90,6 +90,7 @@ enum DesktopHutError: LocalizedError {
     case httpError(Int)
     case parsingFailed
     case downloadLinkNotFound
+    case zipNotSupported
 
     var errorDescription: String? {
         switch self {
@@ -98,6 +99,7 @@ enum DesktopHutError: LocalizedError {
         case .httpError(let code): return "desktophut.com returned HTTP \(code)"
         case .parsingFailed: return "Could not parse the wallpaper list"
         case .downloadLinkNotFound: return "Couldn't find a download link on this wallpaper's page"
+        case .zipNotSupported: return "ZIP downloads aren't supported yet"
         }
     }
 }
@@ -228,21 +230,38 @@ final class DesktopHutService {
         }
     }
 
-    /// Extracts the direct download URL from a detail page — see this file's header comment for
-    /// why no token/obfuscation handling is needed here, unlike MoeWalls.
+    /// The address behind the detail page's own main download button. DesktopHut moved most files
+    /// to `media.desktophut.com`, which a pattern tied to `www` missed (2026-11-28: it matched 2
+    /// of 40 pages). About a quarter are offered as `.zip` instead of `.mp4`. See this file's
+    /// header for why no token or obfuscation handling is needed, unlike MoeWalls.
     static func parseDownloadURL(from html: String) -> URL? {
-        guard let regex = try? NSRegularExpression(pattern: #"href="(https://www\.desktophut\.com/files/[^"]+\.mp4)""#)
+        let button = firstCapture(#"(<a\s[^>]*\bid="primaryDownloadBtn"[^>]*>)"#, in: html)
+        // Without the button, any direct video link on DesktopHut's own file path.
+        let address = button.flatMap { firstCapture(#"\bhref="([^"]+)""#, in: $0) }
+            ?? firstCapture(#"href="(https://(?:www\.|media\.)?desktophut\.com/files/[^"]+\.mp4)""#, in: html)
+        // The address is the page's say-so, so only DesktopHut's own files are accepted.
+        guard let address, let url = URL(string: address.decodingHTMLEntities()),
+              url.scheme == "https", let host = url.host?.lowercased(),
+              host == "desktophut.com" || host.hasSuffix(".desktophut.com"),
+              url.path.hasPrefix("/files/")
         else { return nil }
-        let nsRange = NSRange(html.startIndex..<html.endIndex, in: html)
-        guard let match = regex.firstMatch(in: html, range: nsRange), let range = Range(match.range(at: 1), in: html)
+        return url
+    }
+
+    private static func firstCapture(_ pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text)),
+              let range = Range(match.range(at: 1), in: text)
         else { return nil }
-        return URL(string: String(html[range]))
+        return String(text[range])
     }
 
     /// Fetches an item's detail page and resolves its real download URL + tags.
     func resolveDownload(for item: DesktopHutItem) async throws -> (url: URL, tags: [String]) {
         let html = try await fetchHTML(item.detailURL)
         guard let downloadURL = Self.parseDownloadURL(from: html) else { throw DesktopHutError.downloadLinkNotFound }
+        // Said up front, rather than downloading a file the video import can only fail on.
+        guard downloadURL.pathExtension.lowercased() != "zip" else { throw DesktopHutError.zipNotSupported }
         return (downloadURL, Self.parseTags(from: html))
     }
 

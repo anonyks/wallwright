@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */; };
 		52086E7C07E84B37B2C12955 /* PinningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178A61B2E8014832A76A5E82 /* PinningTests.swift */; };
+		EE00000000000000000000A3 /* SourceParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE00000000000000000000A4 /* SourceParsingTests.swift */; };
 		EE000000000000000000009F /* DownloadProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE00000000000000000000A0 /* DownloadProgressTests.swift */; };
 		EE000000000000000000009D /* VideoFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000009E /* VideoFitTests.swift */; };
 		EE000000000000000000009B /* OtherAudioMonitoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000009C /* OtherAudioMonitoringTests.swift */; };
@@ -251,6 +252,7 @@
 		8451808CBF77573C401B3335 /* VideoCropDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoCropDetectorTests.swift; sourceTree = "<group>"; };
 		8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HotkeyTests.swift; sourceTree = "<group>"; };
 		178A61B2E8014832A76A5E82 /* PinningTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PinningTests.swift; sourceTree = "<group>"; };
+		EE00000000000000000000A4 /* SourceParsingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SourceParsingTests.swift; sourceTree = "<group>"; };
 		EE00000000000000000000A0 /* DownloadProgressTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DownloadProgressTests.swift; sourceTree = "<group>"; };
 		EE000000000000000000009E /* VideoFitTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VideoFitTests.swift; sourceTree = "<group>"; };
 		EE000000000000000000009C /* OtherAudioMonitoringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OtherAudioMonitoringTests.swift; sourceTree = "<group>"; };
@@ -708,6 +710,7 @@
 				3934E907F32A40A6458E4DB6 /* DynamicDesktopHEICTests.swift */,
 				8994815E3798B6E3ED8B3D85 /* HotkeyTests.swift */,
 				178A61B2E8014832A76A5E82 /* PinningTests.swift */,
+				EE00000000000000000000A4 /* SourceParsingTests.swift */,
 				EE00000000000000000000A0 /* DownloadProgressTests.swift */,
 				EE000000000000000000009E /* VideoFitTests.swift */,
 				EE000000000000000000009C /* OtherAudioMonitoringTests.swift */,
@@ -1010,6 +1013,7 @@
 				4870AB9A71A39A6C1DBA9DB2 /* DynamicDesktopHEICTests.swift in Sources */,
 				05EE43C51CC3E6E3425495C0 /* HotkeyTests.swift in Sources */,
 				52086E7C07E84B37B2C12955 /* PinningTests.swift in Sources */,
+				EE00000000000000000000A3 /* SourceParsingTests.swift in Sources */,
 				EE000000000000000000009F /* DownloadProgressTests.swift in Sources */,
 				EE000000000000000000009D /* VideoFitTests.swift in Sources */,
 				EE000000000000000000009B /* OtherAudioMonitoringTests.swift in Sources */,

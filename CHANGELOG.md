@@ -37,6 +37,9 @@ All notable changes to Wallwright are documented here. Format follows
 
 ### Fixed
 - The Dock menu no longer hangs and shows "Application Not Responding".
+- DesktopHut video downloads work again after the site changed its pages. Wallpapers it offers
+  only as `.zip` now say so instead of "Couldn't find a download link".
+- AlphaCoders titles and tags no longer show `&amp;` in place of `&`.
 - Scrolling a browse tab during a download stutters less. Progress now redraws only the
   downloading card's progress bar, a few times a second at most, instead of the tab's grid on
   every network callback, up to hundreds of times a second.
