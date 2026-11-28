@@ -55,8 +55,8 @@ not just in the demo.
 
 - Video wallpapers playing live on desktop, lock screen, and screensaver at once
 - Multi-display support with a per-screen wallpaper picker
-- Playlist rotation, pinning (right-click, or float pinned wallpapers to the top), and a
-  recent-wallpapers menu
+- Playlist rotation, pinning (right-click, or float pinned wallpapers to the top), adding all
+  pinned wallpapers to the playlist at once, and a recent-wallpapers menu
 - Drag-repositionable clock overlay with custom formats and gradients. Each wallpaper keeps its
   own clock setup, and the Custom color follows the wallpaper until you override it
 - Auto-pause on thermal pressure, low battery, fullscreen apps, or the display asleep, each its

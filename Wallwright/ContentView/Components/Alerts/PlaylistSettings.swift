@@ -87,6 +87,13 @@ struct PlaylistSettings: SubviewOfContentView {
                         .font(.headline)
                     Spacer()
                     Button {
+                        playlistViewModel.addWallpapers(pinnedNotInPlaylist)
+                    } label: {
+                        Label("Add Pinned", systemImage: "pin")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(pinnedNotInPlaylist.isEmpty)
+                    Button {
                         let selected = viewModel.selectedWallpaperItems()
                         playlistViewModel.addWallpapers(selected.map(\.wallpaperDirectory))
                         viewModel.clearSelection()
@@ -155,6 +162,19 @@ struct PlaylistSettings: SubviewOfContentView {
         }
         .padding(.horizontal, 40)
         .padding(.top, 20)
+    }
+
+    /// Every pinned wallpaper still missing from the playlist, by title. Taken from the whole
+    /// library, so the sidebar's filters don't change what gets added.
+    private var pinnedNotInPlaylist: [URL] {
+        viewModel.wallpapers
+            .filter { wallpaper in
+                wallpaper.isPinned && !playlistViewModel.playlist.itemDirectories.contains {
+                    $0.isSameWallpaperDirectory(as: wallpaper.wallpaperDirectory)
+                }
+            }
+            .sorted { $0.project.title.localizedStandardCompare($1.project.title) == .orderedAscending }
+            .map(\.wallpaperDirectory)
     }
 
     private func itemTitle(for directory: URL) -> String {

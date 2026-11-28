@@ -15,6 +15,7 @@ All notable changes to Wallwright are documented here. Format follows
   with a tinted white or near-black chosen against its most common color for contrast. Start,
   end and direction can be changed per wallpaper, with Reset to Auto to go back.
 - A color filter in the library's Filters sidebar.
+- Add Pinned in the Playlist panel adds every pinned wallpaper that isn't in the playlist yet.
 - Video Fit setting (Fill, Fit or Stretch) for video and image wallpapers. Settings sets it for
   all wallpapers, and the library's details panel can give one wallpaper its own choice. Like
   the general setting, it affects the desktop, not the lock screen.
